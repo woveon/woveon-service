@@ -11,5 +11,15 @@
     "url": "https://git-codecommit.us-east-1.amazonaws.com/v1/repos/woveon-service"
   },
   "author": "Chadwick Wingrave",
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "dependencies": {
+    "auto-bind-inheritance": "^1.0.6",
+    "express": "^4.16.3",
+    "node-fetch": "^2.1.2",
+    "uuid": "^3.2.1",
+    "woveon-logger": "0.0.5-a"
+  },
+  "devDependencies": {
+    "mocha": "^5.2.0"
+  }
 }

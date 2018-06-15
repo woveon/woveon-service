@@ -5,13 +5,14 @@ const autoBind      = require('auto-bind-inheritance');
 const CryptoJS      = require('crypto-js');
 const os            = require('os');
 const uuidv4        = require('uuid/v4');
+const Listener      = require('./src/listener');
+const Requester     = require('./src/requester');
 
 const Logger        = require('woveon-logger');
 
-const Listener      = require('./listener');
-const Requester     = require('./requester');
 
 module.exports = class Service {
+
 
   // ---------------------------------------------------------------------
   // overrides
@@ -77,7 +78,7 @@ module.exports = class Service {
     this.logger.aspect('service', ' Woveon Plugin Engine');
     this.logger.aspect('service', `  :: ${this.name}`);
     this.logger.aspect('service', '--------------------------------------------------------------------');
-    this.logger.aspect('service', `  config: `, JSON.stringify(_config));
+    this.logger.aspect('service', `  options: ${JSON.stringify(this._options)}`);
     this.logger.aspect('service', '---------------------------------------------------------------------');
 
     this.listener  = new Listener(this.config, this.logger, this._options.staticdir);
@@ -123,36 +124,22 @@ module.exports = class Service {
 
       // request ip calls the microservice that will call it, to verify this MS's ip address
       // this.logger.info('requestip : ', this._options.requestip, ' but skipping! for now, using network interface.');
-      // if ( this._options.requestip && this._options.requestip == true ) {
-      if ( false ) {
-        // get ip address from the WL TODO HERE
-        let RQ = new Requester(this.logger);
-        let result= await RQ.get(`${this.config.api.url}/api/v1/myip`);
-        this.logger.info('myip : ', result);
-        if ( result.success == true ) {
-          this.config.service.address = result.data;
-        } else {
-          this.logger.throwError('/myip failed. could not reach WL somehow?');
-        }
-      } else {
-
-        // get ip address from network interfaces (will return a local ip, so switching to asking WL)
-        let ifacess = os.networkInterfaces();
-        let ifaces = ifacess['eth0'] || ifacess['en0'] || ifacess['lo0']; // os.networkInterfaces()['eth0'];
-        if ( ifaces== null ) {
-          this.logger.info('interfaces:', os.networkInterfaces());
-          this.logger.throwError(`Can't find network interface 'eth0', 'en0' or 'lo0'.`);
-        }
-
-        let that = this;
-        ifaces.forEach(function(iface) {
-          if (that.config.service.family !== iface.family || iface.internal !== false) { // 'IPv4' most likely
-            // skip over internal (i.e. 127.0.0.1) and non-ipv4 addresses
-            return;
-          }
-          that.config.service.address = iface.address; // this.listener.server.address().address;
-        });
+      // get ip address from network interfaces (will return a local ip, so switching to asking WL)
+      let ifacess = os.networkInterfaces();
+      let ifaces = ifacess['eth0'] || ifacess['en0'] || ifacess['lo0']; // os.networkInterfaces()['eth0'];
+      if ( ifaces== null ) {
+        this.logger.info('interfaces:', os.networkInterfaces());
+        this.logger.throwError(`Can't find network interface 'eth0', 'en0' or 'lo0'.`);
       }
+
+      let that = this;
+      ifaces.forEach(function(iface) {
+        if (that.config.service.family !== iface.family || iface.internal !== false) { // 'IPv4' most likely
+          // skip over internal (i.e. 127.0.0.1) and non-ipv4 addresses
+          return;
+        }
+        that.config.service.address = iface.address; // this.listener.server.address().address;
+      });
       this.logger.verbose('service listening on non-internal IP address address: ', this.config.service.address);
 
       await this.onStartup();
@@ -325,3 +312,7 @@ module.exports = class Service {
     }
   };
 };
+
+module.exports.Listener  = Listener;
+module.exports.Requester = Requester;
+module.exports.Logger    = Logger;
