@@ -71,8 +71,10 @@ module.exports = class Service {
     this._options = _options;
     this.name     = this._options.name || _name;
     delete this._options.name; // only one location for name
+    this.internal_address = null;
+    this.external_address = null;
 
-    this.logger = this._options.logger || new Logger(this.name, {}, {'service' : {'color' : 'blue'}});
+    this.logger = this._options.logger || new Logger(this.name, {}, {'service' : {'color' : 'blue'}, 'showname' : true});
     this.logger.aspect('service', '---------------------------------------------------------------------');
     this.logger.aspect('service', '--------------------------------------------------------------------');
     this.logger.aspect('service', ' Woveon Plugin Engine');
@@ -81,7 +83,7 @@ module.exports = class Service {
     this.logger.aspect('service', `  options: ${JSON.stringify(this._options)}`);
     this.logger.aspect('service', '---------------------------------------------------------------------');
 
-    this.listener  = new Listener(this.config, this.logger, this._options.staticdir);
+    this.listener  = new Listener(this._options.port, this.logger, this._options.staticdir);
     this.logger.verbose(`...created service ${this.name}`);
   };
 
@@ -90,24 +92,14 @@ module.exports = class Service {
    * Initialize the service. Start adding your listener routes after this.
    */
   async init() {
-    this.logger.verbose('  ... start init service');
+    this.logger.aspect('service-levels', '  ... start init service');
 
-    /*
-    try {
-      await this.db.init(this.config.plugin.dburl);
-    } catch (err) {
-      console.log(err);
-      throw new Error('Failed to init datbase');
-      process.exit(1);
-    }
-    */
-
-    this.logger.verbose('  ... init listener');
+    this.logger.verbose('service-levels', '    ... init listener');
     await this.listener.init();
 
-    this.logger.verbose('  ... service init complete');
+    this.logger.aspect('service-levels', '    ... service init complete');
     await this.onInit();
-    this.logger.verbose('  ... service onInit complete');
+    this.logger.aspect('service-levels', '    ... service onInit complete');
   }
 
   /**
@@ -116,11 +108,13 @@ module.exports = class Service {
    */
   async startup() {
     try {
+      this.logger.aspect('service-levels', '  ... service startup');
       await this.listener.listen();
 
       this.logger.verbose('  ...startup: service listening on: ', JSON.stringify(this.listener.server.address()));
-      this.config.service.family  = this.listener.server.address().family;
-      this.config.service.port    = this.listener.server.address().port;
+      this.internal_address = this.listener.server.address(); // port and family
+      // this.family  = this.listener.server.address().family;
+      // this.port    = this.listener.server.address().port;
 
       // request ip calls the microservice that will call it, to verify this MS's ip address
       // this.logger.info('requestip : ', this._options.requestip, ' but skipping! for now, using network interface.');
@@ -128,19 +122,21 @@ module.exports = class Service {
       let ifacess = os.networkInterfaces();
       let ifaces = ifacess['eth0'] || ifacess['en0'] || ifacess['lo0']; // os.networkInterfaces()['eth0'];
       if ( ifaces== null ) {
-        this.logger.info('interfaces:', os.networkInterfaces());
+        this.logger.error('interfaces:', os.networkInterfaces());
         this.logger.throwError(`Can't find network interface 'eth0', 'en0' or 'lo0'.`);
       }
 
       let that = this;
       ifaces.forEach(function(iface) {
-        if (that.config.service.family !== iface.family || iface.internal !== false) { // 'IPv4' most likely
+        if (that.internal_address.family !== iface.family || iface.internal !== false) { // 'IPv4' most likely
           // skip over internal (i.e. 127.0.0.1) and non-ipv4 addresses
           return;
         }
-        that.config.service.address = iface.address; // this.listener.server.address().address;
+        that.external_address = iface.address; // this.listener.server.address().address;
+        that.logger.verbose('address from iface is:', iface.address);
       });
-      this.logger.verbose('service listening on non-internal IP address address: ', this.config.service.address);
+      this.logger.verbose('service listening on internal IP address address: ', this.internal_address);
+      this.logger.verbose('service listening on non-internal IP address address: ', this.external_address);
 
       await this.onStartup();
       await this.onPostStartup();
@@ -154,6 +150,7 @@ module.exports = class Service {
    * NOTE: Make sure your service already shut down anything it was managing in onShutdown.
    */
   async shutdown() {
+    this.logger.aspect('service-levels', '  ... service shutdown');
     await this.onShutdown();
     await this.db.close();
     await this.listener.close();
@@ -219,10 +216,8 @@ module.exports = class Service {
   /**
    * @return {string} -
     */
-  static generateToken() {
-    let retval = uuidv4();
-    return retval;
-  }
+  static generateToken() { return uuidv4(); }
+
 
   /**
    * Used to generate tokens. Uses upperalpha/number chars.
@@ -230,14 +225,7 @@ module.exports = class Service {
    * @return {string} - random length string
    */
   static generateRandomString(length = 20) {
-    let text = '';
-    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-
-    for (let i = 0; i < length; i += 1) {
-      text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-
-    return text;
+    return CryptoJS.randomBytes(length).toString('hex');
   };
 
 
@@ -265,52 +253,33 @@ module.exports = class Service {
 
 
   /**
-   * Helper function to encrypt data for storage in database. Uses a key stored in the
-   * container's configuration, passed in via environment variables.
-   * @param {*} _config -
+   * Decrypt data with AES, using a salted key.
+   * @param {*} _saltedkey -
    * @param {*} _secret - Content string to encrypt
    * @return {string} - _secret decrypted to UTF8 string
    */
-  static decrypt(_config, _secret) {
-    let decryptedBytes = CryptoJS.AES.decrypt(_secret, _config.plugin.data_secret);
+  static decrypt(_saltedkey, _secret) {
+    let decryptedBytes = CryptoJS.AES.decrypt(_secret, _saltedkey);
     let plaintext = decryptedBytes.toString(CryptoJS.enc.Utf8);
     return JSON.parse(plaintext);
   }
 
 
   /**
-   * Encrypt data with AES, salted and using a plugin-wide secret key, stored in the
-   * container's configuration, passed in via environment variables.
-   * @param {*} _config -
+   * Encrypt data with AES, using a salted key.
+   * @param {*} _saltedkey -
    * @param {*} _secret - Thing to encrypt. UTF8, bytes, etc. JSON.stringify don't care.
    * @return {object} - call toString() on the object to get the string
    */
-  static encrypt(_config, _secret) {
+  static encrypt(_saltedkey, _secret) {
     let retval = null;
     try {
-      let result = CryptoJS.AES.encrypt(JSON.stringify(_secret), _config.plugin.data_secret);
+      let result = CryptoJS.AES.encrypt(JSON.stringify(_secret), _saltedkey);
       retval = result.toString();
     } catch (e) {console.log(e); throw new Error('Failed to encrypt.');}
     return retval;
   }
 
-
-  /**
-   * Helper function to validate. Really need to have a plan for config and its validation.
-   * @param {*} _config
-   * @param {*} _logger
-   */
-  static _validateConfig(_config, _logger) {
-//    _logger.info('config: ', _config);
-    let confcheck = doConfigCheck(_config);
-    if ( confcheck.valid == false ) {
-      _logger.error('Config Validation Errors:\n', confcheck.errors);
-      _logger.info(_config);
-      throw new Error('Bad configuration');
-    } else if ( _config.app.url.slice(-1) != '/' ) {
-        throw new Error('app.url needs to end in "/"');
-    }
-  };
 };
 
 module.exports.Listener  = Listener;

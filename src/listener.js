@@ -16,10 +16,10 @@ module.exports = class Listener {
    */
   constructor(_port, _logger, _staticdir = null) {
     this.port        = _port;
+    this.server      = null; // set on listen
     this.logger      = _logger;
     this.staticdir   = _staticdir; // this is a relative path, appended to process.cwd()+'/'
     this.app         = null;
-    this.server      = null; // set on listen
     this.islistening = false;
   };
 
@@ -30,7 +30,6 @@ module.exports = class Listener {
 
     if (this.app) {await this.close();}
 
-    let that = this;
 
     this.logger.verbose('  ... listener init');
     this.app = express();
@@ -46,8 +45,10 @@ module.exports = class Listener {
     this.app.use(bodyParser.urlencoded({extended : true, limit : '50mb'}));
 
     this.logger.verbose('  ... listener configure routes');
-    this.app.all('*', (req, res, next) => {
-      that.logger.aspect('listener', `*** Incoming (port ${that.service.port}): `+
+    let that = this;
+    this.app.all('*', function(req, res, next) {
+      // I think this works because shifted to function
+      that.logger.aspect('listener', `*** Incoming (port ${that.port}): `+
         `'${req.originalUrl}' '${req.method}' from: '${req.ip}'`);
 
       // that.logger.verbose(req.params,req.query,req.body);
@@ -78,18 +79,19 @@ module.exports = class Listener {
       // cap with a final error listener
       this.islistening = true;
       this.app.all('*', (req, res) => {
-        this.logger.warn(`Failed to match '${req.method}' '${req.originalUrl}' ${this.service.port}`);
+        this.logger.warn(`Failed to match '${req.method}' '${req.originalUrl}' ${this.port}`);
         res.status(404).json({success : false, data : null});
       });
 
       this.server = this.app.listen(this.port, '0.0.0.0', () => {
-        this.service.port = this.server.address().port;
-        this.service.address = this.server.address().address;
-        this.logger.info(`  ... listener listening on port :${this.service.port} `);
+        // this.service.port = this.server.address().port;
+        this.address = this.server.address().address;
+        this.logger.info(`  ... listener listening on port: ${this.port} `);
         resolve();
       })
         .on('error', (err) => {
-          this.logger.error(`Listener failed starting on port : ${this.service.port}`);
+          this.logger.info('3');
+          this.logger.error(`Listener failed starting on port : ${this.port}`);
           reject(err);
         });
     });
@@ -122,14 +124,14 @@ module.exports = class Listener {
    */
   async responseHandler(_route, _method, _mfilename, _args, _res) {
     this.logger.verbose(`...listener heard route: ${_route} ${_method}`);
-    let fn = _mfilename.split(this.logger.options.trimTo+'/')[1] || _mfilename;
-    this.logger.aspect('listener', `  --- handling : '${_route}' with: '${fn}${_method.name}' :`, _args);
+    let fn = this.logger.trimpath(_mfilename, this.logger.options.trimTo); // _mfilename.split(this.logger.options.trimTo+'/')[1] || _mfilename;
+    this.logger.aspect('listener-incoming', `Handling : '${_route}' with: '${fn}::${_method.name}' :`, _args);
     let result = {success : false};
 
     try {
       result.data    = await _method(_args, _res);
       result.success = true;
-      this.logger.aspect('listener', '  --- result: ', result);
+      this.logger.aspect('listener-result', '  ... result: ', result);
 
       // Check if response has been sent (or redirect(which requires a 302 status code))
       if (! _res.headersSent) {_res.json(result);}
