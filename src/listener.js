@@ -153,7 +153,7 @@ module.exports = class Listener {
   async onGet(_route, _method, _mfilename) {
     if ( this.islistening ) {this.logger.throwError(`calling Listener.onGet ${_route} when already listening.`);}
     if ( this.app == null ) {this.logger.throwError('failed to call init() on this listener.');}
-    this.logger.aspect('listener', `onGet   : ${_route}`);
+    this.logger.aspect('listener-route', `onGet   : ${_route}`);
     this.app.get(_route, (req, res) => {
       this.responseHandler(_route, _method, _mfilename, Object.assign(req.query, req.params), res);
     });
@@ -169,7 +169,7 @@ module.exports = class Listener {
   async onPost(_route, _method, _mfilename ) {
     if ( this.islistening ) {this.logger.throwError(`calling Listener.onPost ${_route} when already listening.`);}
     if ( this.app == null ) {this.throwError('failed to call init() on this listener.');}
-    this.logger.aspect('listener', `onPost  : ${_route}`);
+    this.logger.aspect('listener-route', `onPost  : ${_route}`);
     this.app.post(_route, (req, res) => {
       this.responseHandler(_route, _method, _mfilename,
         Object.assign(req.query, req.params, req.body, req.files), res );
@@ -186,7 +186,7 @@ module.exports = class Listener {
   async onPut(_route, _method, _mfilename) {
     if ( this.islistening ) {this.logger.throwError(`calling Listener.onPut ${_route} when already listening.`);}
     if ( this.app == null ) {this.logger.throwError('failed to call init() on this listener.');}
-    this.logger.aspect('listener', `onPut   : ${_route} ${_mfilename}`);
+    this.logger.aspect('listener-route', `onPut   : ${_route} ${_mfilename}`);
     this.app.put(_route, (req, res) =>
       this.responseHandler(_route, _method, _mfilename,
         Object.assign(req.query, req.params, req.body, req.files), res));
@@ -201,7 +201,7 @@ module.exports = class Listener {
   async onDelete(_route, _method, _mfilename) {
     if ( this.islistening ) {this.logger.throwError(`calling Listener.onDelete ${_route} when already listening.`);}
     if ( this.app == null ) {this.logger.throwError('failed to call init() on this listener.');}
-    this.logger.aspect('listener', `onDelete: ${_route} ${_mfilename}`);
+    this.logger.aspect('listener-route', `onDelete: ${_route} ${_mfilename}`);
     this.app.delete(_route, (req, res) =>
       this.responseHandler(_route, _method, _mfilename,
         Object.assign(req.query, req.params, req.body, req.files), res));

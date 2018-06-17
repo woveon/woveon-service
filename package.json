@@ -20,6 +20,7 @@
     "woveon-logger": "0.0.5-a"
   },
   "devDependencies": {
-    "mocha": "^5.2.0"
+    "mocha": "^5.2.0",
+    "chai": "^4.1.2"
   }
 }
