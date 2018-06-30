@@ -110,6 +110,78 @@ module.exports = class Listener {
 
 
   /**
+   * @param {object} _req -
+   * @param {object} _res -
+   * @param {object} _attr -
+   * @param {object} _val -
+   */
+  checkBodyAttribute(_args, _res, _attr, _val) {
+    let attrs = _attr;
+    let emsg  = '';
+    if ( ! Array.isArray(attrs) )  attrs = [_attr];
+
+    for (let i=0; i<attrs.length; i++) {
+      if ( _args[attrs[i]] === undefined ) {
+        emsg+= ` ${args[i]}`;
+      }
+    }
+
+    if ( emsg != '' ) {
+      let retobj = this.retError(new Error('missing attributes:'+emsg),
+        'Missing Attribute');
+      _res.status(retobj.code).json(retobj);
+    }
+  }
+
+
+  /**
+   * Route succeeded.
+   * @param {object}  _data - returned object
+   * @return {object} - res object for sender
+   */
+  retSuccess(_data) {
+    return {
+      success : true,
+      code    : 200,
+      data    : _data,
+    };
+  }
+
+
+  /**
+   * Route had error in performing its function. NOTE: not a system level error
+   * @param {object}  _data - returned object
+   * @param {string}   _msg - message describing the failure
+   * @return {object} - res object for sender
+   */
+  retError(_data, _msg='General Error') {
+    return {
+      success : false,
+      code    : 200,
+      data    : _data,
+      msg     : _msg,
+    };
+  }
+
+
+  /**
+   * Route had system failure.
+   * @param {object}  _data - returned object
+   * @param {integer} _code - http response code
+   * @param {string}   _msg - message describing the failure
+   * @return {object} - res object for sender
+   */
+  retFail(_data, _code=400, _msg='Failure') {
+    return {
+      success : false,
+      code    : _code,
+      data    : _data,
+      msg     : _msg,
+    };
+  }
+
+
+  /**
    * Helper function for listening, to standardize returns.
    *
    * This returns an object { success : <bool>, data : ... }. Success just means the call completed. It
@@ -128,18 +200,26 @@ module.exports = class Listener {
     this.logger.aspect('listener-incoming', `Handling : '${_route}' with: '${fn}::${_method.name}' :`, _args);
     let result = {success : false};
 
+    // call method and return result
     try {
-      result.data    = await _method(_args, _res);
-      result.success = true;
-      this.logger.aspect('listener-result', '  ... result: ', result);
+      result = await _method(_args, _res);
+      if ( !( r.success && r.code && r.data ) ) {
+        this.logger.error('Yo, method did not return proper object...'+
+                          'call retSucces, retFail or retError');
+      }
 
-      // Check if response has been sent (or redirect(which requires a 302 status code))
+      this.logger.aspect('listener-result', '  ... result: ', result);
+      _res.status(result.code);
+      delete result.code;
       if (! _res.headersSent) {_res.json(result);}
+        // --- Check if response has been sent
+        //     (or redirect(which requires a 302 status code))
+
     } catch (error) {
       this.logger.warn(error);
-      result.error   = `${error}`;
+      if ( process.env.WOV_STAGE != 'prod' ) result.error   = `${error}`;
       this.logger.warn(result);
-      _res.json(result);
+      _res.status(400).json(result);
     }
   }
 
