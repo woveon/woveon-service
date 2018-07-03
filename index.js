@@ -9,6 +9,9 @@ const Listener      = require('./src/listener');
 const Requester     = require('./src/requester');
 
 const Logger        = require('woveon-logger');
+const ModelLoader   = require('./src/modelloader');
+
+
 
 
 module.exports = class Service {
@@ -44,14 +47,17 @@ module.exports = class Service {
    * Called after child's onShutdown, when shutdown was started by the service.
    * NOTE: Call child's onShutdown first, since this is a virtual destructor.
   */
-  async onShutdown() {};
+  async onShutdown() {
+  };
 
 
   /**
    * For now, just return true.
    * @return {bool} - true, since still running
    */
-  async onHealth() {return true;};
+  async onHealth() {
+    return this.listener.retSuccess(true);
+  };
 
   // ---------------------------------------------------------------------
   // /overrides
@@ -83,7 +89,13 @@ module.exports = class Service {
     this.logger.aspect('service', `  options: ${JSON.stringify(this._options)}`);
     this.logger.aspect('service', '---------------------------------------------------------------------');
 
-    this.listener  = new Listener(this._options.port, this.logger, this._options.staticdir);
+    this.listener  = new Listener(
+      this._options.port, 
+      this.logger, 
+      this._options.staticdir,
+      `/${this.name.toLowerCase()}/${this._options.ver}`,
+    );
+
     this.logger.verbose(`...created service ${this.name}`);
   };
 
@@ -282,6 +294,7 @@ module.exports = class Service {
 
 };
 
-module.exports.Listener  = Listener;
-module.exports.Requester = Requester;
-module.exports.Logger    = Logger;
+module.exports.Listener    = Listener;
+module.exports.Requester   = Requester;
+module.exports.Logger      = Logger;
+module.exports.ModelLoader = ModelLoader;

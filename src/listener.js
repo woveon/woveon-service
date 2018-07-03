@@ -13,14 +13,16 @@ module.exports = class Listener {
    * @param {integer} _port - port to listen on
    * @param {*} _logger -
    * @param {*} _staticdir - static content to display, if not null
+   * @param {string} _root - Route root... ex. '/api/v1'
    */
-  constructor(_port, _logger, _staticdir = null) {
+  constructor(_port, _logger, _staticdir = null, _root='') {
     this.port        = _port;
     this.server      = null; // set on listen
     this.logger      = _logger;
     this.staticdir   = _staticdir; // this is a relative path, appended to process.cwd()+'/'
     this.app         = null;
     this.islistening = false;
+    this.root        = _root;     
   };
 
   /**
@@ -129,7 +131,9 @@ module.exports = class Listener {
     if ( emsg != '' ) {
       let retobj = this.retError(new Error('missing attributes:'+emsg),
         'Missing Attribute');
-      _res.status(retobj.code).json(retobj);
+      let code = retobj.code;
+      delete retobj.code;
+      _res.status(code).json(retobj);
     }
   }
 
@@ -188,7 +192,7 @@ module.exports = class Listener {
    * could have completed in failure, but taht will be shown in the data attribute.
    *
    * NOTE: Not responding on error with error codes?
-   * @param {*} _route
+   * @param {string} _route - full route
    * @param {*} _method
    * @param {string} _mfilename - name of method's file
    * @param {*} _args
@@ -197,18 +201,21 @@ module.exports = class Listener {
   async responseHandler(_route, _method, _mfilename, _args, _res) {
     this.logger.verbose(`...listener heard route: ${_route} ${_method}`);
     let fn = this.logger.trimpath(_mfilename, this.logger.options.trimTo); // _mfilename.split(this.logger.options.trimTo+'/')[1] || _mfilename;
-    this.logger.aspect('listener-incoming', `Handling : '${_route}' with: '${fn}::${_method.name}' :`, _args);
+    this.logger.h1('listener.incoming').aspect('listener.incoming', `Handling : '${_route}' with: '${fn}::${_method.name}' :`, _args);
     let result = {success : false};
 
     // call method and return result
     try {
       result = await _method(_args, _res);
-      if ( !( r.success && r.code && r.data ) ) {
-        this.logger.error('Yo, method did not return proper object...'+
-                          'call retSucces, retFail or retError');
+      if ( !( result &&
+              result.success !== undefined &&
+              result.code !== undefined  &&
+              result.data !== undefined ) ) {
+        this.logger.throwError('Yo, method did not return proper object...'+
+                          'call retSucces, retFail or retError\nmethod: ', _method, '\n : in', _mfilename);
       }
 
-      this.logger.aspect('listener-result', '  ... result: ', result);
+      this.logger.aspect('listener.result', '  ... result: ', result);
       _res.status(result.code);
       delete result.code;
       if (! _res.headersSent) {_res.json(result);}
@@ -216,6 +223,7 @@ module.exports = class Listener {
         //     (or redirect(which requires a 302 status code))
 
     } catch (error) {
+      console.log(error);
       this.logger.warn(error);
       if ( process.env.WOV_STAGE != 'prod' ) result.error   = `${error}`;
       this.logger.warn(result);
@@ -226,32 +234,34 @@ module.exports = class Listener {
 
   /**
    * RESTFUL GET route managed with method.
-   * @param {*} _route
-   * @param {*} _method - method to call
+   * @param {string} _route - partial route, appended to this.root
+   * @param {function} _method - method to call
    * @param {string} _mfilename - name of method's file
    */
   async onGet(_route, _method, _mfilename) {
-    if ( this.islistening ) {this.logger.throwError(`calling Listener.onGet ${_route} when already listening.`);}
+    let rr = this.root + _route;
+    if ( this.islistening ) {this.logger.throwError(`calling Listener.onGet "${rr}" when already listening.`);}
     if ( this.app == null ) {this.logger.throwError('failed to call init() on this listener.');}
-    this.logger.aspect('listener-route', `onGet   : ${_route}`);
-    this.app.get(_route, (req, res) => {
-      this.responseHandler(_route, _method, _mfilename, Object.assign(req.query, req.params), res);
+    this.logger.aspect('listener.route', `onGet   : ${rr}`);
+    this.app.get(rr, (req, res) => {
+      this.responseHandler(rr, _method, _mfilename, Object.assign(req.query, req.params), res);
     });
   }
 
 
   /**
    * RESTFUL POST route managed with method.
-   * @param {*} _route
-   * @param {*} _method
+   * @param {string} _route - partial route, appended to this.root
+   * @param {function} _method - method to call
    * @param {string} _mfilename - name of method's file
    */
   async onPost(_route, _method, _mfilename ) {
-    if ( this.islistening ) {this.logger.throwError(`calling Listener.onPost ${_route} when already listening.`);}
+    let rr = this.root + _route;
+    if ( this.islistening ) {this.logger.throwError(`calling Listener.onPost ${rr} when already listening.`);}
     if ( this.app == null ) {this.throwError('failed to call init() on this listener.');}
-    this.logger.aspect('listener-route', `onPost  : ${_route}`);
-    this.app.post(_route, (req, res) => {
-      this.responseHandler(_route, _method, _mfilename,
+    this.logger.aspect('listener.route', `onPost  : ${rr}`);
+    this.app.post(rr, (req, res) => {
+      this.responseHandler(rr, _method, _mfilename,
         Object.assign(req.query, req.params, req.body, req.files), res );
     });
   };
@@ -259,31 +269,33 @@ module.exports = class Listener {
 
   /**
    * RESTFUL PUT route managed with method.
-   * @param {*} _route
-   * @param {*} _method
+   * @param {string} _route - partial route, appended to this.root
+   * @param {function} _method - method to call
    * @param {string} _mfilename - name of method's file
    */
   async onPut(_route, _method, _mfilename) {
-    if ( this.islistening ) {this.logger.throwError(`calling Listener.onPut ${_route} when already listening.`);}
+    let rr = this.root + _route;
+    if ( this.islistening ) {this.logger.throwError(`calling Listener.onPut ${rr} when already listening.`);}
     if ( this.app == null ) {this.logger.throwError('failed to call init() on this listener.');}
-    this.logger.aspect('listener-route', `onPut   : ${_route} ${_mfilename}`);
-    this.app.put(_route, (req, res) =>
-      this.responseHandler(_route, _method, _mfilename,
+    this.logger.aspect('listener.route', `onPut   : ${rr} ${_mfilename}`);
+    this.app.put(rr, (req, res) =>
+      this.responseHandler(rr, _method, _mfilename,
         Object.assign(req.query, req.params, req.body, req.files), res));
   }
 
   /**
    * RESTFUL DELETE route managed with method.
-   * @param {*} _route
-   * @param {*} _method
+   * @param {string} _route - partial route, appended to this.root
+   * @param {function} _method - method to call
    * @param {string} _mfilename - name of method's file
    */
   async onDelete(_route, _method, _mfilename) {
-    if ( this.islistening ) {this.logger.throwError(`calling Listener.onDelete ${_route} when already listening.`);}
+    let rr = this.root + _route;
+    if ( this.islistening ) {this.logger.throwError(`calling Listener.onDelete ${rr} when already listening.`);}
     if ( this.app == null ) {this.logger.throwError('failed to call init() on this listener.');}
-    this.logger.aspect('listener-route', `onDelete: ${_route} ${_mfilename}`);
-    this.app.delete(_route, (req, res) =>
-      this.responseHandler(_route, _method, _mfilename,
+    this.logger.aspect('listener.route', `onDelete: ${rr} ${_mfilename}`);
+    this.app.delete(rr, (req, res) =>
+      this.responseHandler(rr, _method, _mfilename,
         Object.assign(req.query, req.params, req.body, req.files), res));
   }
 
