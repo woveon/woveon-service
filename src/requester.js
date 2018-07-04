@@ -65,7 +65,7 @@ module.exports = class Requester {
    */
   async get(url, headers, _rawresult = false) {
     // let fullurl = (this._baseurl ? this._baseurl+url: url);
-    return this.request(url, 'get', headers, _rawresult);
+    return this.request(url, 'get', headers, null, _rawresult);
   }
 
 
