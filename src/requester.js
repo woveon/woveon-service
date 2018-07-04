@@ -43,12 +43,14 @@ module.exports = class Requester {
     this.logger.aspect('requester', `requester '${_method}' '${fullurl}' '${JSON.stringify(_body)}'`);
     let r = null;
 
-    r = await fetch(fullurl, {
+    let fetchoptions = {
       method  : _method,
       headers : Object.assign(this.headerbase, _headers),
-      body    : _body ? JSON.stringify(_body) : '',
-    })
-    .catch( (err) => {this.logger.error(err); throw err;});
+    };
+    if ( _body != null ) fetchoptions.body = (_body ? JSON.stringify(_body) : '');
+
+    r = await fetch(fullurl, fetchoptions)
+      .catch( (err) => {this.logger.error(err); throw err;});
 
     if ( _rawresult) retval = r;
     else {retval = await r.json(); retval.status = r.status;}
@@ -60,7 +62,7 @@ module.exports = class Requester {
    * RESTFUL Get
    * @param {*} url -
    * @param {*} headers -
-   * @param {*} _rawresult - should this return the data or the result object
+   * @param {*} _rawresult - should this retunull, null, rn the data or the result object
    * @return {promise}
    */
   async get(url, headers, _rawresult = false) {
