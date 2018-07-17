@@ -112,12 +112,16 @@ module.exports = class Listener {
 
 
   /**
+   * This checks that the passed in args have the _attr... val skipped for now.
+   *
    * @param {object} _args -
    * @param {object} _res -
    * @param {object} _attr -
    * @param {object} _val - unused at the moment
+   * @return {string} - names of missing attributes, '' on success
    */
   checkBodyAttribute(_args, _res, _attr, _val) {
+    let retval = 'Failed';
     let attrs = _attr;
     let emsg  = '';
     if ( ! Array.isArray(attrs) )  attrs = [_attr];
@@ -135,6 +139,11 @@ module.exports = class Listener {
       delete retobj.code;
       _res.status(code).json(retobj).end();
     }
+
+    if ( emsg == '' ) retval = null;
+    else retval = emsg;
+
+    return retval;
   }
 
 
