@@ -22,7 +22,7 @@ module.exports = class Listener {
     this.staticdir   = _staticdir; // this is a relative path, appended to process.cwd()+'/'
     this.app         = null;
     this.islistening = false;
-    this.root        = _root;     
+    this.root        = _root;
   };
 
   /**
@@ -127,10 +127,11 @@ module.exports = class Listener {
 
     for (let i=0; i<attrs.length; i++) {
       if ( _args[attrs[i]] === undefined ) {
-        emsg+= ` ${_args[i]}`;
+        emsg+= ` ${attrs[i]}`;
       }
     }
 
+    console.log('checkBodyAtribure "', emsg, '"');
     if ( emsg == '' ) {
       retval = null;
     } else {
