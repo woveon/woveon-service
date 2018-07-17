@@ -112,10 +112,10 @@ module.exports = class Listener {
 
 
   /**
-   * @param {object} _req -
+   * @param {object} _args -
    * @param {object} _res -
    * @param {object} _attr -
-   * @param {object} _val -
+   * @param {object} _val - unused at the moment
    */
   checkBodyAttribute(_args, _res, _attr, _val) {
     let attrs = _attr;
@@ -124,7 +124,7 @@ module.exports = class Listener {
 
     for (let i=0; i<attrs.length; i++) {
       if ( _args[attrs[i]] === undefined ) {
-        emsg+= ` ${args[i]}`;
+        emsg+= ` ${_args[i]}`;
       }
     }
 
@@ -133,7 +133,7 @@ module.exports = class Listener {
         'Missing Attribute');
       let code = retobj.code;
       delete retobj.code;
-      _res.status(code).json(retobj);
+      _res.status(code).json(retobj).end();
     }
   }
 
