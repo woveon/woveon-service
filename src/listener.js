@@ -115,13 +115,12 @@ module.exports = class Listener {
    * This checks that the passed in args have the _attr... val skipped for now.
    *
    * @param {object} _args -
-   * @param {object} _res -
    * @param {object} _attr -
    * @param {object} _val - unused at the moment
-   * @return {string} - names of missing attributes, '' on success
+   * @return {Error} - Error or null
    */
-  checkBodyAttribute(_args, _res, _attr, _val) {
-    let retval = 'Failed';
+  checkBodyAttribute(_args, _attr, _val) {
+    let retval = new Error('Unknown'); // start in error state
     let attrs = _attr;
     let emsg  = '';
     if ( ! Array.isArray(attrs) )  attrs = [_attr];
@@ -132,16 +131,15 @@ module.exports = class Listener {
       }
     }
 
-    if ( emsg != '' ) {
-      let retobj = this.retError(new Error('missing attributes:'+emsg),
-        'Missing Attribute');
-      let code = retobj.code;
-      delete retobj.code;
-      _res.status(code).json(retobj).end();
+    if ( emsg == '' ) {
+      retval = null;
+    } else {
+      retval = new Error('missing attributes:'+emsg);
+      // let retobj = this.retError(new Error('missing attributes:'+emsg), 'Missing Attribute');
+      // let code = retobj.code;
+      // delete retobj.code;
+      // _res.status(code).json(retobj).end();
     }
-
-    if ( emsg == '' ) retval = null;
-    else retval = emsg;
 
     return retval;
   }
