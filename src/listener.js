@@ -4,6 +4,25 @@ const path       = require('path');
 
 
 /**
+ * Created a class so I can do 'instanceof WovReturn'
+ */
+class WovReturn {
+
+  /**
+   * Create the object, just a container for data.
+   *
+   * @param {object} _data - success, code, data, msg
+   */
+  constructor(_data) {
+    this.success = _data.success;
+    this.code    = _data.code;
+    this.data    = _data.data;
+    this.msg     = _data.msg || null;
+  }
+};
+
+
+/**
  * Class that manages RESTFUL listening via ExpressJS.
  */
 module.exports = class Listener {
@@ -23,6 +42,7 @@ module.exports = class Listener {
     this.app         = null;
     this.islistening = false;
     this.root        = _root;
+    this.openroute   = null;
   };
 
   /**
@@ -131,7 +151,7 @@ module.exports = class Listener {
       }
     }
 
-    console.log('checkBodyAtribure "', emsg, '"');
+    // console.log('checkBodyAtribure "', emsg, '"');
     if ( emsg == '' ) {
       retval = null;
     } else {
@@ -152,11 +172,11 @@ module.exports = class Listener {
    * @return {object} - res object for sender
    */
   retSuccess(_data) {
-    return {
+    return new WovReturn({
       success : true,
       code    : 200,
       data    : _data,
-    };
+    });
   }
 
 
@@ -167,12 +187,12 @@ module.exports = class Listener {
    * @return {object} - res object for sender
    */
   retError(_data, _msg='General Error') {
-    return {
+    return new WovReturn({
       success : false,
       code    : 200,
       data    : _data,
       msg     : _msg,
-    };
+    });
   }
 
 
@@ -184,12 +204,12 @@ module.exports = class Listener {
    * @return {object} - res object for sender
    */
   retFail(_data, _code=400, _msg='Failure') {
-    return {
+    return new WovReturn({
       success : false,
       code    : _code,
       data    : _data,
       msg     : _msg,
-    };
+    });
   }
 
 
@@ -241,6 +261,37 @@ module.exports = class Listener {
 
 
   /**
+   * This 'protects' a route you pass in, selected from root, and any variables you
+   * return in _method are then passed to your regular leaf function.
+   *
+   *   ex. /user/:sessionid/widgets/:widgetid  - use onRoute('/user/:sessionid') to
+   *       make calls to databases to see if session is valid, then return userid
+   *       so the leaf method can lookup and see if user can access that widget.
+   *
+   * NOTE: vals stored in _req.wov.
+   */
+  async onRoute(_route, _method) {
+    this.app.use(_route, async function(_req, _res, next) {
+      let args = Object.assign(_req.query, _req.params, _req.body, _req.files, _req.wov);
+      let result = await _method(args, _res);
+
+      if ( result instanceof WovReturn ) {
+        _res.status(result.code);
+        delete result.code;
+        if (! _res.headersSent) {_res.json(result);}
+        return next(result);
+      } else if ( result instanceof Error ) {
+        this.logger.throwError(result);
+      } else {
+        // add in params
+        _req.wov = Object.assign({}, _req.wov, result);
+      }
+      return next();
+    }.bind(this));
+  }
+
+
+  /**
    * RESTFUL GET route managed with method.
    * @param {string} _route - partial route, appended to this.root
    * @param {function} _method - method to call
@@ -248,11 +299,13 @@ module.exports = class Listener {
    */
   async onGet(_route, _method, _mfilename) {
     let rr = this.root + _route;
+
     if ( this.islistening ) {this.logger.throwError(`calling Listener.onGet "${rr}" when already listening.`);}
     if ( this.app == null ) {this.logger.throwError('failed to call init() on this listener.');}
     this.logger.aspect('listener.route', `onGet   : ${rr}`);
+
     this.app.get(rr, (req, res) => {
-      this.responseHandler(rr, _method, _mfilename, Object.assign(req.query, req.params), res);
+      this.responseHandler(rr, _method, _mfilename, Object.assign(req.query, req.params, req.wov), res);
     });
   }
 
@@ -270,7 +323,7 @@ module.exports = class Listener {
     this.logger.aspect('listener.route', `onPost  : ${rr}`);
     this.app.post(rr, (req, res) => {
       this.responseHandler(rr, _method, _mfilename,
-        Object.assign(req.query, req.params, req.body, req.files), res );
+        Object.assign(req.query, req.params, req.body, req.files, req.wov), res );
     });
   };
 
@@ -288,7 +341,7 @@ module.exports = class Listener {
     this.logger.aspect('listener.route', `onPut   : ${rr} ${_mfilename}`);
     this.app.put(rr, (req, res) =>
       this.responseHandler(rr, _method, _mfilename,
-        Object.assign(req.query, req.params, req.body, req.files), res));
+        Object.assign(req.query, req.params, req.body, req.files, req.wov), res));
   }
 
   /**
@@ -304,7 +357,8 @@ module.exports = class Listener {
     this.logger.aspect('listener.route', `onDelete: ${rr} ${_mfilename}`);
     this.app.delete(rr, (req, res) =>
       this.responseHandler(rr, _method, _mfilename,
-        Object.assign(req.query, req.params, req.body, req.files), res));
+        Object.assign(req.query, req.params, req.body, req.files, req.wov), res));
   }
 
 };
+
