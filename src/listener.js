@@ -17,7 +17,8 @@ class WovReturn {
     this.success = _data.success;
     this.code    = _data.code;
     this.data    = _data.data;
-    this.msg     = _data.msg || null;
+    this.msg     = _data.msg;
+    if (this.msg == null ) delete this.msg;
   }
 };
 
@@ -271,6 +272,7 @@ module.exports = class Listener {
    * NOTE: vals stored in _req.wov.
    */
   async onRoute(_route, _method) {
+    this.logger.aspect('listener.route', `onRoute : ${_route}`);
     this.app.use(_route, async function(_req, _res, next) {
       let args = Object.assign(_req.query, _req.params, _req.body, _req.files, _req.wov);
       let result = await _method(args, _res);
