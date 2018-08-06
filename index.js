@@ -71,7 +71,7 @@ module.exports = class Service {
    *                     : name - overwrite the _name
    *                     : logger - pass in a logger
    */
-  constructor(_name, _options = {name : '', port : 80, logger : null,  staticdir : null}) {
+  constructor(_name, _options = {name : '', port : 80, logger : null,  staticdir : null, baseroute : null}) {
     autoBind(this);
 
     this._options = _options;
@@ -83,17 +83,23 @@ module.exports = class Service {
     this.logger = this._options.logger || new Logger(this.name, {}, {'service' : {'color' : 'blue'}, 'showname' : true});
     this.logger.aspect('service', '---------------------------------------------------------------------');
     this.logger.aspect('service', '--------------------------------------------------------------------');
-    this.logger.aspect('service', ' Woveon Plugin Engine');
+    this.logger.aspect('service', ' Woveon Service');
     this.logger.aspect('service', `  :: ${this.name}`);
     this.logger.aspect('service', '--------------------------------------------------------------------');
     this.logger.aspect('service', `  options: ${JSON.stringify(this._options)}`);
     this.logger.aspect('service', '---------------------------------------------------------------------');
 
+    // default route is /service/ver, when baseroute is null
+    this.logger.info('Base route is :', this._options.baseroute, _options);
+    if ( this._options.baseroute == null ) {
+      this._options.baseroute = `/${this.name.toLowerCase()}/${this._options.ver}`;
+    }
+
     this.listener  = new Listener(
-      this._options.port, 
-      this.logger, 
+      this._options.port,
+      this.logger,
       this._options.staticdir,
-      `/${this.name.toLowerCase()}/${this._options.ver}`,
+      this._options.baseroute,
     );
 
     this.logger.verbose(`...created service ${this.name}`);
@@ -164,7 +170,7 @@ module.exports = class Service {
   async shutdown() {
     this.logger.aspect('service-levels', '  ... service shutdown');
     await this.onShutdown();
-    await this.db.close();
+    if ( this.db ) await this.db.close();
     await this.listener.close();
     // wtf.dump();
 //    setTimeout(()=>{wtf.dump();}, 3000); // log running things

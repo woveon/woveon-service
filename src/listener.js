@@ -138,9 +138,9 @@ module.exports = class Listener {
    * @param {object} _args -
    * @param {object} _attr -
    * @param {object} _val - unused at the moment
-   * @return {Error} - Error or null
+   * @return {Error/retError} - null on success or Error/retError depending on _retError
    */
-  checkBodyAttribute(_args, _attr, _val) {
+  checkBodyAttribute(_args, _attr, _val, _retRawError= true) {
     let retval = new Error('Unknown'); // start in error state
     let attrs = _attr;
     let emsg  = '';
@@ -156,11 +156,10 @@ module.exports = class Listener {
     if ( emsg == '' ) {
       retval = null;
     } else {
-      retval = new Error('missing attributes:'+emsg);
-      // let retobj = this.retError(new Error('missing attributes:'+emsg), 'Missing Attribute');
-      // let code = retobj.code;
-      // delete retobj.code;
-      // _res.status(code).json(retobj).end();
+      retval = new Error('Missing attribute:'+emsg);
+      if ( _retRawError == false ) {
+        retval = this.retError({args: _args, attr: _attr}, retval.message);
+      }
     }
 
     return retval;
@@ -230,18 +229,19 @@ module.exports = class Listener {
   async responseHandler(_route, _method, _mfilename, _args, _res) {
     this.logger.verbose(`...listener heard route: ${_route} ${_method}`);
     let fn = this.logger.trimpath(_mfilename, this.logger.options.trimTo); // _mfilename.split(this.logger.options.trimTo+'/')[1] || _mfilename;
-    this.logger.h1('listener.incoming').aspect('listener.incoming', `Handling : '${_route}' with: '${fn}::${_method.name}' :`, _args);
+    this.logger.aspect('listener.incoming', `Handling : '${_route}' with: '${fn}::${_method.name}' :`, _args);
     let result = {success : false};
 
     // call method and return result
     try {
       result = await _method(_args, _res);
-      if ( !( result &&
-              result.success !== undefined &&
-              result.code !== undefined  &&
-              result.data !== undefined ) ) {
-        this.logger.throwError('Yo, method did not return proper object...'+
-                          'call retSucces, retFail or retError\nmethod: ', _method, '\n : in', _mfilename);
+      if ( ! result instanceof WovReturn ) {
+        this.logger.throwError(
+          'Method did not return WovReturn object. Call retSucces, retFail or retError\n'+
+          '  result  : ', JSON.stringify(result, null, '  '), '\n'+
+          '  @route  : ', _route, '\n'+
+          '  @method : ', _method, '\n'+
+          '  @file   : ', _mfilename);
       }
 
       this.logger.aspect('listener.result', '  ... result: ', result);

@@ -36,8 +36,9 @@ module.exports = class Requester {
    * @param {bool} _rawresult - should this return the data or the result object
    * @return {promise} - a Promise that returns the result.
    */
-  async request(_url, _method, _headers, _body, _rawresult = false) {
+  async request(_url, _method, _headers, _body, _rawresult = false, _throwOnError = false) {
     let retval = null;
+    let fetchfail = false;
     this.logger.verbose(` url '${_url}'  baseurl '${this._baseurl}'`);
     let fullurl = (this._baseurl ? this._baseurl+_url: _url);
     this.logger.aspect('requester', `requester '${_method}' '${fullurl}' '${JSON.stringify(_body)}'`);
@@ -50,10 +51,19 @@ module.exports = class Requester {
     if ( _body != null ) fetchoptions.body = (_body ? JSON.stringify(_body) : '');
 
     r = await fetch(fullurl, fetchoptions)
-      .catch( (err) => {this.logger.error(err); throw err;});
+      .catch( (err) => {
+        this.logger.error(err);
+        if ( _throwOnError ) {
+          throw err;
+        } else fetchfail = err.message;
+      });
 
-    if ( _rawresult) retval = r;
-    else {retval = await r.json(); retval.status = r.status;}
+    if ( fetchfail != false ) {
+      retval = {success : false, status : 400, data : fetchfail};
+    } else {
+      if ( _rawresult) retval = r;
+      else {retval = await r.json(); retval.status = r.status;}
+    }
     return retval;
   }
 
