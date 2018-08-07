@@ -5,13 +5,11 @@ const autoBind      = require('auto-bind-inheritance');
 const CryptoJS      = require('crypto-js');
 const os            = require('os');
 const uuidv4        = require('uuid/v4');
-const Listener      = require('./src/listener');
-const Requester     = require('./src/requester');
+const Listener      = require('./listener');
+const Requester     = require('./requester');
 
 const Logger        = require('woveon-logger');
-const ModelLoader   = require('./src/modelloader');
-
-
+const ModelLoader   = require('./modelloader');
 
 
 module.exports = class Service {
@@ -90,7 +88,7 @@ module.exports = class Service {
     this.logger.aspect('service', '---------------------------------------------------------------------');
 
     // default route is /service/ver, when baseroute is null
-    this.logger.info('Base route is :', this._options.baseroute, _options);
+    // this.logger.info('Base route is :', this._options.baseroute, _options);
     if ( this._options.baseroute == null ) {
       this._options.baseroute = `/${this.name.toLowerCase()}/${this._options.ver}`;
     }

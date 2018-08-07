@@ -44,7 +44,20 @@ module.exports = class Listener {
     this.islistening = false;
     this.root        = _root;
     this.openroute   = null;
+    this.externalapp = false;
   };
+
+
+  /**
+   * Latch on to an existing express app.
+   */
+  async initWithApp(_app) {
+    this.externalapp = true;
+    if (this.app) {await this.close();}
+    this.app = _app;
+    this.logger.verbose('  ... listener inited with external app, assuming is listening');
+  }
+
 
   /**
    * Create and config the listening app.
@@ -95,8 +108,9 @@ module.exports = class Listener {
    */
   async listen() {
 
-    // this.logger.info('Listener called listen()'); console.trace();
+    if ( this.externalapp == true ) { this.islistening = true; return Promise.resolve();}
 
+    // this.logger.info('Listener called listen()'); console.trace();
     return new Promise((resolve, reject) => {
 
       // cap with a final error listener
@@ -140,7 +154,7 @@ module.exports = class Listener {
    * @param {object} _val - unused at the moment
    * @return {Error/retError} - null on success or Error/retError depending on _retError
    */
-  checkBodyAttribute(_args, _attr, _val, _retRawError= true) {
+  checkBodyAttribute(_args, _attr, _val, _retRawError= false) {
     let retval = new Error('Unknown'); // start in error state
     let attrs = _attr;
     let emsg  = '';
@@ -363,4 +377,6 @@ module.exports = class Listener {
   }
 
 };
+
+module.exports.WovReturn = WovReturn;
 
