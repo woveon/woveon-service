@@ -1,6 +1,7 @@
 const express    = require('express');
 const bodyParser = require('body-parser');
 const path       = require('path');
+const Handlebars = require('Handlebars');
 
 
 /**
@@ -34,8 +35,9 @@ module.exports = class Listener {
    * @param {*} _logger -
    * @param {*} _staticdir - static content to display, if not null
    * @param {string} _root - Route root... ex. '/api/v1'
+   * @param {string} _name - Name of this listener (or its parent microservice)
    */
-  constructor(_port, _logger, _staticdir = null, _root='') {
+  constructor(_port, _logger, _staticdir = null, _root='', _name = null) {
     this.port        = _port;
     this.server      = null; // set on listen
     this.logger      = _logger;
@@ -45,6 +47,12 @@ module.exports = class Listener {
     this.root        = _root;
     this.openroute   = null;
     this.externalapp = false;
+    this.name        = _name;
+
+    this.docs        = {};
+    this.views       = {};
+    this.templateNode = null;
+    this.verbs = ['get', 'post', 'put', 'delete'];
   };
 
 
@@ -108,7 +116,17 @@ module.exports = class Listener {
    */
   async listen() {
 
-    if ( this.externalapp == true ) { this.islistening = true; return Promise.resolve();}
+    this.logger.info('listen :: resolveDocs');
+    try {
+      this._resolveDocs();
+    } catch (e) {
+      console.log(e);
+      console.trace();
+      throw new Error('failed to resolve Docs');
+    }
+    this.logger.info('2listen :: resolveDocs');
+
+    if ( this.externalapp == true ) {this.islistening = true; return Promise.resolve();}
 
     // this.logger.info('Listener called listen()'); console.trace();
     return new Promise((resolve, reject) => {
@@ -172,7 +190,7 @@ module.exports = class Listener {
     } else {
       retval = new Error('Missing attribute:'+emsg);
       if ( _retRawError == false ) {
-        retval = this.retError({args: _args, attr: _attr}, retval.message);
+        retval = this.retError({args : _args, attr : _attr}, retval.message);
       }
     }
 
@@ -235,12 +253,14 @@ module.exports = class Listener {
    *
    * NOTE: Not responding on error with error codes?
    * @param {string} _route - full route
-   * @param {*} _method
+   * @param {*} _method - a function that returns WovReturn, or an object/value, with success assumed
    * @param {string} _mfilename - name of method's file
    * @param {*} _args
    * @param {*} _res
+   * @param {object} _options - further instructions to this handler
    */
-  async responseHandler(_route, _method, _mfilename, _args, _res) {
+  async responseHandler(_route, _method, _mfilename, _args, _res, _options = {}) {
+    this.logger.info('asdfadsfadf: ', _route);
     this.logger.verbose(`...listener heard route: ${_route} ${_method}`);
     let fn = this.logger.trimpath(_mfilename, this.logger.options.trimTo); // _mfilename.split(this.logger.options.trimTo+'/')[1] || _mfilename;
     this.logger.aspect('listener.incoming', `Handling : '${_route}' with: '${fn}::${_method.name}' :`, _args);
@@ -248,14 +268,26 @@ module.exports = class Listener {
 
     // call method and return result
     try {
-      result = await _method(_args, _res);
-      if ( ! result instanceof WovReturn ) {
+      if ( typeof _method === 'function' ) {
+        result = await _method(_args, _res);
+      } else {
+        this.logger.info('jus data', _method);
+        result = this.retSuccess(_method);
+      }
+
+      if ( result == null || (! result instanceof WovReturn) ) {
         this.logger.throwError(
           'Method did not return WovReturn object. Call retSucces, retFail or retError\n'+
           '  result  : ', JSON.stringify(result, null, '  '), '\n'+
           '  @route  : ', _route, '\n'+
           '  @method : ', _method, '\n'+
           '  @file   : ', _mfilename);
+      }
+
+      // perform any additional actions, based upon _options
+      if ( _options.addRoute == true ) {
+        this.logger.info('adding route : ', _route);
+        result.data.route = _route;
       }
 
       this.logger.aspect('listener.result', '  ... result: ', result);
@@ -312,9 +344,12 @@ module.exports = class Listener {
    * @param {string} _route - partial route, appended to this.root
    * @param {function} _method - method to call
    * @param {string} _mfilename - name of method's file
+   * @param {Docmethod} _docMethod - documentation of this method
    */
-  async onGet(_route, _method, _mfilename) {
+  async onGet(_route, _method, _mfilename, _docMethod = null) {
+    if ( _mfilename == null ) {this.logger.throwError('Need to append "__filename" to listener function.');}
     let rr = this.root + _route;
+    this.onDoc(rr, _docMethod, 'get');
 
     if ( this.islistening ) {this.logger.throwError(`calling Listener.onGet "${rr}" when already listening.`);}
     if ( this.app == null ) {this.logger.throwError('failed to call init() on this listener.');}
@@ -331,9 +366,13 @@ module.exports = class Listener {
    * @param {string} _route - partial route, appended to this.root
    * @param {function} _method - method to call
    * @param {string} _mfilename - name of method's file
+   * @param {Docmethod} _docMethod - documentation of this method
    */
-  async onPost(_route, _method, _mfilename ) {
+  async onPost(_route, _method, _mfilename, _docMethod = null ) {
+    if ( _mfilename == null ) {this.logger.throwError('Need to append "__filename" to listener function.');}
     let rr = this.root + _route;
+    this.onDoc(rr, _docMethod, 'post');
+
     if ( this.islistening ) {this.logger.throwError(`calling Listener.onPost ${rr} when already listening.`);}
     if ( this.app == null ) {this.throwError('failed to call init() on this listener.');}
     this.logger.aspect('listener.route', `onPost  : ${rr}`);
@@ -349,9 +388,13 @@ module.exports = class Listener {
    * @param {string} _route - partial route, appended to this.root
    * @param {function} _method - method to call
    * @param {string} _mfilename - name of method's file
+   * @param {Docmethod} _docMethod - documentation of this method
    */
-  async onPut(_route, _method, _mfilename) {
+  async onPut(_route, _method, _mfilename, _docMethod = null) {
+    if ( _mfilename == null ) {this.logger.throwError('Need to append "__filename" to listener function.');}
     let rr = this.root + _route;
+    this.onDoc(rr, _docMethod, 'put');
+
     if ( this.islistening ) {this.logger.throwError(`calling Listener.onPut ${rr} when already listening.`);}
     if ( this.app == null ) {this.logger.throwError('failed to call init() on this listener.');}
     this.logger.aspect('listener.route', `onPut   : ${rr} ${_mfilename}`);
@@ -365,9 +408,13 @@ module.exports = class Listener {
    * @param {string} _route - partial route, appended to this.root
    * @param {function} _method - method to call
    * @param {string} _mfilename - name of method's file
+   * @param {Docmethod} _docMethod - documentation of this method
    */
-  async onDelete(_route, _method, _mfilename) {
+  async onDelete(_route, _method, _mfilename, _docMethod = null) {
+    if ( _mfilename == null ) {this.logger.throwError('Need to append "__filename" to listener function.');}
     let rr = this.root + _route;
+    this.onDoc(rr, _docMethod, 'delete');
+
     if ( this.islistening ) {this.logger.throwError(`calling Listener.onDelete ${rr} when already listening.`);}
     if ( this.app == null ) {this.logger.throwError('failed to call init() on this listener.');}
     this.logger.aspect('listener.route', `onDelete: ${rr} ${_mfilename}`);
@@ -376,7 +423,452 @@ module.exports = class Listener {
         Object.assign(req.query, req.params, req.body, req.files, req.wov), res));
   }
 
+
+  /**
+   * Take the DocPath objects in this.docs and turn in to html to be served.
+   */
+  _resolveDocs() {
+    if ( this.islistening ) {this.logger.throwError(`calling Listener.onDoc "${rr}" when already listening.`);}
+    if ( this.app == null ) {this.logger.info('here'); this.logger.throwError('failed to call init() on this listener.');}
+
+    let cur = this.docs;
+    let innerhtml = this._resolveDocNode(cur, ''); // create a page for each
+    // this.logger.info('innerhtml2: ', innerhtml);
+    this._renderDocOverview(innerhtml);            // create the overview
+  }
+
+
+  /**
+   * @param {object} _cur - a node of this.docs
+   * @param {string} _curpath - current route leading to this _cur node
+   * @return {string} - endpoints
+   */
+  _resolveDocNode(_cur, _curpath) {
+    let retval = '';
+    let endpointTemplate = `
+<div>
+  <div>{{#if hasPage}}<a href='{{docroute}}'>{{/if}}{{route}} - {{#each vlist}}{{this}} {{/each}}{{#if hasPage}}</a>{{/if}}
+  {{#if summary}}
+  <div style='margin-left: 15px'><i>{{summary}}</i></div>
+  {{/if}}
+</div>
+`;
+    let compiledTemplate = Handlebars.compile(endpointTemplate);
+
+    this.logger.info(`_resolveDocNode: ${_curpath}`);
+
+    // build the end node path with all the verbs
+    if ( _cur.hasOwnProperty('base') ) {
+      let node = _cur['base'];
+      let dataOverview = {
+        route    : this.root+_curpath,
+        docroute : this.root+'/doc'+_curpath,
+      };
+      if (node == null) {
+        node = new DocPath({
+          route   : _curpath,
+          summary : '',
+          desc    : '',
+          methods : {},
+          params  : [],
+        }).options;
+      } else {
+        dataOverview.hasPage = true; // has has path page, then link
+      }
+      if ( node.summary ) dataOverview.summary = node.summary;
+
+      let vlist = [];
+      for (let vi in this.verbs ) {
+        if ( _cur.hasOwnProperty(this.verbs[vi]) ) {
+          let verb = this.verbs[vi];
+          vlist.push(verb);
+          this.logger.info(' -- has proerpty ', verb, ' ',  _cur.hasOwnProperty(verb) );
+
+          if ( node.methods[verb] != null ) {
+            if ( _cur[verb] != null ) {
+              this.logger.warn(`Two definitions: Conflict ${_curpath} - ${verb}.`);
+              node.methods[verb] = _cur[verb];
+              dataOverview.hasPage = true; // has verb path page, then link
+            } else {
+              // do nothing. _cur[verb] is null, just holding place, letting us know a route existed
+              // this.logger.info(` -- ${_curpath} : no doc for route ${verb}`);
+            }
+          } else {
+            if ( _cur[verb] != null ) {
+              // this.logger.info(` -- ${_curpath} : adding ${verb}`);
+              node.methods[verb] = _cur[verb];
+              dataOverview.hasPage = true; // has verb path page, then link
+            } else {
+              // this.logger.info(` -- ${_curpath} : creating ${verb}`);
+              node.methods[verb] = new DocMethod({
+                summary   : null,
+                desc      : null,
+                docs      : [],
+                params    : [],
+                responses : {},
+              }).options;
+              // dataOverview.hasPage = true; // has verb path page, then link
+            }
+          }
+        }
+      }
+
+      // add  line to the overview page
+      dataOverview.vlist = vlist;
+      let r = compiledTemplate(dataOverview);
+      // this.logger.info(' - ', r);
+      retval += r;
+
+      this.logger.info(`${_curpath} PATH: `, node);
+      this._renderEndpoint(_curpath, node);
+    }
+
+    // continue searching for endnodes
+    for (let k in _cur) {
+      if ( _cur.hasOwnProperty(k) ) {
+        // this.logger.info(` --- trying k: ${k}`);
+        let r = _cur[k];
+
+        // console.log('  ', verbs.indexOf(k) != -1);
+        // console.log('  ', k=='base'? 'T':'F');
+
+        if ( !(this.verbs.indexOf(k) != -1 || k == 'base') ) {
+          if ( typeof r == 'object' ) {
+            let rr = this._resolveDocNode(r, _curpath + '/' + k);
+//            this.logger.info(' -- ', rr);
+            retval += rr;
+          } else {
+            this.logger.info(` what is this??? `, k, r);
+            console.trace();
+          }
+        }
+      }
+    }
+
+    return retval;
+  }
+
+
+  /**
+   * Renders a list of endpoints and links to detailed documentation on an endpoint.
+   * @param {string} _innerhtml - html of all the endpoints previously rendered
+   */
+  _renderDocOverview(_innerhtml) {
+    let rawTemplateBody= `
+<html>
+<head>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+</head>
+<body>
+
+
+<div class='container'>
+  <h1>{{name}} - Documentation</h1>
+  {{{innerhtml}}}
+</div>
+
+  <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+</body>
+</html>
+ `;
+
+    // compile handlebars template (and cache it)
+    let templateBody   = Handlebars.compile(rawTemplateBody);
+
+    let bodyhtml = templateBody({innerhtml : _innerhtml, name : this.name});
+    // this.logger.info('innerhtml = ', _innerhtml);
+    // this.logger.info('bodyhtml = ', bodyhtml);
+    this.app.get(this.root + '/doc', async (req, res) => {res.send(bodyhtml);});
+  }
+
+  /**
+   * This documents an endpoint, to return when the endpoint is reached.
+   *
+   * @param {string} _route - path to get to endpoint
+   * @param {object} _node - node containg data of the endpoing, all methods
+   */
+  _renderEndpoint(_route, _node) {
+    let rr = this.root + '/doc' + _route;
+
+    // create static html
+    this.logger.aspect('listener.route', `onDoc   : ${rr} - GET`);
+
+    // Templates for Handlebars
+    let hPath = `
+<html>
+<head>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+</head>
+<body>
+
+<div class='container'>
+  <div><a href='${this.root}/doc' class='btn btn-primary'>back</a></div>
+
+  <h1>{{route}}</h1>
+
+  <blockquote>{{summary}}</blockquote>
+
+  <p><strong>Description</strong>: {{desc}}</p>
+
+  {{#if docs}}
+  <div class='wov-docs'>
+  {{#each docs}}
+    <dt>Document: <a href="{{link}}" target="_blank">{{title}}</a></dt>
+    <dd>{{description}}</dd>
+  {{/each}}
+  </div> <!-- end wov-docs -->
+  {{/if}}
+
+  {{#if params}}
+  <div class='container-params'>
+  {{#each params}}
+    <dt>Param: {{name}}{{#if in}} - in {{in}}{{/if}}{{#if required}}<strong> (required)</strong><br />{{/if}}</dt>
+    <dd>{{desc}}</dd>
+  {{/each}}
+  </div>
+  {{/if}}
+
+  <div class='container container-methods'>
+    {{#each methods}}
+    <div>
+
+      <h2 style='text-transform: uppercase;'>{{@key}}</h2>
+      <p><i>{{summary}}</i></p>
+      {{#if desc}}<p><strong>Description</strong>: {{desc}}</p>{{/if}}
+
+      {{#if docs}}
+      <div class='wov-docs'>
+      {{#each docs}}
+        <dt>Document: <a href="{{link}}" target="_blank">{{title}}</a></dt>
+        <dd>{{description}}</dd>
+      {{/each}}
+      </div> <!-- end wov-docs -->
+      {{/if}}
+
+      {{#if params}}
+      <div class='wov-params'>
+      {{#each params}}
+        <dt>Parameter: {{name}}{{#if in}} - in {{in}}{{/if}}{{#if required}}<strong> (required)</strong><br />{{/if}}</dt>
+        <dd>{{desc}}</dd>
+      {{/each}}
+      </div> <!-- ends wov-params -->
+      {{/if}}
+
+      {{#if responses}}
+      <div>
+      {{#each responses}}
+        <div><strong>{{@key}} Response</strong>: {{desc}}</div>
+      {{/each}}
+      </div>
+      {{/if}}
+
+    </div> <!-- ends method -->
+    {{/each}}
+  </div> <!-- ends container-methods -->
+
+  <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+
+</body>
+</html>
+`;
+
+    // compile handlebars template (and cache it)
+    if ( this.templateNode == null ) this.templateNode   = Handlebars.compile(hPath);
+
+    let nodehtml = this.templateNode(_node);
+    this.app.get(rr, async (req, res) => {res.send(nodehtml);});
+  }
+  /*
+    // get data
+    / *
+    let d = null;
+    if (typeof _doc === 'function') {
+      d = await _doc(Object.assign(req.query, req.params, req.wov));
+    } else d = {data : _doc};
+    * /
+    _doc.route = rr;
+
+    // callback for data object
+    this.app.report(rr, (req, res) => {
+      let dd = d;
+      this.logger.info('hit callback: ', rr);
+      this.responseHandler(rr, dd, _mfilename,
+        Object.assign(req.query, req.params, req.wov), res, {addRoute : true});
+    });
+
+
+      this._addDocRoute(rr, null, v);
+
+      // normal response
+      res.status(200);
+      res.send(v);
+      res.end();
+    });
+  }
+  */
+
+
+  /**
+   * Break up the _route into objects, and store the _docdata at that point in this.docs.
+   * If _docdata is null, then at least we know that the route exists, tho undocumented.
+   *
+   * @param {string} _route - rest path
+   * @param {object} _docdata -  follows teh DocPath or DocMethod schema, based upon _httpverb
+   * @param {string} _httpverb - http verb, or null for Path documentation
+   */
+  onDoc(_route, _docdata, _httpverb = null) {
+    this.logger.info('onDoc ', _route,  _httpverb, ': ', _docdata);
+
+    if ( !(_httpverb == null || this.verbs.indexOf(_httpverb) != -1) ) {
+      this.logger.throwError(`Unknown http verb '${_httpverb}'.`);
+      process.exit(1);
+    }
+
+    let paths = _route.split('/');
+    let cur = this.docs;
+
+    console.log('paths: ', paths, '  from ', _route);
+
+    for (let i=1; i<paths.length; i++) {
+      let p = paths[i];
+      // console.log(`  p: '${p}'    cur: ${Object.keys(cur)}`);
+      if ( ! (p in cur) ) {
+        // console.log(`  --- add '${p}'`);
+        cur[p] = {};
+      }
+      cur = cur[p];
+      // console.log('  cur now ', cur);
+    }
+
+
+    if ( _httpverb == null ) {
+      console.log('base :', _route);
+      if ( _docdata != null ) _docdata.route = _route;
+      cur['base'] = _docdata;
+    } else {
+      console.log(_httpverb+' :', _route);
+      cur[_httpverb] = _docdata;
+      if ( cur['base'] == undefined ) cur['base'] = null;
+    }
+
+    console.log('thedocs: ', JSON.stringify(this.docs, null, '  '));
+  }
+
+
 };
 
+
+/**
+ */
+class DocPath {
+
+  /**
+   * @param {object} _options - additional options to pass to this object
+   */
+  constructor(_options) {
+    let base = {
+      route   : '',
+      summary : '',
+      desc    : '',
+      docs    : [],
+      methods : {}, // description of each method, via DocMethod object
+      params  : [], // description of each param, via DocParam object
+    };
+    this.options = Object.assign({}, base, _options);
+   // if ( this.options.route == null || this.options.route == '' ) {throw new Error('Needs a route');}
+  }
+
+  // toString() { return this.options; }
+}
+
+/**
+ * Documentation of a path's method.
+ *
+ */
+class DocMethod {
+
+  /**
+   * @param {object} _options} -
+   */
+  constructor(_options) {
+    let base = {
+      summary   : null,
+      desc      : null,
+      docs      : [],
+      params    : [],
+      responses : {},
+    };
+    this.options = Object.assign({}, base, _options);
+  }
+};
+
+
+/**
+ * Documentation of an externally linked document.
+ *
+ */
+class DocDoc {
+
+  /**
+   * @param {object} _options} -
+   */
+  constructor(_options) {
+    let base = {
+      title : null,
+      desc  : null,
+      link  : null,
+    };
+    this.options = Object.assign({}, base, _options);
+  }
+};
+
+
+/**
+ * Documentaiton of a parameter.
+ *
+ */
+class DocParam {
+
+  /**
+   * @param {object} _options} -
+   */
+  constructor(_options) {
+    let base = {
+      name     : null,
+      desc     : null,
+      in       : null,
+      required : null,
+    };
+    this.options = Object.assign({}, base, _options);
+  }
+};
+
+
+/**
+ * Documentaiton of a response.
+ *
+ */
+class DocResp {
+
+  /**
+   * @param {object} _options} -
+   */
+  constructor(_options) {
+    let base = {
+      desc : null,
+    };
+    this.options = Object.assign({}, base, _options);
+  }
+};
+
+
 module.exports.WovReturn = WovReturn;
+module.exports.DocPath   = DocPath;
+module.exports.DocMethod = DocMethod;
+module.exports.DocParam  = DocParam;
+module.exports.DocResp   = DocResp;
 

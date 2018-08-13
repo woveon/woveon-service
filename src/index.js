@@ -98,6 +98,7 @@ module.exports = class Service {
       this.logger,
       this._options.staticdir,
       this._options.baseroute,
+      this.name,
     );
 
     this.logger.verbose(`...created service ${this.name}`);
