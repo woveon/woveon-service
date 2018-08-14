@@ -116,7 +116,6 @@ module.exports = class Listener {
    */
   async listen() {
 
-    this.logger.info('listen :: resolveDocs');
     try {
       this._resolveDocs();
     } catch (e) {
@@ -124,11 +123,9 @@ module.exports = class Listener {
       console.trace();
       throw new Error('failed to resolve Docs');
     }
-    this.logger.info('2listen :: resolveDocs');
 
     if ( this.externalapp == true ) {this.islistening = true; return Promise.resolve();}
 
-    // this.logger.info('Listener called listen()'); console.trace();
     return new Promise((resolve, reject) => {
 
       // cap with a final error listener
@@ -145,7 +142,6 @@ module.exports = class Listener {
         resolve();
       })
         .on('error', (err) => {
-          this.logger.info('3');
           this.logger.error(`Listener failed starting on port : ${this.port}`);
           reject(err);
         });
@@ -260,7 +256,6 @@ module.exports = class Listener {
    * @param {object} _options - further instructions to this handler
    */
   async responseHandler(_route, _method, _mfilename, _args, _res, _options = {}) {
-    this.logger.info('asdfadsfadf: ', _route);
     this.logger.verbose(`...listener heard route: ${_route} ${_method}`);
     let fn = this.logger.trimpath(_mfilename, this.logger.options.trimTo); // _mfilename.split(this.logger.options.trimTo+'/')[1] || _mfilename;
     this.logger.aspect('listener.incoming', `Handling : '${_route}' with: '${fn}::${_method.name}' :`, _args);
@@ -271,7 +266,6 @@ module.exports = class Listener {
       if ( typeof _method === 'function' ) {
         result = await _method(_args, _res);
       } else {
-        this.logger.info('jus data', _method);
         result = this.retSuccess(_method);
       }
 
@@ -286,7 +280,6 @@ module.exports = class Listener {
 
       // perform any additional actions, based upon _options
       if ( _options.addRoute == true ) {
-        this.logger.info('adding route : ', _route);
         result.data.route = _route;
       }
 
@@ -429,11 +422,10 @@ module.exports = class Listener {
    */
   _resolveDocs() {
     if ( this.islistening ) {this.logger.throwError(`calling Listener.onDoc "${rr}" when already listening.`);}
-    if ( this.app == null ) {this.logger.info('here'); this.logger.throwError('failed to call init() on this listener.');}
+    if ( this.app == null ) {this.logger.throwError('failed to call init() on this listener.');}
 
     let cur = this.docs;
     let innerhtml = this._resolveDocNode(cur, ''); // create a page for each
-    // this.logger.info('innerhtml2: ', innerhtml);
     this._renderDocOverview(innerhtml);            // create the overview
   }
 
@@ -454,8 +446,6 @@ module.exports = class Listener {
 </div>
 `;
     let compiledTemplate = Handlebars.compile(endpointTemplate);
-
-    this.logger.info(`_resolveDocNode: ${_curpath}`);
 
     // build the end node path with all the verbs
     if ( _cur.hasOwnProperty('base') ) {
@@ -482,7 +472,7 @@ module.exports = class Listener {
         if ( _cur.hasOwnProperty(this.verbs[vi]) ) {
           let verb = this.verbs[vi];
           vlist.push(verb);
-          this.logger.info(' -- has proerpty ', verb, ' ',  _cur.hasOwnProperty(verb) );
+          // this.logger.info(' -- has proerpty ', verb, ' ',  _cur.hasOwnProperty(verb) );
 
           if ( node.methods[verb] != null ) {
             if ( _cur[verb] != null ) {
@@ -519,7 +509,7 @@ module.exports = class Listener {
       // this.logger.info(' - ', r);
       retval += r;
 
-      this.logger.info(`${_curpath} PATH: `, node);
+      // this.logger.info(`${_curpath} PATH: `, node);
       this._renderEndpoint(_curpath, node);
     }
 
@@ -538,8 +528,8 @@ module.exports = class Listener {
 //            this.logger.info(' -- ', rr);
             retval += rr;
           } else {
-            this.logger.info(` what is this??? `, k, r);
-            console.trace();
+            // this.logger.info(` what is this??? `, k, r);
+            // console.trace();
           }
         }
       }
@@ -721,7 +711,7 @@ module.exports = class Listener {
    * @param {string} _httpverb - http verb, or null for Path documentation
    */
   onDoc(_route, _docdata, _httpverb = null) {
-    this.logger.info('onDoc ', _route,  _httpverb, ': ', _docdata);
+    this.logger.aspect('listener.route', 'onDoc ', _route,  _httpverb, ': ', _docdata);
 
     if ( !(_httpverb == null || this.verbs.indexOf(_httpverb) != -1) ) {
       this.logger.throwError(`Unknown http verb '${_httpverb}'.`);
@@ -731,31 +721,26 @@ module.exports = class Listener {
     let paths = _route.split('/');
     let cur = this.docs;
 
-    console.log('paths: ', paths, '  from ', _route);
-
     for (let i=1; i<paths.length; i++) {
       let p = paths[i];
-      // console.log(`  p: '${p}'    cur: ${Object.keys(cur)}`);
       if ( ! (p in cur) ) {
-        // console.log(`  --- add '${p}'`);
         cur[p] = {};
       }
       cur = cur[p];
-      // console.log('  cur now ', cur);
     }
 
 
     if ( _httpverb == null ) {
-      console.log('base :', _route);
+      // console.log('base :', _route);
       if ( _docdata != null ) _docdata.route = _route;
       cur['base'] = _docdata;
     } else {
-      console.log(_httpverb+' :', _route);
+      // console.log(_httpverb+' :', _route);
       cur[_httpverb] = _docdata;
       if ( cur['base'] == undefined ) cur['base'] = null;
     }
 
-    console.log('thedocs: ', JSON.stringify(this.docs, null, '  '));
+    // console.log('thedocs: ', JSON.stringify(this.docs, null, '  '));
   }
 
 
