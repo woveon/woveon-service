@@ -1,6 +1,6 @@
 {
   "name": "woveon-service",
-  "version": "1.0.10",
+  "version": "1.0.10a",
   "description": "Tools to build a microservice.",
   "main": "src/index.js",
   "scripts": {
@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://git-codecommit.us-east-1.amazonaws.com/v1/repos/woveon-service"
+    "url": "https://github.com/woveon/woveon-service"
   },
   "author": "Chadwick Wingrave",
   "license": "MIT",
