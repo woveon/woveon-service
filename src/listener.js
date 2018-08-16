@@ -49,6 +49,11 @@ module.exports = class Listener {
     this.externalapp = false;
     this.name        = _name;
 
+    if ( typeof _port == 'object' ) {
+      console.trace();
+      this.logger.throwError('You are not sending correct params to Listener');
+    }
+
     this.docs        = {};
     this.views       = {};
     this.templateNode = null;
@@ -127,6 +132,7 @@ module.exports = class Listener {
     if ( this.externalapp == true ) {this.islistening = true; return Promise.resolve();}
 
     return new Promise((resolve, reject) => {
+
 
       // cap with a final error listener
       this.islistening = true;
@@ -209,6 +215,19 @@ module.exports = class Listener {
 
 
   /**
+   * Redirect to path.
+   * @param {string} _path - the redirect URL
+   */
+  retRedirect(_path) {
+    return new WovReturn({
+      success : true,
+      code    : 302,
+      data    : _path,
+    });
+  }
+
+
+  /**
    * Route had error in performing its function. NOTE: not a system level error
    * @param {object}  _data - returned object
    * @param {string}   _msg - message describing the failure
@@ -256,7 +275,7 @@ module.exports = class Listener {
    * @param {object} _options - further instructions to this handler
    */
   async responseHandler(_route, _method, _mfilename, _args, _res, _options = {}) {
-    this.logger.verbose(`...listener heard route: ${_route} ${_method}`);
+    this.logger.verbose(`...listener heard route: ${_route}`);
     let fn = this.logger.trimpath(_mfilename, this.logger.options.trimTo); // _mfilename.split(this.logger.options.trimTo+'/')[1] || _mfilename;
     this.logger.aspect('listener.incoming', `Handling : '${_route}' with: '${fn}::${_method.name}' :`, _args);
     let result = {success : false};
@@ -278,17 +297,25 @@ module.exports = class Listener {
           '  @file   : ', _mfilename);
       }
 
+
       // perform any additional actions, based upon _options
       if ( _options.addRoute == true ) {
         result.data.route = _route;
       }
 
       this.logger.aspect('listener.result', '  ... result: ', result);
-      _res.status(result.code);
-      delete result.code;
-      if (! _res.headersSent) {_res.json(result);}
-        // --- Check if response has been sent
-        //     (or redirect(which requires a 302 status code))
+
+      // Redirect
+      if ( result.code == 302 ) {
+        _res.redirect(302, result.data);
+      } else {
+
+        // Success, Fail, Error
+        _res.status(result.code);
+        delete result.code;
+        if (! _res.headersSent) {_res.json(result);}
+          // --- Check if response has been sent
+      }
 
     } catch (error) {
       console.log(error);
@@ -390,7 +417,7 @@ module.exports = class Listener {
 
     if ( this.islistening ) {this.logger.throwError(`calling Listener.onPut ${rr} when already listening.`);}
     if ( this.app == null ) {this.logger.throwError('failed to call init() on this listener.');}
-    this.logger.aspect('listener.route', `onPut   : ${rr} ${_mfilename}`);
+    this.logger.aspect('listener.route', `onPut   : ${rr}`);
     this.app.put(rr, (req, res) =>
       this.responseHandler(rr, _method, _mfilename,
         Object.assign(req.query, req.params, req.body, req.files, req.wov), res));
@@ -410,7 +437,7 @@ module.exports = class Listener {
 
     if ( this.islistening ) {this.logger.throwError(`calling Listener.onDelete ${rr} when already listening.`);}
     if ( this.app == null ) {this.logger.throwError('failed to call init() on this listener.');}
-    this.logger.aspect('listener.route', `onDelete: ${rr} ${_mfilename}`);
+    this.logger.aspect('listener.route', `onDelete: ${rr}`);
     this.app.delete(rr, (req, res) =>
       this.responseHandler(rr, _method, _mfilename,
         Object.assign(req.query, req.params, req.body, req.files, req.wov), res));
@@ -711,7 +738,7 @@ module.exports = class Listener {
    * @param {string} _httpverb - http verb, or null for Path documentation
    */
   onDoc(_route, _docdata, _httpverb = null) {
-    this.logger.aspect('listener.route', 'onDoc ', _route,  _httpverb, ': ', _docdata);
+    // this.logger.aspect('listener.route', 'onDoc ', _route,  _httpverb, ': ', _docdata);
 
     if ( !(_httpverb == null || this.verbs.indexOf(_httpverb) != -1) ) {
       this.logger.throwError(`Unknown http verb '${_httpverb}'.`);
