@@ -397,8 +397,13 @@ module.exports = class Listener {
     if ( this.app == null ) {this.throwError('failed to call init() on this listener.');}
     this.logger.aspect('listener.route', `onPost  : ${rr}`);
     this.app.post(rr, (req, res) => {
-      this.responseHandler(rr, _method, _mfilename,
-        Object.assign(req.query, req.params, req.body, req.files, req.wov), res );
+      this.logger.info(' parmas: ', req.params);
+      this.logger.info('  query: ', req.query);
+      this.logger.info('   body: ', req.body);
+      this.logger.info('    wov: ', req.wov);
+      let args = Object.assign({}, req.query, req.params, req.body, req.files, req.wov);
+      this.logger.info(' resulting args: ', args);
+      this.responseHandler(rr, _method, _mfilename, args, res);
     });
   };
 
