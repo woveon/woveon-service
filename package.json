@@ -1,6 +1,6 @@
 {
   "name": "woveon-service",
-  "version": "1.0.12",
+  "version": "0.0.12",
   "description": "Tools to build a microservice.",
   "main": "src/index.js",
   "scripts": {
