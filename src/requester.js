@@ -39,17 +39,18 @@ module.exports = class Requester {
   async request(_url, _method, _headers, _body, _rawresult = false, _throwOnError = false) {
     let retval = null;
     let fetchfail = false;
-    this.logger.verbose(` url '${_url}'  baseurl '${this._baseurl}'`);
+    this.logger.verbose(` url '${_url}'  baseurl '${this._baseurl}'  method '${_method}'`);
     let fullurl = (this._baseurl ? this._baseurl+_url: _url);
     this.logger.aspect('requester', `requester '${_method}' '${fullurl}' '${JSON.stringify(_body)}'`);
     let r = null;
 
     let fetchoptions = {
       method  : _method,
-      headers : Object.assign(this.headerbase, _headers),
+      headers : Object.assign({}, this.headerbase, _headers), // passed in override
     };
     if ( _body != null ) fetchoptions.body = (_body ? JSON.stringify(_body) : '');
 
+    // this.logger.info('fetchOptions ', fetchoptions);
     r = await fetch(fullurl, fetchoptions)
       .catch( (err) => {
         this.logger.error(err);
@@ -62,7 +63,17 @@ module.exports = class Requester {
       retval = {success : false, status : 400, data : fetchfail};
     } else {
       if ( _rawresult) retval = r;
-      else {retval = await r.json(); retval.status = r.status;}
+      else {
+        try {
+          retval = await r.json();
+          retval.status = r.status;
+        } catch (e) {
+          this.logger.error(e);
+          if ( _throwOnError ) {throw err;} else fetchfail = err.message;
+          // just return the raw result
+          retval = r;
+        }
+      }
     }
     return retval;
   }

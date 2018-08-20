@@ -307,6 +307,7 @@ module.exports = class Listener {
 
       // Redirect
       if ( result.code == 302 ) {
+        this.logger.info('redirect: ');
         _res.redirect(302, result.data);
       } else {
 
