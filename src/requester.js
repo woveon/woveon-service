@@ -69,7 +69,7 @@ module.exports = class Requester {
           retval.status = r.status;
         } catch (e) {
           this.logger.error(e);
-          if ( _throwOnError ) {throw err;} else fetchfail = err.message;
+          // if ( _throwOnError ) {throw e;} else fetchfail = e.message;
           // just return the raw result
           retval = r;
         }
