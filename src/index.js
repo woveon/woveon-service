@@ -7,6 +7,7 @@ const os            = require('os');
 const uuidv4        = require('uuid/v4');
 const Listener      = require('./listener');
 const Requester     = require('./requester');
+const WovReturn     = require('./wovreturn');
 
 const Logger        = require('woveon-logger');
 const ModelLoader   = require('./modelloader');
@@ -300,6 +301,7 @@ module.exports = class Service {
 };
 
 module.exports.Listener    = Listener;
+module.exports.WovReturn   = WovReturn;
 module.exports.Requester   = Requester;
 module.exports.Logger      = Logger;
 module.exports.ModelLoader = ModelLoader;

@@ -3,26 +3,7 @@ const bodyParser = require('body-parser');
 const path       = require('path');
 const Handlebars = require('handlebars');
 
-
-/**
- * Created a class so I can do 'instanceof WovReturn'
- */
-class WovReturn {
-
-  /**
-   * Create the object, just a container for data.
-   *
-   * @param {object} _data - success, code, data, msg
-   */
-  constructor(_data) {
-    this.success = _data.success;
-    this.code    = _data.code;
-    this.data    = _data.data;
-    this.msg     = _data.msg;
-    if (this.msg == null ) delete this.msg;
-  }
-};
-
+const WovReturn  = require('./wovreturn');
 
 /**
  * Class that manages RESTFUL listening via ExpressJS.
@@ -172,58 +153,35 @@ module.exports = class Listener {
    * @param {object} _args -
    * @param {object} _attr -
    * @param {object} _val - unused at the moment
+   * @param {boolean} _retRawError - on error: if true, returns Error, false
+   *   (default) it returns a WovReturn object.
    * @return {Error/retError} - null on success or Error/retError depending on _retError
    */
   checkBodyAttribute(_args, _attr, _val, _retRawError= false) {
-    let retval = new Error('Unknown'); // start in error state
-    let attrs = _attr;
-    let emsg  = '';
-    if ( ! Array.isArray(attrs) )  attrs = [_attr];
-
-    for (let i=0; i<attrs.length; i++) {
-      if ( _args[attrs[i]] === undefined ) {
-        emsg+= ` ${attrs[i]}`;
-      }
-    }
-
-    // console.log('checkBodyAtribure "', emsg, '"');
-    if ( emsg == '' ) {
-      retval = null;
-    } else {
-      retval = new Error('Missing attribute:'+emsg);
-      if ( _retRawError == false ) {
-        retval = this.retError({args : _args, attr : _attr}, retval.message);
-      }
-    }
-
-    return retval;
+    this.logger.logDeprecated('should just call WovReturn.checkBodyAttribute directly.');
+    return WovReturn.checkAttributes(_args, _attr, _val, _retRawError);
   }
 
 
   /**
    * Route succeeded.
    * @param {object}  _data - returned object
-   * @return {object} - res object for sender
+   * @return {WovReturn} -
    */
   retSuccess(_data) {
-    return new WovReturn({
-      success : true,
-      code    : 200,
-      data    : _data,
-    });
+    this.logger.logDeprecated('should just call WovReturn.retSuccess directly.');
+    return WovReturn.retSuccess(_data);
   }
 
 
   /**
    * Redirect to path.
    * @param {string} _path - the redirect URL
+   * @return {WovReturn} -
    */
   retRedirect(_path) {
-    return new WovReturn({
-      success : true,
-      code    : 302,
-      data    : _path,
-    });
+    this.logger.logDeprecated('should just call WovReturn.retRedirect directly.');
+    return WovReturn.retRedirect(_path);
   }
 
 
@@ -234,12 +192,8 @@ module.exports = class Listener {
    * @return {object} - res object for sender
    */
   retError(_data, _msg='General Error') {
-    return new WovReturn({
-      success : false,
-      code    : 200,
-      data    : _data,
-      msg     : _msg,
-    });
+    this.logger.logDeprecated('should just call WovReturn.retError directly.');
+    return WovReturn.retError(_data, _msg);
   }
 
 
@@ -251,12 +205,8 @@ module.exports = class Listener {
    * @return {object} - res object for sender
    */
   retFail(_data, _code=400, _msg='Failure') {
-    return new WovReturn({
-      success : false,
-      code    : _code,
-      data    : _data,
-      msg     : _msg,
-    });
+    this.logger.logDeprecated('should just call WovReturn.retFail directly.');
+    return WovReturn.retFail(_data, _code, _msg);
   }
 
 
