@@ -2,7 +2,8 @@
 // let wtf = require('wtfnode'); // debugging code for not cleanly shutting down
 
 const autoBind      = require('auto-bind-inheritance');
-const CryptoJS      = require('crypto-js');
+const CryptoJS      = require('crypto-js'); // library with convenient syntax
+const crypto        = require('crypto');    // part of nodejs
 const os            = require('os');
 const uuidv4        = require('uuid/v4');
 const Listener      = require('./listener');
@@ -234,7 +235,7 @@ module.exports = class Service {
   /**
    * @return {string} -
     */
-  static generateToken() { return uuidv4(); }
+  static generateToken() {return uuidv4();}
 
 
   /**
@@ -243,7 +244,7 @@ module.exports = class Service {
    * @return {string} - random length string
    */
   static generateRandomString(length = 20) {
-    return CryptoJS.randomBytes(length).toString('hex');
+    return crypto.randomBytes(length).toString('hex');
   };
 
 

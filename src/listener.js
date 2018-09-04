@@ -118,7 +118,7 @@ module.exports = class Listener {
       // cap with a final error listener
       this.islistening = true;
       this.app.all('*', (req, res) => {
-        this.logger.warn(`Failed to match '${req.method}' '${req.originalUrl}' ${this.port}`);
+        this.logger.warn(`REST LISTENER: Failed to match endpoint '${req.method}' '${req.originalUrl}' ${this.port}`);
         res.status(404).json({success : false, data : null});
       });
 
@@ -159,6 +159,7 @@ module.exports = class Listener {
    */
   checkBodyAttribute(_args, _attr, _val, _retRawError= false) {
     this.logger.logDeprecated('should just call WovReturn.checkBodyAttribute directly.');
+    console.trace();
     return WovReturn.checkAttributes(_args, _attr, _val, _retRawError);
   }
 
@@ -170,6 +171,7 @@ module.exports = class Listener {
    */
   retSuccess(_data) {
     this.logger.logDeprecated('should just call WovReturn.retSuccess directly.');
+    console.trace();
     return WovReturn.retSuccess(_data);
   }
 
@@ -181,6 +183,7 @@ module.exports = class Listener {
    */
   retRedirect(_path) {
     this.logger.logDeprecated('should just call WovReturn.retRedirect directly.');
+    console.trace();
     return WovReturn.retRedirect(_path);
   }
 
@@ -193,6 +196,7 @@ module.exports = class Listener {
    */
   retError(_data, _msg='General Error') {
     this.logger.logDeprecated('should just call WovReturn.retError directly.');
+    console.trace();
     return WovReturn.retError(_data, _msg);
   }
 
@@ -206,6 +210,7 @@ module.exports = class Listener {
    */
   retFail(_data, _code=400, _msg='Failure') {
     this.logger.logDeprecated('should just call WovReturn.retFail directly.');
+    console.trace();
     return WovReturn.retFail(_data, _code, _msg);
   }
 
