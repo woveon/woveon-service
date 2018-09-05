@@ -28,6 +28,7 @@ module.exports = class Service {
    * add routes.
   */
   async onInit() {
+    this.logger.info('onInit woveon-service');
     this.listener.onGet('/shutdown', this.onShutdown, __filename);
     this.listener.onGet('/health', this.onHealth, __filename);
   };
@@ -47,8 +48,7 @@ module.exports = class Service {
    * Called after child's onShutdown, when shutdown was started by the service.
    * NOTE: Call child's onShutdown first, since this is a virtual destructor.
   */
-  async onShutdown() {
-  };
+  async onShutdown() {};
 
 
   /**
@@ -56,7 +56,8 @@ module.exports = class Service {
    * @return {bool} - true, since still running
    */
   async onHealth() {
-    return this.listener.retSuccess(true);
+    this.logger.info('woveon-service onHealth hit');
+    return WovReturn.retSuccess(true);
   };
 
   // ---------------------------------------------------------------------
@@ -66,21 +67,32 @@ module.exports = class Service {
 
   /**
    * Create the service.
-   * @param {string} _name - Name of service
    * @param {object} _options - additional options
    *                     : name - overwrite the _name
+   *                     : port - port this listens on
    *                     : logger - pass in a logger
+   *                     : staticdir - where static html is served from
+   *                     : baseroute - prepended to each endpoint ex. https://host/baseroute/route
+   * NOTE: recently changed arguments to use nodejs defaults... bound to screw this up
    */
-  constructor(_name, _options = {name : '', port : 80, logger : null,  staticdir : null, baseroute : null}) {
+  constructor({name = null, port = 80, logger = null, staticdir = null, baseroute = null, ver = 'v1'}) {
+    // constructor(_name, _options = {name : '', port : 80, logger : null,  staticdir : null, baseroute : null}) {
     autoBind(this);
 
-    this._options = _options;
-    this.name     = this._options.name || _name;
-    delete this._options.name; // only one location for name
+    this._options = {
+      port      : port,
+      staticdir : staticdir,
+      baseroute : baseroute || `/${name.toLowerCase()}/${ver}`,
+      ver       : ver,
+    };
+
+    this.name     = name;
     this.internal_address = null;
     this.external_address = null;
 
-    this.logger = this._options.logger || new Logger(this.name, {}, {'service' : {'color' : 'blue'}, 'showname' : true});
+    this.logger = logger || new Logger(this.name, {}, {'service' : {'color' : 'blue'}, 'showname' : true});
+    this.logger.info(`  options: ${JSON.stringify(this._options)}`);
+
     this.logger.aspect('service', '---------------------------------------------------------------------');
     this.logger.aspect('service', '--------------------------------------------------------------------');
     this.logger.aspect('service', ' Woveon Service');
@@ -88,12 +100,6 @@ module.exports = class Service {
     this.logger.aspect('service', '--------------------------------------------------------------------');
     this.logger.aspect('service', `  options: ${JSON.stringify(this._options)}`);
     this.logger.aspect('service', '---------------------------------------------------------------------');
-
-    // default route is /service/ver, when baseroute is null
-    // this.logger.info('Base route is :', this._options.baseroute, _options);
-    if ( this._options.baseroute == null ) {
-      this._options.baseroute = `/${this.name.toLowerCase()}/${this._options.ver}`;
-    }
 
     this.listener  = new Listener(
       this._options.port,
@@ -195,6 +201,7 @@ module.exports = class Service {
    * @param {string} _name - name of the model to be created
    * @param {object} _rsdef - resource definition file, containing Mixin and plSchemaAdditions
    */
+  /* NOTE: think this is only in WoveonEngine
   initPluginResourceModel(_name, _rsdef) {
     if ( _rsdef.plSchemaAdditions != null && _rsdef.Mixin != null ) {
       let sch = null;
@@ -230,6 +237,7 @@ module.exports = class Service {
         'attributes.');
     }
   }
+  */
 
 
   /**

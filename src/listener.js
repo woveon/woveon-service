@@ -118,8 +118,9 @@ module.exports = class Listener {
       // cap with a final error listener
       this.islistening = true;
       this.app.all('*', (req, res) => {
-        this.logger.warn(`REST LISTENER: Failed to match endpoint '${req.method}' '${req.originalUrl}' ${this.port}`);
-        res.status(404).json({success : false, data : null});
+        let str = `REST LISTENER: Failed to match endpoint '${req.method}' '${req.originalUrl}' ${this.port}`;
+        this.logger.warn(str);
+        res.status(404).json({success : false, data : str});
       });
 
       this.server = this.app.listen(this.port, '0.0.0.0', () => {
@@ -259,6 +260,7 @@ module.exports = class Listener {
       }
 
       this.logger.aspect('listener.result', '  ... result: ', result);
+      this.logger.info('  ... result: ', result);
 
       // Redirect
       if ( result.code == 302 ) {

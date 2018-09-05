@@ -1,4 +1,4 @@
-const Service = require('../index');
+const Service = require('../src/index');
 const ML      = require('../src/modelloader');
 const expect  = require('chai').expect;
 
