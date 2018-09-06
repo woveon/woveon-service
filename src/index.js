@@ -48,7 +48,7 @@ module.exports = class Service {
    * Called after child's onShutdown, when shutdown was started by the service.
    * NOTE: Call child's onShutdown first, since this is a virtual destructor.
   */
-  async onShutdown() {};
+  async onShutdown() { await this.listener.close(); };
 
 
   /**
@@ -71,18 +71,18 @@ module.exports = class Service {
    *                     : name - overwrite the _name
    *                     : port - port this listens on
    *                     : logger - pass in a logger
-   *                     : staticdir - where static html is served from
+   *                     : staticdir - where static html is served from, null means no staticdir
    *                     : baseroute - prepended to each endpoint ex. https://host/baseroute/route
    * NOTE: recently changed arguments to use nodejs defaults... bound to screw this up
    */
-  constructor({name = null, port = 80, logger = null, staticdir = null, baseroute = null, ver = 'v1'}) {
+  constructor({name = 'unnamed', port = 80, logger = null, staticdir = null, baseroute = null, ver = 'v1'}) {
     // constructor(_name, _options = {name : '', port : 80, logger : null,  staticdir : null, baseroute : null}) {
     autoBind(this);
 
     this._options = {
       port      : port,
       staticdir : staticdir,
-      baseroute : baseroute || `/${name.toLowerCase()}/${ver}`,
+      baseroute : baseroute || `/api/${ver}`,
       ver       : ver,
     };
 
@@ -95,8 +95,7 @@ module.exports = class Service {
 
     this.logger.aspect('service', '---------------------------------------------------------------------');
     this.logger.aspect('service', '--------------------------------------------------------------------');
-    this.logger.aspect('service', ' Woveon Service');
-    this.logger.aspect('service', `  :: ${this.name}`);
+    this.logger.aspect('service', ` Woveon Service :: ${this.name}`);
     this.logger.aspect('service', '--------------------------------------------------------------------');
     this.logger.aspect('service', `  options: ${JSON.stringify(this._options)}`);
     this.logger.aspect('service', '---------------------------------------------------------------------');
@@ -133,35 +132,11 @@ module.exports = class Service {
    */
   async startup() {
     try {
-      this.logger.aspect('service-levels', '  ... service startup');
+      this.logger.aspect('service-levels', '  ... starting listener');
       await this.listener.listen();
 
-      this.logger.verbose('  ...startup: service listening on: ', JSON.stringify(this.listener.server.address()));
-      this.internal_address = this.listener.server.address(); // port and family
-      // this.family  = this.listener.server.address().family;
-      // this.port    = this.listener.server.address().port;
-
-      // request ip calls the microservice that will call it, to verify this MS's ip address
-      // this.logger.info('requestip : ', this._options.requestip, ' but skipping! for now, using network interface.');
-      // get ip address from network interfaces (will return a local ip, so switching to asking WL)
-      let ifacess = os.networkInterfaces();
-      let ifaces = ifacess['eth0'] || ifacess['en0'] || ifacess['lo0']; // os.networkInterfaces()['eth0'];
-      if ( ifaces== null ) {
-        this.logger.error('interfaces:', os.networkInterfaces());
-        this.logger.throwError(`Can't find network interface 'eth0', 'en0' or 'lo0'.`);
-      }
-
-      let that = this;
-      ifaces.forEach(function(iface) {
-        if (that.internal_address.family !== iface.family || iface.internal !== false) { // 'IPv4' most likely
-          // skip over internal (i.e. 127.0.0.1) and non-ipv4 addresses
-          return;
-        }
-        that.external_address = iface.address; // this.listener.server.address().address;
-        that.logger.verbose('address from iface is:', iface.address);
-      });
-      this.logger.verbose('service listening on internal IP address address: ', this.internal_address);
-      this.logger.verbose('service listening on non-internal IP address address: ', this.external_address);
+      this.logger.verbose('service listening on: ',
+        JSON.stringify(this.listener.server.address()));
 
       await this.onStartup();
       await this.onPostStartup();

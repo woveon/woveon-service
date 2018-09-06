@@ -30,7 +30,8 @@ module.exports = class Listener {
     this.externalapp = false;
     this.name        = _name;
 
-    if ( typeof _port == 'object' ) {
+    if ( _port == null || typeof _port == 'object' ) {
+      this.logger.info(` args: `, typeof _port,  Array.from(arguments));
       console.trace();
       this.logger.throwError('You are not sending correct params to Listener');
     }
