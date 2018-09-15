@@ -261,7 +261,6 @@ module.exports = class Listener {
       }
 
       this.logger.aspect('listener.result', '  ... result: ', result);
-      // this.logger.info('  ... result: ', result);
 
       // Redirect
       if ( result.code == 302 ) {
