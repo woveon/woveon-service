@@ -45,10 +45,11 @@ module.exports = class Listener {
 
   /**
    * Latch on to an existing express app.
+   * @param {ExpressJs} _app - extend this existing app with this listener
    */
   async initWithApp(_app) {
     this.externalapp = true;
-    if (this.app) {await this.close();}
+    if (this.app) { await this.close(); }
     this.app = _app;
     this.logger.verbose('  ... listener inited with external app, assuming is listening');
   }
@@ -59,7 +60,7 @@ module.exports = class Listener {
    */
   async init() {
 
-    if (this.app) {await this.close();}
+    if (this.app) { await this.close(); }
 
 
     this.logger.verbose('  ... listener init');
@@ -68,8 +69,9 @@ module.exports = class Listener {
     // serve static content if set
     if ( this.staticdir != null ) {
       let fullstaticdir = path.join(process.cwd()+'/'+this.staticdir);
-      this.logger.verbose(`  ... serving static content on ${fullstaticdir}.`);
-      this.app.use('/static', express.static(fullstaticdir));
+      this.logger.info(`  ... serving static content on '${fullstaticdir}'.`);
+      this.app.use(express.static(fullstaticdir));
+      // this.app.use('/static', express.static(fullstaticdir));
     }
 
     this.app.use(bodyParser.json({limit : '50mb'}));
@@ -83,10 +85,10 @@ module.exports = class Listener {
         `'${req.originalUrl}' '${req.method}' from: '${req.ip}'`);
 
       // that.logger.verbose(req.params,req.query,req.body);
-      if (Object.keys(req.params > 0).length) {that.logger.aspect('listener', '  : params : ', req.params);}
-      if (Object.keys(req.query).length)      {that.logger.aspect('listener', '  :  query : ', req.query);}
-      if (Object.keys(req.body).length)       {that.logger.aspect('listener', '  :   body : ', req.body);}
-      if (req.files)                          {that.logger.aspect('listener', '  :  query : ', req.files);}
+      if (Object.keys(req.params > 0).length) { that.logger.aspect('listener', '  : params : ', req.params); }
+      if (Object.keys(req.query).length)      { that.logger.aspect('listener', '  :  query : ', req.query);  }
+      if (Object.keys(req.body).length)       { that.logger.aspect('listener', '  :   body : ', req.body);   }
+      if (req.files)                          { that.logger.aspect('listener', '  :  query : ', req.files);  }
 
       res.header('Access-Control-Allow-Origin', req.headers.origin);
       res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
@@ -103,15 +105,14 @@ module.exports = class Listener {
    */
   async listen() {
 
-    try {
-      this._resolveDocs();
-    } catch (e) {
+    try { this._resolveDocs(); }
+    catch (e) {
       console.log(e);
       console.trace();
       throw new Error('failed to resolve Docs');
     }
 
-    if ( this.externalapp == true ) {this.islistening = true; return Promise.resolve();}
+    if ( this.externalapp == true ) { this.islistening = true; return Promise.resolve(); }
 
     return new Promise((resolve, reject) => {
 
@@ -239,11 +240,8 @@ module.exports = class Listener {
 
     // call method and return result
     try {
-      if ( typeof _method === 'function' ) {
-        result = await _method(_args, _res);
-      } else {
-        result = this.retSuccess(_method);
-      }
+      if ( typeof _method === 'function' ) { result = await _method(_args, _res); }
+      else { result = this.retSuccess(_method); }
 
       if ( result == null || (! result instanceof WovReturn) ) {
         this.logger.throwError(
@@ -264,18 +262,16 @@ module.exports = class Listener {
 
       // Redirect
       if ( result.code == 302 ) {
-        this.logger.info('redirect: ');
+        this.logger.info('redirect: ', result.data);
         _res.redirect(302, result.data);
-      } else {
-
-        // Success, Fail, Error
+      }
+      else { // Success, Fail, Error
         _res.status(result.code);
         delete result.code;
-        if (! _res.headersSent) {_res.json(result);}
-          // --- Check if response has been sent
+        if (! _res.headersSent) { _res.json(result); } // Check if response has been sent
       }
-
-    } catch (error) {
+    }
+    catch (error) {
       console.log(error);
       this.logger.warn(error);
       if ( process.env.WOV_STAGE != 'prod' ) result.error   = `${error}`;
@@ -294,6 +290,8 @@ module.exports = class Listener {
    *       so the leaf method can lookup and see if user can access that widget.
    *
    * NOTE: vals stored in _req.wov.
+   * @param {url} _route -
+   * @param {string} _method - http method
    */
   async onRoute(_route, _method) {
     this.logger.aspect('listener.route', `onRoute : ${_route}`);
@@ -304,11 +302,13 @@ module.exports = class Listener {
       if ( result instanceof WovReturn ) {
         _res.status(result.code);
         delete result.code;
-        if (! _res.headersSent) {_res.json(result);}
+        if (! _res.headersSent) { _res.json(result); }
         return next(result);
-      } else if ( result instanceof Error ) {
+      }
+      else if ( result instanceof Error ) {
         this.logger.throwError(result);
-      } else {
+      }
+      else {
         // add in params
         _req.wov = Object.assign({}, _req.wov, result);
       }
@@ -325,12 +325,12 @@ module.exports = class Listener {
    * @param {Docmethod} _docMethod - documentation of this method
    */
   async onGet(_route, _method, _mfilename, _docMethod = null) {
-    if ( _mfilename == null ) {this.logger.throwError('Need to append "__filename" to listener function.');}
+    if ( _mfilename == null ) { this.logger.throwError('Need to append "__filename" to listener function.'); }
     let rr = this.root + _route;
     this.onDoc(rr, _docMethod, 'get');
 
-    if ( this.islistening ) {this.logger.throwError(`calling Listener.onGet "${rr}" when already listening.`);}
-    if ( this.app == null ) {this.logger.throwError('failed to call init() on this listener.');}
+    if ( this.islistening ) { this.logger.throwError(`calling Listener.onGet "${rr}" when already listening.`); }
+    if ( this.app == null ) { this.logger.throwError('failed to call init() on this listener.'); }
     this.logger.aspect('listener.route', `onGet   : ${rr}`);
 
     this.app.get(rr, (req, res) => {
@@ -347,12 +347,12 @@ module.exports = class Listener {
    * @param {Docmethod} _docMethod - documentation of this method
    */
   async onPost(_route, _method, _mfilename, _docMethod = null ) {
-    if ( _mfilename == null ) {this.logger.throwError('Need to append "__filename" to listener function.');}
+    if ( _mfilename == null ) { this.logger.throwError('Need to append "__filename" to listener function.'); }
     let rr = this.root + _route;
     this.onDoc(rr, _docMethod, 'post');
 
-    if ( this.islistening ) {this.logger.throwError(`calling Listener.onPost ${rr} when already listening.`);}
-    if ( this.app == null ) {this.throwError('failed to call init() on this listener.');}
+    if ( this.islistening ) { this.logger.throwError(`calling Listener.onPost ${rr} when already listening.`); }
+    if ( this.app == null ) { this.throwError('failed to call init() on this listener.'); }
     this.logger.aspect('listener.route', `onPost  : ${rr}`);
     this.app.post(rr, (req, res) => {
       this.logger.info(' parmas: ', req.params);
@@ -374,12 +374,12 @@ module.exports = class Listener {
    * @param {Docmethod} _docMethod - documentation of this method
    */
   async onPut(_route, _method, _mfilename, _docMethod = null) {
-    if ( _mfilename == null ) {this.logger.throwError('Need to append "__filename" to listener function.');}
+    if ( _mfilename == null ) { this.logger.throwError('Need to append "__filename" to listener function.'); }
     let rr = this.root + _route;
     this.onDoc(rr, _docMethod, 'put');
 
-    if ( this.islistening ) {this.logger.throwError(`calling Listener.onPut ${rr} when already listening.`);}
-    if ( this.app == null ) {this.logger.throwError('failed to call init() on this listener.');}
+    if ( this.islistening ) { this.logger.throwError(`calling Listener.onPut ${rr} when already listening.`); }
+    if ( this.app == null ) { this.logger.throwError('failed to call init() on this listener.'); }
     this.logger.aspect('listener.route', `onPut   : ${rr}`);
     this.app.put(rr, (req, res) =>
       this.responseHandler(rr, _method, _mfilename,
@@ -394,12 +394,12 @@ module.exports = class Listener {
    * @param {Docmethod} _docMethod - documentation of this method
    */
   async onDelete(_route, _method, _mfilename, _docMethod = null) {
-    if ( _mfilename == null ) {this.logger.throwError('Need to append "__filename" to listener function.');}
+    if ( _mfilename == null ) { this.logger.throwError('Need to append "__filename" to listener function.'); }
     let rr = this.root + _route;
     this.onDoc(rr, _docMethod, 'delete');
 
-    if ( this.islistening ) {this.logger.throwError(`calling Listener.onDelete ${rr} when already listening.`);}
-    if ( this.app == null ) {this.logger.throwError('failed to call init() on this listener.');}
+    if ( this.islistening ) { this.logger.throwError(`calling Listener.onDelete ${rr} when already listening.`); }
+    if ( this.app == null ) { this.logger.throwError('failed to call init() on this listener.'); }
     this.logger.aspect('listener.route', `onDelete: ${rr}`);
     this.app.delete(rr, (req, res) =>
       this.responseHandler(rr, _method, _mfilename,
@@ -411,8 +411,8 @@ module.exports = class Listener {
    * Take the DocPath objects in this.docs and turn in to html to be served.
    */
   _resolveDocs() {
-    if ( this.islistening ) {this.logger.throwError(`calling Listener.onDoc "${rr}" when already listening.`);}
-    if ( this.app == null ) {this.logger.throwError('failed to call init() on this listener.');}
+    if ( this.islistening ) { this.logger.throwError(`calling Listener.onDoc "${rr}" when already listening.`); }
+    if ( this.app == null ) { this.logger.throwError('failed to call init() on this listener.'); }
 
     let cur = this.docs;
     let innerhtml = this._resolveDocNode(cur, ''); // create a page for each
@@ -452,9 +452,9 @@ module.exports = class Listener {
           methods : {},
           params  : [],
         }).options;
-      } else {
-        dataOverview.hasPage = true; // has has path page, then link
       }
+      else { dataOverview.hasPage = true; } // has has path page, then link
+
       if ( node.summary ) dataOverview.summary = node.summary;
 
       let vlist = [];
@@ -469,16 +469,19 @@ module.exports = class Listener {
               this.logger.warn(`Two definitions: Conflict ${_curpath} - ${verb}.`);
               node.methods[verb] = _cur[verb];
               dataOverview.hasPage = true; // has verb path page, then link
-            } else {
+            }
+            else {
               // do nothing. _cur[verb] is null, just holding place, letting us know a route existed
               // this.logger.info(` -- ${_curpath} : no doc for route ${verb}`);
             }
-          } else {
+          }
+          else {
             if ( _cur[verb] != null ) {
               // this.logger.info(` -- ${_curpath} : adding ${verb}`);
               node.methods[verb] = _cur[verb];
               dataOverview.hasPage = true; // has verb path page, then link
-            } else {
+            }
+            else {
               // this.logger.info(` -- ${_curpath} : creating ${verb}`);
               node.methods[verb] = new DocMethod({
                 summary   : null,
@@ -517,7 +520,8 @@ module.exports = class Listener {
             let rr = this._resolveDocNode(r, _curpath + '/' + k);
 //            this.logger.info(' -- ', rr);
             retval += rr;
-          } else {
+          }
+          else {
             // this.logger.info(` what is this??? `, k, r);
             // console.trace();
           }
@@ -560,7 +564,7 @@ module.exports = class Listener {
     let bodyhtml = templateBody({innerhtml : _innerhtml, name : this.name});
     // this.logger.info('innerhtml = ', _innerhtml);
     // this.logger.info('bodyhtml = ', bodyhtml);
-    this.app.get(this.root + '/doc', async (req, res) => {res.send(bodyhtml);});
+    this.app.get(this.root + '/doc', async (req, res) => { res.send(bodyhtml); });
   }
 
   /**
@@ -660,7 +664,7 @@ module.exports = class Listener {
     if ( this.templateNode == null ) this.templateNode   = Handlebars.compile(hPath);
 
     let nodehtml = this.templateNode(_node);
-    this.app.get(rr, async (req, res) => {res.send(nodehtml);});
+    this.app.get(rr, async (req, res) => { res.send(nodehtml); });
   }
   /*
     // get data
@@ -724,7 +728,8 @@ module.exports = class Listener {
       // console.log('base :', _route);
       if ( _docdata != null ) _docdata.route = _route;
       cur['base'] = _docdata;
-    } else {
+    }
+    else {
       // console.log(_httpverb+' :', _route);
       cur[_httpverb] = _docdata;
       if ( cur['base'] == undefined ) cur['base'] = null;
@@ -773,9 +778,9 @@ class DocMethod {
     let base = {
       summary   : null,
       desc      : null,
-      docs      : [],
-      params    : [],
-      responses : {},
+      docs      : [],      // DocDoc
+      params    : [],      // DocParam
+      responses : {},      // DocResp
     };
     this.options = Object.assign({}, base, _options);
   }
@@ -834,7 +839,8 @@ class DocResp {
    */
   constructor(_options) {
     let base = {
-      desc : null,
+      desc   : null,
+      params : [],  // DocParam
     };
     this.options = Object.assign({}, base, _options);
   }

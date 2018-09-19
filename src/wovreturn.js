@@ -91,20 +91,26 @@ module.exports = class WovReturn {
   /**
    * This checks that the passed in args have the _attr... val skipped for now.
    *
-   * @param {object} _args -
-   * @param {object} _attr - The attributes to check. If array, all are required. If hash, then check boolean to see if required or not. If string, assume required.
+   * @param {object} _args - argument object to check
+   * @param {object} _attr - The attributes to check. If array, all are required.
+   *                         If hash, then check boolean to see if required or not.
+   *                         If string, assume required.
    * @param {object} _val - unused at the moment
-   * @param {boolean} _retRawError - on error: if true, returns Error, false
-   *   (default) it returns a WovReturn object.
+   * @param {boolean} _options - options to change behavior
    * @return {Error/retError} - null on success or Error/retError depending on _retError
    */
-  static checkAttributes(_args, _attr, _val, _retRawError= false) {
+  static checkAttributes(_args, _attr, _val, _options = {
+      retRawError : false,  // - on true, instead returns Error object
+      checkStrict : true,   // - toggles strict enforcement of only named _attr
+                            //   should exist. when false, only checks _attr provided.
+    } ) {
+
     let retval = null; // new Error('Unknown'); // start in error state
     let attrs = _attr;
     let emsg  = {missing : [], unexpected : [] };
 
     // convert string/array to hash, assuming true
-    if ( typeof _attr == 'string' ) {attrs = {}; attrs[_attr] = true;}
+    if ( typeof _attr == 'string' ) { attrs = {}; attrs[_attr] = true; }
     else if ( Array.isArray(_attr) )  {
       attrs = {}; _attr.forEach((e) => {
         // console.log('setting ', e);
@@ -116,9 +122,11 @@ module.exports = class WovReturn {
 //    console.log('attrs: ', attrs);
 
     // check all in args are in acceptable attrs (required or not)
-    for (let k in _args) {
-      // console.log('sadf: k ', k, attrs);
-      if ( attrs[k] === undefined ) {emsg.unexpected.push(k);}
+    if ( _options.checkStrict == true ) {
+      for (let k in _args) {
+        // console.log('sadf: k ', k, attrs);
+        if ( attrs[k] === undefined ) { emsg.unexpected.push(k); }
+      }
     }
     // check all required attrs are in args
     for (let k in attrs) {
@@ -129,15 +137,15 @@ module.exports = class WovReturn {
       }
     }
 
- //    console.log('checkBodyAtribure "', emsg, '"');
-    if ( emsg.missing.length == 0 && emsg.unexpected.length == 0 ) {
-      retval = null;
-    } else {
-      if ( _retRawError == false ) {
+    //    console.log('checkBodyAtribure "', emsg, '"');
+    if ( emsg.missing.length == 0 && emsg.unexpected.length == 0 ) { retval = null; }
+    else {
+      if ( _options.retRawError == false ) {
         emsg.args = _args;
         emsg.attrs = attrs;
         retval = this.retError(emsg, `ERROR: attribute failure`);
-      } else {retval = new Error(emsg);}
+      }
+      else { retval = new Error(emsg); }
     }
 
     return retval;

@@ -82,7 +82,7 @@ module.exports = class Service {
     this._options = {
       port      : port,
       staticdir : staticdir,
-      baseroute : baseroute || `/api/${ver}`,
+      baseroute : baseroute || `/${ver}`,
       ver       : ver,
     };
 
