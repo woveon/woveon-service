@@ -10,12 +10,14 @@ module.exports = class WovReturn {
    *
    * @param {object} _data - success, code, data, msg
    */
-  constructor(_data) {
+  constructor(_data, _meta = null) {
     this.success = _data.success;  // success/fail is based on function, not connection
     this.code    = _data.code;     // http codes for connection success/fail
     this.data    = _data.data;
     this.msg     = _data.msg;
     if (this.msg == null ) delete this.msg;
+
+    if ( _meta != null ) this.meta = _meta; // if has it
   }
 
 
@@ -24,20 +26,43 @@ module.exports = class WovReturn {
    * (i.e. data usually not shown with typical toString function).
    * @return {string} - json stringified view of this
    */
-  ts() {return JSON.stringify(this, null, '  ');}
+  ts() { return JSON.stringify(this, null, '  '); }
+
+
+  /**
+   * Utility function to see if the object follows the WovReturn format (not an 'instanceof' check).
+   * Checks by looking for code, data and success.
+   * Useful for return value checks.
+   * NOTE: 'code' can be stripped on returns, since it is put into status code
+   * @param {object} _obj - checked object
+   * @return {boolean} - true if should be considered a WovReturn
+   */
+  static isValidWovReturn(_obj) {
+    if ( _obj.data === undefined || _obj.success === undefined ) return false;
+    return true;
+  }
+
+
+  /**
+   * Sets meta data.
+   * @param {object} _wr - wov return object
+   * @param {object} _meta - merges into existing meta
+   */
+  static addMeta(_wr, _meta) { if ( _wr.meta === undefined ) _wr.meta = {}; Object.assign(_wr.meta, _meta); }
 
 
   /**
    * Route succeeded.
    * @param {object}  _data - returned object
+   * @param {object}  _meta - metadata about the returned object (ex. for fetch, a url)
    * @return {object} - res object for sender
    */
-  static retSuccess(_data) {
+  static retSuccess(_data, _meta = null) {
     return new WovReturn({
       success : true,
       code    : 200,
       data    : _data,
-    });
+    }, _meta);
   }
 
 
@@ -46,12 +71,12 @@ module.exports = class WovReturn {
    * @param {string} _path - the redirect URL
    * @return {object} - res object for sender
    */
-  static retRedirect(_path) {
+  static retRedirect(_path, _meta = null) {
     return new WovReturn({
       success : true,
       code    : 302,
       data    : _path,
-    });
+    }, _meta);
   }
 
 
@@ -61,13 +86,13 @@ module.exports = class WovReturn {
    * @param {string}   _msg - message describing the failure
    * @return {object} - res object for sender
    */
-  static retError(_data, _msg='General Error') {
+  static retError(_data, _msg='General Error', _meta = null) {
     return new WovReturn({
       success : false,
       code    : 200,
       data    : _data,
       msg     : _msg,
-    });
+    }, _meta);
   }
 
 
@@ -78,13 +103,13 @@ module.exports = class WovReturn {
    * @param {string}   _msg - message describing the failure
    * @return {object} - res object for sender
    */
-  static retFail(_data, _code=400, _msg='Failure') {
+  static retFail(_data, _code=400, _msg='Failure', _meta = null) {
     return new WovReturn({
       success : false,
       code    : _code,
       data    : _data,
       msg     : _msg,
-    });
+    }, _meta);
   }
 
 

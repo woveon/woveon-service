@@ -143,10 +143,8 @@ module.exports = class Listener {
    * If this was listenining, close down.
    */
   async close() {
-    if ( this.server ) {
-      await this.server.close();
-      this.server = null;
-    }
+    if ( this.server ) { await this.server.close(); this.server = null; }
+    else { this.logger.error('listener with no server'); console.trace(); }
   };
 
 
@@ -236,6 +234,7 @@ module.exports = class Listener {
     this.logger.verbose(`...listener heard route: ${_route}`);
     let fn = this.logger.trimpath(_mfilename, this.logger.options.trimTo); // _mfilename.split(this.logger.options.trimTo+'/')[1] || _mfilename;
     this.logger.aspect('listener.incoming', `Handling : '${_route}' with: '${fn}::${_method.name}' :`, _args);
+    this.logger.aspect('thread', `>>>arriving at ${fn}::${_method.name} in ${_mfilename}`);
     let result = {success : false};
 
     // call method and return result
@@ -259,10 +258,11 @@ module.exports = class Listener {
       }
 
       this.logger.aspect('listener.result', '  ... result: ', result);
+      this.logger.aspect('thread', `<<<leaving from ${fn}::${_method.name}`, result);
 
       // Redirect
       if ( result.code == 302 ) {
-        this.logger.info('redirect: ', result.data);
+        this.logger.info('redirect: ', result);
         _res.redirect(302, result.data);
       }
       else { // Success, Fail, Error

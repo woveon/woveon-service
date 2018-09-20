@@ -29,7 +29,7 @@ module.exports = class Service {
   */
   async onInit() {
     this.logger.info('onInit woveon-service');
-    this.listener.onGet('/shutdown', this.onShutdown, __filename);
+    this.listener.onGet('/shutdown', this.doShutdown, __filename);
     this.listener.onGet('/health', this.onHealth, __filename);
   };
 
@@ -48,7 +48,10 @@ module.exports = class Service {
    * Called after child's onShutdown, when shutdown was started by the service.
    * NOTE: Call child's onShutdown first, since this is a virtual destructor.
   */
-  async onShutdown() { await this.listener.close(); };
+  async onShutdown() { 
+    await this.listener.close();
+    this.listener = null;
+  } 
 
 
   /**
@@ -68,15 +71,14 @@ module.exports = class Service {
   /**
    * Create the service.
    * @param {object} _options - additional options
-   *                     : name - overwrite the _name
-   *                     : port - port this listens on
-   *                     : logger - pass in a logger
-   *                     : staticdir - where static html is served from, null means no staticdir
-   *                     : baseroute - prepended to each endpoint ex. https://host/baseroute/route
+   *     : name - overwrite the _name
+   *     : port - port this listens on
+   *     : logger - pass in a logger
+   *     : staticdir - where static html is served from, null means no staticdir
+   *     : baseroute - prepended to each endpoint ex. https://host/baseroute/route
    * NOTE: recently changed arguments to use nodejs defaults... bound to screw this up
    */
   constructor({name = 'unnamed', port = 80, logger = null, staticdir = null, baseroute = null, ver = 'v1'}) {
-    // constructor(_name, _options = {name : '', port : 80, logger : null,  staticdir : null, baseroute : null}) {
     autoBind(this);
 
     this._options = {
@@ -126,6 +128,7 @@ module.exports = class Service {
     this.logger.aspect('service-levels', '    ... service onInit complete');
   }
 
+
   /**
    * @param {bool} _requestip -
    * Starts the listener listening.
@@ -149,70 +152,10 @@ module.exports = class Service {
    * Turns off the service by closing the listener.
    * NOTE: Make sure your service already shut down anything it was managing in onShutdown.
    */
-  async shutdown() {
+  async doShutdown() {
     this.logger.aspect('service-levels', '  ... service shutdown');
     await this.onShutdown();
-    if ( this.db ) await this.db.close();
-    await this.listener.close();
-    // wtf.dump();
-//    setTimeout(()=>{wtf.dump();}, 3000); // log running things
   };
-
-
-  /**
-   * Add a Mongoose schema to this Service. Stores in this.resourceModels, for easy access later.
-   * Call this function in onInit, so db is active.
-   */
-  /*
-  addResourceModel(_model) {
-    this.logger.info('... adding Resource model: ', _model.collection.name);
-    this.resourceModels[_model.collection.name] = _model;
-  }
-  */
-
-  /**
-   * Creates a mongodb for the Resoure type, storing it in plResourceModels.
-   * NOTE: call in onInit, so db is not null
-   * @param {string} _name - name of the model to be created
-   * @param {object} _rsdef - resource definition file, containing Mixin and plSchemaAdditions
-   */
-  /* NOTE: think this is only in WoveonEngine
-  initPluginResourceModel(_name, _rsdef) {
-    if ( _rsdef.plSchemaAdditions != null && _rsdef.Mixin != null ) {
-      let sch = null;
-      let model = null;
-
-      if ( this.db.isConnected() == false ) {
-        this.logger.throwError('Calling initPluginResourceModel when db is not connected. '+
-          'Call in "onInit" run-level.');
-      }
-
-      try {
-        sch = new Schema(Object.assign({}, PluginResSchemaBase, _rsdef.plSchemaAdditions), {timestamps : true});
-            // timestamps => createdAt, updatedAt
-      } catch (err) {
-        this.logger.error(err);
-        throw new Error(`Failed to create a schema for ${_name}.`);
-      }
-
-      // try to grab cached. note, since Mongoose caches them inernally, and not
-      // per connection, I am doing this.
-      try {
-        model = this.db.connection.model(_name);
-      } catch (err) {model= this.db.connection.model(_name, sch);}
-
-      this.logger.verbose('... adding Resource model: ', model.collection.name);
-      this.logger.verbose('... models :', Object.keys(this.plResourceModels));
-      this.plResourceModels[model.collection.name] = model;
-
-    } else {
-      this.logger.throwError('Bad values passed to initResourceModel. '+
-        '"initResourceModel" should be passed a remote service definition '+
-        'for a resource, which has "plSchemaAdditions" and "Mixin" '+
-        'attributes.');
-    }
-  }
-  */
 
 
   /**
