@@ -9,6 +9,7 @@ const uuidv4        = require('uuid/v4');
 const Listener      = require('./listener');
 const Requester     = require('./requester');
 const WovReturn     = require('./wovreturn');
+const Config        = require('./config');
 
 const Logger        = require('woveon-logger');
 const ModelLoader   = require('./modelloader');
@@ -232,3 +233,4 @@ module.exports.WovReturn   = WovReturn;
 module.exports.Requester   = Requester;
 module.exports.Logger      = Logger;
 module.exports.ModelLoader = ModelLoader;
+module.exports.Config      = Config;

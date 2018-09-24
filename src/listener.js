@@ -144,7 +144,7 @@ module.exports = class Listener {
    */
   async close() {
     if ( this.server ) { await this.server.close(); this.server = null; }
-    else { this.logger.error('listener with no server'); console.trace(); }
+    else { this.logger.warn('listener with no server (never inited)'); console.trace(); }
   };
 
 
