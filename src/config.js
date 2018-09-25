@@ -77,13 +77,16 @@ module.exports = class Config {
   }
 
   genK8SConfigMap() {
-    let retval = `# generated from ${this.constructor.name}\n`;
+    // this.logger.info('genK8SConfigMap : ', this.toString());
+    // let retval = `# generated from ${this.constructor.name}\n`;
+    let retval = '';
     for (let p in this.conf) { if (this.conf.hasOwnProperty(p)) retval += `${p}=${this.conf[p]}\n`; }
     return retval;
   }
 
   genK8SSecrets() {
-    let retval = `# generated from ${this.constructor.name}\n`;
+    // let retval = `# generated from ${this.constructor.name}\n`;
+    let retval = '';
     for (let p in this.sconf) { if (this.sconf.hasOwnProperty(p)) retval += `${p}=${this.sconf[p]}\n`; }
     return retval;
   }
