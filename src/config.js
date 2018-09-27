@@ -103,19 +103,21 @@ module.exports = class Config {
     return retval;
   }
 
-  toString() {
+  toString(_pretty = false) {
+    let spacer = null;
+    if ( _pretty ) spacer = '  ';
     let retval = `${this.constructor.name} {`;
-    retval += ` conf : ${JSON.stringify(this.conf, null, null)},`;
-    retval += ` sconf : ${JSON.stringify(this.sconf, null, null)},`;
-    if ( this.wmsg.length > 0 ) { retval += ` wmsg: ${JSON.stringify(this.wmsg, null, null)},`; }
-    if ( this.emsg.length > 0 ) { retval += ` emsg: ${JSON.stringify(this.emsg, null, null)},`; }
+    retval += ` conf : ${JSON.stringify(this.conf, null, spacer)},`;
+    retval += ` sconf : ${JSON.stringify(this.sconf, null, spacer)},`;
+    if ( this.wmsg.length > 0 ) { retval += ` wmsg: ${JSON.stringify(this.wmsg, null, spacer)},`; }
+    if ( this.emsg.length > 0 ) { retval += ` emsg: ${JSON.stringify(this.emsg, null, spacer)},`; }
     retval += `}`;
     return retval;
   }
 
   static displayMe() {
     if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
-    module.exports.logger.info(module.exports.staticconfig.toString());
+    module.exports.staticconfig.logger.info(module.exports.staticconfig.toString(true));
   }
 
 };
