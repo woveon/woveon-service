@@ -113,6 +113,11 @@ module.exports = class Config {
     return retval;
   }
 
+  static displayMe() {
+    if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
+    module.exports.logger.info(module.exports.staticconfig.toString());
+  }
+
 };
 
 module.exports.staticconfig = 1;
