@@ -10,7 +10,7 @@ let ws = new Service({
 
 expect(ws.name).to.equal('demo');
 expect(ws._options.ver).to.equal('v1');
-expect(ws._options.baseroute).to.equal('/demo/v1');
+expect(ws._options.baseroute).to.equal('/v1');
 
 new Promise(async function(r, j) {
   await ws.init();

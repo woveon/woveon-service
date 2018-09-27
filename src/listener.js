@@ -70,7 +70,7 @@ module.exports = class Listener {
     if ( this.staticdir != null ) {
       let fullstaticdir = path.join(process.cwd()+'/'+this.staticdir);
       this.logger.info(`  ... serving static content on '${fullstaticdir}'.`);
-      this.app.use(express.static(fullstaticdir));
+      this.app.use('/static', express.static(fullstaticdir));
       // this.app.use('/static', express.static(fullstaticdir));
     }
 

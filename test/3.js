@@ -1,7 +1,7 @@
 
-const WovReturn = require('../src/wovreturn');
-const Logger    = require('woveon-logger');
 const expect    = require('chai').expect;
+const Logger    = require('woveon-logger');
+const WovReturn = require('../src/wovreturn');
 
 const mtag = '3_WovRet';
 let logger = new Logger(mtag, {

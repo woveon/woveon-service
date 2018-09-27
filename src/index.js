@@ -96,6 +96,8 @@ module.exports = class Service {
     this.logger = logger || new Logger(this.name, {}, {'service' : {'color' : 'blue'}, 'showname' : true});
     this.logger.info(`  options: ${JSON.stringify(this._options)}`);
 
+    this.logger.info('static dir : ', staticdir);
+
     this.logger.aspect('service', '---------------------------------------------------------------------');
     this.logger.aspect('service', '--------------------------------------------------------------------');
     this.logger.aspect('service', ` Woveon Service :: ${this.name}`);

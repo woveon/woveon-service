@@ -9,6 +9,7 @@ let logger    = new Service.Logger('logger', {debug : true});
 let c = null;
 
 function setEnvs() {
+  Service.Config.staticconfig = 1; // avoid error
   process.env.A = 'A';
   process.env.B = 'B';
   process.env.C = 'C';
@@ -24,7 +25,7 @@ function setEnvs() {
 // catch errors of undefined env variables
 setEnvs();
 try {
-  c = new Service.Config(logger, ['A', 'B', 'Z'], ['C', 'sZ']);
+  new Service.Config(logger, ['A', 'B', 'Z'], ['C', 'sZ']);
   expect(1 == 0 ).to.be.true; // should never reach this
 } catch (err) {
   console.log(err.message);
@@ -33,16 +34,17 @@ try {
 
 // catch null
 setEnvs();
-c = new Service.Config(logger, ['A', 'B', 'X'], ['C', 'sX']);
-expect(c.wmsg.length == 2);
+new Service.Config(logger, ['A', 'B', 'X'], ['C', 'sX']);
+logger.info('config: ', Service.Config.staticconfig);//.toString());
+expect(Service.Config.staticconfig.wmsg.length).to.equal(2);
 
 // catch ''
 setEnvs();
-c = new Service.Config(logger, ['A', 'B', 'Y'], ['C', 'sY']);
-expect(c.wmsg.length == 2);
+new Service.Config(logger, ['A', 'B', 'Y'], ['C', 'sY']);
+expect(Service.Config.staticconfig.wmsg.length).to.equal(2);
 
 setEnvs();
-c = new Service.Config(logger, ['A', 'B'], ['C'], {blankenvvars: false});
+new Service.Config(logger, ['A', 'B'], ['C'], {blankenvvars: false});
 /*
 logger.info('c: ', c.toString());
 logger.info('A: ', c.get('A'));
@@ -55,20 +57,36 @@ expect(process.env.A == undefined).to.be.false;
 expect(process.env.B == undefined).to.be.false;
 expect(process.env.C == undefined).to.be.false;
 expect(process.env.Y == '').to.be.true;
-expect(c.get('A')).to.equal(process.env.A);
-expect(c.get('B')).to.equal(process.env.B);
-expect(c.get('C')).to.equal(undefined);
-expect(c.sget('A')).to.equal(undefined);
-expect(c.sget('C')).to.equal(process.env.C);
+expect(Service.Config.get('A')).to.equal(process.env.A);
+expect(Service.Config.get('B')).to.equal(process.env.B);
+try {
+  Service.Config.get('C');
+  expect(1).to.equal(2); // should never reach here because get C throws error as it is undefined.
+} catch (e) {
+  // strip terminal escape codes
+  let m = e.message.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+  expect(m.endsWith('Undefined config \'C\': but it is in sconf. Try \'sget("C")\'')).to.be.true;
+}
+try {
+  Service.Config.sget('A');
+  expect(1).to.equal(2);
+} catch (e) {
+  // strip terminal escape codes
+  let m = e.message.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+  expect(m.endsWith('Undefined secure config \'A\': but it is in conf. Try \'get("A")\'')).to.be.true;
+}
+expect(Service.Config.sget('C')).to.equal(process.env.C);
 
 
 setEnvs();
-let cm = c.genK8SConfigMap();
+new Service.Config(logger, ['A', 'B'], ['C'], {blankenvvars: false});
+let cm = Service.Config.genK8SConfigMap();
+logger.info('cm: ', cm);
 expect(cm.includes('A=A')).to.be.true;
 expect(cm.includes('B=B')).to.be.true;
 expect(cm.includes('C=C')).to.be.false;
-setEnvs();
-let se = c.genK8SSecrets();
+let se = Service.Config.genK8SSecrets();
+logger.info('se: ', se);
 expect(se.includes('A=A')).to.be.false;
 expect(se.includes('B=B')).to.be.false;
 expect(se.includes('C=C')).to.be.true;
