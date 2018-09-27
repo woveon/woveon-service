@@ -29,8 +29,8 @@ module.exports = class Config {
     for (let i=0; i<_conf.length; i++) {
       let vn = _conf[i];
       let v = process.env[vn];
-      console.log('v: un', v, ' ', v === undefined, ' ', v == undefined, ' ', v == 'undefined');
-      console.log('v: nu', v, ' ', v === null, ' ', v == null, ' ', v == 'null');
+      // console.log('v: un', v, ' ', v === undefined, ' ', v == undefined, ' ', v == 'undefined');
+      // console.log('v: nu', v, ' ', v === null, ' ', v == null, ' ', v == 'null');
       if ( v == 'undefined') { this.emsg.push(`env variable ${vn} is not defined`); v = undefined; }
       else {
         if ( v == 'null' ) v = null;
@@ -57,7 +57,10 @@ module.exports = class Config {
 
     // console.log('emsg: ', this.emsg);
     if ( this.emsg.length != 0 ) { this.logger.throwError('Config Error: ', this.emsg); }
-    if ( this.wmsg.length != 0 ) { this.logger.warn('Config Warning: ', this.wmsg); }
+    if ( this.wmsg.length != 0 ) { 
+      this.logger.warn('Config Warning: (', this.wmsg.length, ')'); 
+      for(let i=0; i<this.wmsg.length; i++) { this.logger.warn(i+1, ') ', this.wmsg[i]); }
+    }
 
   }
 
@@ -89,10 +92,7 @@ module.exports = class Config {
   static genK8SConfigMap() {
     if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
     let retval = '';
-    for (let p in module.exports.staticconfig.conf) { 
-      module.exports.staticconfig.logger.info(p);
-      if (module.exports.staticconfig.conf.hasOwnProperty(p)) retval += `${p}=${module.exports.staticconfig.conf[p]}\n`; 
-    }
+    for (let p in module.exports.staticconfig.conf) { if (module.exports.staticconfig.conf.hasOwnProperty(p)) retval += `${p}=${module.exports.staticconfig.conf[p]}\n`; }
     return retval;
   }
 
