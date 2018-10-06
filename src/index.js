@@ -82,7 +82,6 @@ module.exports = class Service {
   constructor(_options = {}) {
     autoBind(this);
 
-
     this._options = Object.assign({}, {
       port      : 80,
       ver       : 'v1',
@@ -91,12 +90,12 @@ module.exports = class Service {
     }, _options);
     if ( this._options.baseroute == null ) this._options.baseroute = `/${this._options.ver}`;
 
-
     this.name     = _options.name || 'unnamed';
     this.internal_address = null;
     this.external_address = null;
 
-    this.logger = _options.logger || new Logger(this.name, {'service' : {'color' : 'blue'}, 'showname' : true}, {});
+    this.logger = _options.logger || new Logger(this.name, {showname: true}, {'service' : {'color' : 'blue'}});
+    this.logger.info(`  options: ${JSON.stringify(this._options)}`);
 
     this.logger.info('static dir : ', this._options.staticdir);
 
@@ -104,6 +103,7 @@ module.exports = class Service {
     this.logger.aspect('service', '--------------------------------------------------------------------');
     this.logger.aspect('service', ` Woveon Service :: ${this.name}`);
     this.logger.aspect('service', '--------------------------------------------------------------------');
+    this.logger.aspect('service', `  options: ${JSON.stringify(this._options)}`);
     this.logger.aspect('service', '---------------------------------------------------------------------');
 
     this.listener  = new Listener(
