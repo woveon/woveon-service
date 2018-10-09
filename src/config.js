@@ -1,6 +1,55 @@
 
 /**
- * A single object that reads in environment variables, ensures they are set, and serves as a single point of these during running. This means you get environment variable simplicity, and can manage it in one location. As well, this divides them into non-secure/secure, and can export them, useful for creating Kubernetes ConfigMaps and Secure files.
+ * Config is a single object managing configuration information pulled from the environment.
+ *
+ * It reads in environment variables, ensures they are set, and serves as a single point of 
+ * these during runtime. This means you get environment variable simplicity, and can manage 
+ * these in one location, as opposed to having env vars scattered throughout your code.
+ *
+ *
+ * Usage:
+ *
+ *   - Defining:
+ *
+ *      // Don't pass in variables, as they should be the same for runtime each time
+ *      class MyConfig extends Config {
+ *        constructor(_logger) {
+ *          super(_logger, [ 'ENV_VAR_1', 'ENV_VAR_2' ], [ 'SECRET_VAR_1', 'SECRET_VAR_2' ] );
+ *        }
+ *      }
+ *
+ *   - Creation:
+ *
+ *      // Just create and forget. You only call static methods.
+ *      new MyConfig(new Logger());
+ *
+ *
+ * Useful functionality (static):
+ *
+ *   - The get/sget methods return the variables.
+ *       MyConfig.get('ENV_VAR_1');
+ *       MyConfig.sget('SECRET_VAR_1');
+ *
+ *   - The genK8S[ConfigMap|Secrets] dump the variables in a format for Kubernetes configuration.
+ *       ex. MyConfig.genK8SConfigMap() 
+ *       ENV_VAR_1=X
+ *       ENV_VAR_2=Y
+ *
+ *   - The isInited is a test if the config has been created (probably only need in special cases).
+ *
+ *   - The displayMe prints the config at runtime for human viewing.
+ *
+ *
+ * Gotchas:
+ *  - Variables are deleted in this shell once read in to avoid using the process.env version
+ *    in your code and being sloppy (unless you set the option "blankenvvars" to false).
+ *  - It should be overloaded via inheritance and not just created with variables passed
+ *    to it. This enables the static methods for generating K8s config to work properly.
+ *  - There is only one config object ever created, so you need to create the object 
+ *    once and call static methods on it. This enables the variable to be accessed across
+ *    all files, in whatever form it is instantiated as (i.e. overloaded via inheritance).
+ *
+ *
  */
 module.exports = class Config {
 
@@ -113,6 +162,11 @@ module.exports = class Config {
     if ( this.emsg.length > 0 ) { retval += ` emsg: ${JSON.stringify(this.emsg, null, spacer)},`; }
     retval += `}`;
     return retval;
+  }
+
+  static isInited() {
+    if ( module.exports.staticconfig == 1 ) return false;
+    return true;
   }
 
   static displayMe() {
