@@ -95,9 +95,9 @@ module.exports = class Service {
     this.external_address = null;
 
     this.logger = _options.logger || new Logger(this.name, {showname: true}, {'service' : {'color' : 'blue'}});
-    this.logger.info(`  options: ${JSON.stringify(this._options)}`);
+    // this.logger.info(`  options: ${JSON.stringify(this._options)}`);
 
-    this.logger.info('static dir : ', this._options.staticdir);
+    // this.logger.info('static dir : ', this._options.staticdir);
 
     this.logger.aspect('service', '---------------------------------------------------------------------');
     this.logger.aspect('service', '--------------------------------------------------------------------');
