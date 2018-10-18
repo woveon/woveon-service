@@ -106,7 +106,7 @@ module.exports = class Config {
 
     // console.log('emsg: ', this.emsg);
     if ( this.emsg.length != 0 ) { this.logger.throwError('Config Error: ', this.emsg); }
-    if ( this.wmsg.length != 0 ) { 
+    if ( this.wmsg.length != 0 ) {
       this.logger.warn('Config Warning: (', this.wmsg.length, ')'); 
       for(let i=0; i<this.wmsg.length; i++) { this.logger.warn(i+1, ') ', this.wmsg[i]); }
     }
@@ -114,7 +114,7 @@ module.exports = class Config {
   }
 
   static get(_v) { 
-    if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
+    if ( module.exports.staticconfig == 1 ) throw new Error(`Config not inited: get("${_v}")`);
     let retval = module.exports.staticconfig.conf[_v];
     if ( retval === undefined ) {
       if ( module.exports.staticconfig.sconf[_v] !== undefined ) 
