@@ -1,4 +1,5 @@
 
+const Logger = require('woveon-logger');
 /**
  * Config is a single object managing configuration information pulled from the environment.
  *
@@ -45,7 +46,7 @@
  *    in your code and being sloppy (unless you set the option "blankenvvars" to false).
  *  - It should be overloaded via inheritance and not just created with variables passed
  *    to it. This enables the static methods for generating K8s config to work properly.
- *  - There is only one config object ever created, so you need to create the object 
+ *  - There is only one config object ever created, so you need to create the object
  *    once and call static methods on it. This enables the variable to be accessed across
  *    all files, in whatever form it is instantiated as (i.e. overloaded via inheritance).
  *
@@ -55,8 +56,9 @@ module.exports = class Config {
 
 
   /**
-   * @param {array} _conf - environment variables this microservice uses (for K8s ConfigMap) 
-   * @param {array} _sconf - private/secure environment variables this microservice uses (for K8s Secrets) 
+   * @param {Logger} _logger - will create one if null
+   * @param {array} _conf - environment variables this microservice uses (for K8s ConfigMap)
+   * @param {array} _sconf - private/secure environment variables this microservice uses (for K8s Secrets)
    * @param {boolean} blankenvvars - by default, sets all env vars to undefined, so your program MUST pull from config
    */
   constructor(_logger, _conf, _sconf, {blankenvvars} = {blankenvvars : true}) {
@@ -66,11 +68,9 @@ module.exports = class Config {
 
     this.conf = {};
     this.sconf = {};
-    this.logger = _logger;
-
-//    console.log('blankenvvars: ', blankenvvars);
-//    console.log('conf : ', _conf);
-//    console.log('sconf: ', _sconf);
+    this.logger = _logger ||  new Logger('config',
+      {showName : true, debug : true, level : 'verbose'},
+      {'listener' : true, 'requester' : true, 'listener.route' : true});
 
     this.emsg = [];
     this.wmsg = [];
@@ -138,18 +138,26 @@ module.exports = class Config {
     return retval;
   }
 
+  _genK8SConfigMap() {
+    let retval = '';
+    for (let p in this.conf) { if (this.conf.hasOwnProperty(p)) retval += `${p}=${this.conf[p]}\n`; }
+    return retval;
+  }
+
   static genK8SConfigMap() {
     if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
+    return module.exports.staticconfig._genK8SConfigMap();
+  }
+
+  _genK8SSecrets() {
     let retval = '';
-    for (let p in module.exports.staticconfig.conf) { if (module.exports.staticconfig.conf.hasOwnProperty(p)) retval += `${p}=${module.exports.staticconfig.conf[p]}\n`; }
+    for (let p in this.sconf) { if (this.sconf.hasOwnProperty(p)) retval += `${p}=${this.sconf[p]}\n`; }
     return retval;
   }
 
   static genK8SSecrets() {
     if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
-    let retval = '';
-    for (let p in module.exports.staticconfig.sconf) { if (module.exports.staticconfig.sconf.hasOwnProperty(p)) retval += `${p}=${module.exports.staticconfig.sconf[p]}\n`; }
-    return retval;
+    return module.exports.staticconfig._genK8SSecrets();
   }
 
   toString(_pretty = false) {
