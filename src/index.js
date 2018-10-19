@@ -88,13 +88,14 @@ module.exports = class Service {
       staticdir : null,
       baseroute : null,
     }, _options);
-    if ( this._options.baseroute == null ) this._options.baseroute = `/${this._options.ver}`;
 
     this.name     = _options.name || 'unnamed';
     this.internal_address = null;
     this.external_address = null;
 
-    this.logger = _options.logger || new Logger(this.name, {showname: true}, {'service' : {'color' : 'blue'}});
+    if ( this._options.baseroute == null ) this._options.baseroute = `/${this.name}/${this._options.ver}`;
+
+    this.logger = _options.logger || new Logger(this.name, {showname : true}, {'service' : {'color' : 'blue'}});
     // this.logger.info(`  options: ${JSON.stringify(this._options)}`);
 
     // this.logger.info('static dir : ', this._options.staticdir);
