@@ -75,6 +75,12 @@ module.exports = class Config {
     this.emsg = [];
     this.wmsg = [];
 
+    // all should have this:
+    //   - WOV_STAGE - the curret stage the microservice is running in
+    //   - WOV_ME    - who the developer is (which may be the stagename)
+    _conf.push('WOV_STAGE', 'WOV_ME');
+
+    // Apply each in _conf and _sconf 
     for (let i=0; i<_conf.length; i++) {
       let vn = _conf[i];
       let v = process.env[vn];
