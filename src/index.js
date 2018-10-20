@@ -4,7 +4,6 @@
 const autoBind      = require('auto-bind-inheritance');
 const CryptoJS      = require('crypto-js'); // library with convenient syntax
 const crypto        = require('crypto');    // part of nodejs
-const os            = require('os');
 const uuidv4        = require('uuid/v4');
 const Listener      = require('./listener');
 const Requester     = require('./requester');
@@ -49,10 +48,10 @@ module.exports = class Service {
    * Called after child's onShutdown, when shutdown was started by the service.
    * NOTE: Call child's onShutdown first, since this is a virtual destructor.
   */
-  async onShutdown() { 
+  async onShutdown() {
     await this.listener.close();
     this.listener = null;
-  } 
+  };
 
 
   /**
@@ -104,7 +103,6 @@ module.exports = class Service {
     this.logger.aspect('service', '--------------------------------------------------------------------');
     this.logger.aspect('service', ` Woveon Service :: ${this.name}`);
     this.logger.aspect('service', '--------------------------------------------------------------------');
-    this.logger.aspect('service', `  options: ${JSON.stringify(this._options)}`);
     this.logger.aspect('service', '---------------------------------------------------------------------');
 
     this.listener  = new Listener(
@@ -149,7 +147,8 @@ module.exports = class Service {
       await this.onStartup();
       await this.onPostStartup();
 
-    } catch (err) {this.logger.error(err); throw new Error(`run failed`);};
+    }
+    catch (err) { this.logger.rethrowError(err, `run failed`); };
   };
 
 
@@ -166,7 +165,7 @@ module.exports = class Service {
   /**
    * @return {string} -
     */
-  static generateToken() {return uuidv4();}
+  static generateToken() { return uuidv4(); }
 
 
   /**
@@ -199,7 +198,7 @@ module.exports = class Service {
 
   /**
    */
-  static orderedStringReset() {Service.GOS_last = -1;}
+  static orderedStringReset() { Service.GOS_last = -1; }
 
 
   /**
@@ -226,7 +225,8 @@ module.exports = class Service {
     try {
       let result = CryptoJS.AES.encrypt(JSON.stringify(_secret), _saltedkey);
       retval = result.toString();
-    } catch (e) {console.log(e); throw new Error('Failed to encrypt.');}
+    }
+    catch (e) { console.log(e); throw new Error('Failed to encrypt.'); }
     return retval;
   }
 
