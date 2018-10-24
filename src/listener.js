@@ -2,6 +2,7 @@ const express    = require('express');
 const bodyParser = require('body-parser');
 const path       = require('path');
 const Handlebars = require('handlebars');
+const fs         = require('fs');
 
 const WovReturn  = require('./wovreturn');
 
@@ -69,6 +70,17 @@ module.exports = class Listener {
     // serve static content if set
     if ( this.staticdir != null ) {
       let fullstaticdir = path.join(process.cwd()+'/'+this.staticdir);
+
+      // test that directory exists
+      let failedpath = true;
+      if ( fs.existsSync(fullstaticdir) ) {
+        let sy = fs.statSync(fullstaticdir);
+        if ( sy.isDirectory() ) failedpath = false;
+      }
+      if ( failedpath == true ) {
+        this.logger.throwError(`Failed to set path for static content: "${fullstaticdir}". Did you start node in the correct directory? Maybe go back a directory and run it?`);
+      }
+
       this.logger.info(`  ... serving static content on '${fullstaticdir}'.`);
       this.app.use('/static', express.static(fullstaticdir));
       // this.app.use('/static', express.static(fullstaticdir));
@@ -262,7 +274,7 @@ module.exports = class Listener {
 
       // Redirect
       if ( result.code == 302 ) {
-        this.logger.info('redirect: ', result);
+        // this.logger.info('redirect: ', result, _res);
         _res.redirect(302, result.data);
       }
       else { // Success, Fail, Error
@@ -326,9 +338,9 @@ module.exports = class Listener {
    */
   async onGet(_route, _method, _mfilename, _docMethod = null) {
     if ( _mfilename == null ) { this.logger.throwError('Need to append "__filename" to listener function.'); }
-    this.logger.info('onGet : root : ', this.root);
+    this.logger.info('onGet : root: ', this.root);
     let rr = this.root + _route;
-    this.logger.info('onGet : rr : ', rr);
+    this.logger.info('onGet : rr: ', rr);
     this.onDoc(rr, _docMethod, 'get');
 
     if ( this.islistening ) { this.logger.throwError(`calling Listener.onGet "${rr}" when already listening.`); }
@@ -455,7 +467,11 @@ module.exports = class Listener {
           params  : [],
         }).options;
       }
-      else { dataOverview.hasPage = true; } // has has path page, then link
+      else { 
+        if ( node.methods == null ) node.methods = {}
+        if ( node.params  == null ) node.params  = []
+        dataOverview.hasPage = true; 
+      } // has has path page, then link
 
       if ( node.summary ) dataOverview.summary = node.summary;
 
@@ -465,6 +481,8 @@ module.exports = class Listener {
           let verb = this.verbs[vi];
           vlist.push(verb);
           // this.logger.info(' -- has proerpty ', verb, ' ',  _cur.hasOwnProperty(verb) );
+          // this.logger.info('getting verb: ', verb, ' of node : ', node);
+
 
           if ( node.methods[verb] != null ) {
             if ( _cur[verb] != null ) {
