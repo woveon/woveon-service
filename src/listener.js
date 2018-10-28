@@ -338,9 +338,9 @@ module.exports = class Listener {
    */
   async onGet(_route, _method, _mfilename, _docMethod = null) {
     if ( _mfilename == null ) { this.logger.throwError('Need to append "__filename" to listener function.'); }
-    this.logger.info('onGet : root: ', this.root);
+//    this.logger.info('onGet : root: ', this.root);
     let rr = this.root + _route;
-    this.logger.info('onGet : rr: ', rr);
+//    this.logger.info('onGet : rr: ', rr);
     this.onDoc(rr, _docMethod, 'get');
 
     if ( this.islistening ) { this.logger.throwError(`calling Listener.onGet "${rr}" when already listening.`); }
