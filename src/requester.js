@@ -90,7 +90,7 @@ module.exports = class Requester {
             else {
               // this.logger.info('error ', r.status);
               retval = WovReturn.retError(retval);
-              retval.addMeta({url : r.url, status : r.status});
+              WovReturn.addMeta(retval, {url : r.url, status : r.status});
             }
             // this.logger.info('result is ', retval);
           }

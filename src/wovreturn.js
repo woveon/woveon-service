@@ -38,6 +38,7 @@ module.exports = class WovReturn {
    * @return {boolean} - true if should be considered a WovReturn
    */
   static isValidWovReturn(_obj) {
+    if ( _obj == null ) return false;
     if ( _obj.data === undefined || _obj.success === undefined ) return false;
     return true;
   }
