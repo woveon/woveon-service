@@ -66,8 +66,9 @@ module.exports = class Config {
     if ( module.exports.staticconfig != 1 ) { _logger.throwError('Calling Config constructor multiple times'); }
     module.exports.staticconfig = this;
 
-    this.conf = {};
+    this.conf  = {};
     this.sconf = {};
+    this._data  = {};
     this.logger = _logger ||  new Logger('config',
       {showName : true, debug : true, level : 'verbose'},
       {'listener' : true, 'requester' : true, 'listener.route' : true});
@@ -76,9 +77,10 @@ module.exports = class Config {
     this.wmsg = [];
 
     // all should have this:
+    //   - WOV_PROJECT - the name of the project
     //   - WOV_STAGE - the curret stage the microservice is running in
     //   - WOV_ME    - who the developer is (which may be the stagename)
-    _conf.push('WOV_STAGE', 'WOV_ME');
+    _conf.push('WOV_STAGE', 'WOV_ME', 'WOV_PROJECT');
 
     // Apply each in _conf and _sconf 
     for (let i=0; i<_conf.length; i++) {
@@ -113,13 +115,12 @@ module.exports = class Config {
     // console.log('emsg: ', this.emsg);
     if ( this.emsg.length != 0 ) { this.logger.throwError('Config Error: ', this.emsg); }
     if ( this.wmsg.length != 0 ) {
-      this.logger.warn('Config Warning: (', this.wmsg.length, ')'); 
-      for(let i=0; i<this.wmsg.length; i++) { this.logger.warn(i+1, ') ', this.wmsg[i]); }
+      this.logger.warn('Config Warning: (', this.wmsg.length, ')');
+      for (let i=0; i<this.wmsg.length; i++) { this.logger.warn(i+1, ') ', this.wmsg[i]); }
     }
-
   }
 
-  static get(_v) { 
+  static get(_v) {
     if ( module.exports.staticconfig == 1 ) throw new Error(`Config not inited: get("${_v}")`);
     let retval = module.exports.staticconfig.conf[_v];
     if ( retval === undefined ) {
@@ -172,11 +173,35 @@ module.exports = class Config {
     let retval = `${this.constructor.name} {`;
     retval += ` conf : ${JSON.stringify(this.conf, null, spacer)},`;
     retval += ` sconf : ${JSON.stringify(this.sconf, null, spacer)},`;
+    retval += ` data : ${JSON.stringify(Object.keys(this._data), null, spacer)},`;
     if ( this.wmsg.length > 0 ) { retval += ` wmsg: ${JSON.stringify(this.wmsg, null, spacer)},`; }
     if ( this.emsg.length > 0 ) { retval += ` emsg: ${JSON.stringify(this.emsg, null, spacer)},`; }
     retval += `}`;
     return retval;
   }
+
+  /**
+   * Set data on the Config for later use.
+   *   ex. Not  'get("A")' but C.A
+   *
+   * @param {string} _key - the key for the data
+   * @param {object} _val - data attached to config
+   */
+  static setData(_key, _val) {
+    if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
+    module.exports.staticconfig._data[_key] = _val;
+  }
+
+  /**
+   * Return the data.
+   * @param {string} _key - the key for the data
+   * @return {object} - returns data
+   */
+  static data(_key) {
+    if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
+    return module.exports.staticconfig._data[_key];
+  }
+
 
   static isInited() {
     if ( module.exports.staticconfig == 1 ) return false;
@@ -186,6 +211,11 @@ module.exports = class Config {
   static displayMe() {
     if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
     module.exports.staticconfig.logger.info(module.exports.staticconfig.toString(true));
+  }
+
+  static getLogger() { 
+    if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
+    return module.exports.staticconfig.logger;
   }
 
 };

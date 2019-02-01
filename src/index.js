@@ -81,6 +81,10 @@ module.exports = class Service {
   constructor(_options = {}) {
     autoBind(this);
 
+    if ( typeof _options != 'object' ) {
+      throw Error(`Woveon-Service service is not being initialized with an object, but a "${typeof _options}", with value: "${_options}".`);
+    }
+
     this._options = Object.assign({}, {
       port      : 80,
       ver       : 'v1',

@@ -53,6 +53,7 @@ module.exports = class Requester {
     if ( _body != null ) fetchoptions.body = (_body ? JSON.stringify(_body) : '');
 
     // this.logger.info('fetchOptions ', fetchoptions);
+    this.logger.aspect('request.full', `url: ${fullurl} : `, fetchoptions);
     this.logger.aspect('thread', `>>>transfer to ${fullurl}`);
     r = await fetch(fullurl, fetchoptions)
       .catch( (err) => {
@@ -71,35 +72,57 @@ module.exports = class Requester {
       if ( _rawresult) retval = r;
       else {
         try {
-          this.logger.aspect('req.redirect', 'r returned ', r);
+          let contentmismatch = false;
+          this.logger.aspect('req.redirect', 'r: ', r.ok);
+          this.logger.aspect('req.redirect', 'r: ', r.status);
+          this.logger.aspect('req.redirect', 'r: ', r.statusText);
+          this.logger.aspect('req.redirect', 'r: ', r.headers.raw());
+          this.logger.aspect('req.redirect', 'r: ', r.headers.get('content-type'));
+
+          if ( ! r.headers.get('content-type').startsWith(this.headerbase['Content-Type']) ) {
+            this.logger.warn(`Content type mismatch: expected(${this.headerbase['Content-Type']}) received(${r.headers.get('content-type')})`);
+            contentmismatch = true;
+            if ( r.headers.get('content-type').startsWith('text/html') ) {
+              retval = await r.text();
+              this.logger.warn('text: ', retval);
+            }
+            else if ( r.headers.get('content-type').startsWith('application/json') ) {
+              retval = await r.json();
+              this.logger.warn('json: ', retval);
+            }
+
+          }
 
           // handle types of data: only json and html so far
           if ( this.headerbase['Content-Type'] == 'application/json' ) {
-            retval = await r.json();
+            if ( retval == null ) retval = await r.json();
             // this.logger.info('json returned ', retval);
             if ( WovReturn.isValidWovReturn(retval) ) {
               // this.logger.info('just adding meta to json');
-              WovReturn.addMeta(retval, {url : r.url});
+              WovReturn.addMeta(retval, {url : r.url, contentmismatch});
               this.logger.info('code ', retval);
               retval.code = r.status; // adding back in
             }
             else if ( r.status == 200 ) {
               // this.logger.info('success');
               retval = WovReturn.retSuccess(retval, {url : r.url});
+              WovReturn.addMeta(retval, {contentmismatch});
             }
             else {
               // this.logger.info('error ', r.status);
               retval = WovReturn.retError(retval);
               WovReturn.addMeta(retval, {url : r.url, status : r.status});
+              WovReturn.addMeta(retval, {contentmismatch});
             }
             // this.logger.info('result is ', retval);
           }
           else if ( this.headerbase['Content-Type'] == 'text/html' ) {
-            let html = await r.text();
+            let html = retval;
+            if ( html == null ) html = await r.text();
             this.logger.aspect('req.redirect', 'text returned ', html);
             if      ( r.status == 200 ) { retval = WovReturn.retSuccess(html,  {url : r.url}); }
             else if ( r.status == 302 ) { retval = WovReturn.retRedirect(html, {url : r.url}); }
-            else if ( r.status == 400 ) { 
+            else if ( r.status == 400 ) {
 
               // --- check if json is returned for error returns
               try { let json = JSON.parse(html); retval = WovReturn.retError(json, null,    {url : r.url}); }
@@ -107,11 +130,17 @@ module.exports = class Requester {
 
             }
             else { retval = WovReturn.retFail(html, r.status, 'unhandled http code', {url : r.url}); }
+            WovReturn.addMeta(retval, {contentmismatch});
           }
           else { this.logger.error(`Unknown content type of '${this.headerbase['Content-Type']}'`); }
         }
         catch (e) {
           this.logger.error(e);
+          this.logger.aspect('req.redirect', 'r: ', r.ok);
+          this.logger.aspect('req.redirect', 'r: ', r.status);
+          this.logger.aspect('req.redirect', 'r: ', r.statusText);
+          this.logger.aspect('req.redirect', 'r: ', r.headers.raw());
+          this.logger.aspect('req.redirect', 'r: ', r.headers.get('content-type'));
           // if ( _throwOnError ) {throw e;} else fetchfail = e.message;
           // just return the raw result
           retval = r;

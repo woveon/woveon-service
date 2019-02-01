@@ -100,7 +100,7 @@ module.exports = class Listener {
       if (Object.keys(req.params > 0).length) { that.logger.aspect('listener', '  : params : ', req.params); }
       if (Object.keys(req.query).length)      { that.logger.aspect('listener', '  :  query : ', req.query);  }
       if (Object.keys(req.body).length)       { that.logger.aspect('listener', '  :   body : ', req.body);   }
-      if (req.files)                          { that.logger.aspect('listener', '  :  query : ', req.files);  }
+      if (req.files)                          { that.logger.aspect('listener', '  :  files : ', req.files);  }
 
       res.header('Access-Control-Allow-Origin', req.headers.origin);
       res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
@@ -116,6 +116,7 @@ module.exports = class Listener {
    * @return {promise}
    */
   async listen() {
+
 
     try { this._resolveDocs(); }
     catch (e) {
