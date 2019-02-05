@@ -54,6 +54,41 @@ const Logger = require('woveon-logger');
  */
 module.exports = class Config {
 
+  /**
+   * Generic function to add array of vars to the config.
+   */
+  static _addInVars(_l, _vars, _dest, _emsg, _wmsg, _extra, _blankenvvars) {
+
+    for (let i=0; i<_vars.length; i++) {
+      let vn = _vars[i];
+      let v = process.env[vn];
+      // console.log('v: un', v, ' ', v === undefined, ' ', v == undefined, ' ', v == 'undefined');
+      // console.log('v: nu', v, ' ', v === null, ' ', v == null, ' ', v == 'null');
+      if ( v == 'undefined') { _emsg.push(`env variable ${vn} is not defined`); v = undefined; }
+      else {
+        if ( v == 'null' ) v = null;
+        if ( v == null || v == '' ) { _wmsg.push(`${_extra}env variable ${vn} is '${v}'`); }
+        _l.aspect('config', vn + ': '+ v);
+        _dest[vn] = v;
+        if ( _blankenvvars ) process.env[vn] = undefined;
+      }
+    }
+  }
+
+
+  /**
+   * Print results and such.
+   * @param {Logger} _l - woveon logger
+   * @param {array} _wmsg - array of warnings
+   * @param {array} _emsg - array of errors
+   */
+  static _reviewResults(_l, _wmsg, _emsg) {
+    if ( _emsg.length != 0 ) { _l.throwError('Config Error: ', _emsg); }
+    if ( _wmsg.length != 0 ) {
+      _l.warn('Config Warning: (', _wmsg.length, ')');
+      for (let i=0; i<_wmsg.length; i++) { _l.warn(i+1, ') ', _wmsg[i]); }
+    }
+  }
 
   /**
    * @param {Logger} _logger - will create one if null
@@ -82,7 +117,11 @@ module.exports = class Config {
     //   - WOV_ME    - who the developer is (which may be the stagename)
     _conf.push('WOV_STAGE', 'WOV_ME', 'WOV_PROJECT');
 
-    // Apply each in _conf and _sconf 
+    // Apply each in _conf and _sconf
+    module.exports._addInVars(this.logger, _conf,  this.conf,  this.emsg, this.wmsg, '',        blankenvvars);
+    module.exports._addInVars(this.logger, _sconf, this.sconf, this.emsg, this.wmsg, 'secret ', blankenvvars);
+
+    /*
     for (let i=0; i<_conf.length; i++) {
       let vn = _conf[i];
       let v = process.env[vn];
@@ -111,24 +150,36 @@ module.exports = class Config {
         if ( blankenvvars ) process.env[vn] = undefined;
       }
     }
+    */
 
     // console.log('emsg: ', this.emsg);
+    module.exports._reviewResults(this.logger, this.wmsg, this.emsg);
+    /*
     if ( this.emsg.length != 0 ) { this.logger.throwError('Config Error: ', this.emsg); }
     if ( this.wmsg.length != 0 ) {
       this.logger.warn('Config Warning: (', this.wmsg.length, ')');
       for (let i=0; i<this.wmsg.length; i++) { this.logger.warn(i+1, ') ', this.wmsg[i]); }
     }
+    */
   }
 
-  static get(_v) {
-    if ( module.exports.staticconfig == 1 ) throw new Error(`Config not inited: get("${_v}")`);
-    let retval = module.exports.staticconfig.conf[_v];
+
+  /**
+   * Returns a config variable.
+   * @param {string} _k - environment variable
+   * @return {string} - value for the key
+   */
+  static get(_k) {
+    if ( module.exports.staticconfig == 1 ) throw new Error(`Config not inited: get("${_k}")`);
+    let retval = module.exports.staticconfig.conf[_k];
     if ( retval === undefined ) {
-      if ( module.exports.staticconfig.sconf[_v] !== undefined ) 
-        module.exports.staticconfig.logger.throwError(`Undefined config '${_v}': but it is in sconf. Try 'sget("${_v}")'`);
-      else if ( process.env[_v] !== undefined ) 
-        module.exports.staticconfig.logger.throwError(`Undefined config '${_v}': but it is an environment variable. Add '${_v}' to config constructor.`);
-      else module.exports.staticconfig.logger.throwError(`Undefined config '${_v}': set the environment variable and add to instantiation of Config`);
+      if ( module.exports.staticconfig.sconf[_k] !== undefined ) {
+        module.exports.staticconfig.logger.throwError(`Undefined config '${_k}': but it is in sconf. Try 'sget("${_k}")'`);
+      }
+      else if ( process.env[_k] !== undefined ) {
+        module.exports.staticconfig.logger.throwError(`Undefined config '${_k}': but it is an environment variable. Add '${_k}' to config constructor.`);
+      }
+      else module.exports.staticconfig.logger.throwError(`Undefined config '${_k}': set the environment variable and add to instantiation of Config`);
     }
     return retval;
   }
@@ -144,6 +195,30 @@ module.exports = class Config {
     }
     return retval;
   }
+
+  /**
+   * Set a value later.
+   * @param {string} _k - key
+   * @param {bool} _blankenvvars - if true, deletes the env var from the current environment
+   */
+  static set(_k, _blankenvvars = true) {
+    if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
+    module.exports._addInVars(module.exports.staticconfig.logger, [_k], module.exports.staticconfig.conf, module.exports.staticconfig.emsg, module.exports.staticconfig.wmsg, '', _blankenvvars);
+    module.exports._reviewResults(module.exports.staticconfig.logger, module.exports.staticconfig.wmsg, module.exports.staticconfig.emsg);
+  }
+
+
+  /**
+   * Secure set a value later.
+   * @param {string} _k - key
+   * @param {bool} _blankenvvars - if true, deletes the env var from the current environment
+   */
+  static sset(_k, _blankenvvars = true) {
+    if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
+    module.exports._addInVars(module.exports.logger, [_k], module.exports.sconf, module.exports.emsg, module.wmsg, 'secure ', _blankenvvars);
+    module.exports._reviewResults(this.logger, this.wmsg, this.emsg);
+  }
+
 
   _genK8SConfigMap() {
     let retval = '';
