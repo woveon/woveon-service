@@ -215,7 +215,7 @@ module.exports = class Config {
    */
   static sset(_k, _blankenvvars = true) {
     if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
-    module.exports._addInVars(module.exports.logger, [_k], module.exports.sconf, module.exports.emsg, module.wmsg, 'secure ', _blankenvvars);
+    module.exports._addInVars(module.exports.staticconfig.logger, [_k], module.exports.staticconfig.sconf, module.exports.staticconfig.emsg, module.exports.staticconfig.wmsg, 'secure ', _blankenvvars);
     module.exports._reviewResults(this.logger, this.wmsg, this.emsg);
   }
 
