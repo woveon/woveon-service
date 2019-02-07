@@ -197,11 +197,32 @@ module.exports = class Config {
   }
 
   /**
-   * Set a value later.
+   * (re)Set a value later.
+   * @param {string} _k - key
+   * @param {string} _v - value
+   */
+  static set(_k, _v) {
+    if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
+    module.exports.staticconfig.conf[_k] = _v;
+  }
+
+
+  /**
+   * (re)sSet a value later.
+   * @param {string} _k - key
+   * @param {string} _v - value
+   */
+  static sset(_k, _v) {
+    if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
+    module.exports.staticconfig.sconf[_k] = _v;
+  }
+
+  /**
+   * Add a value later.
    * @param {string} _k - key
    * @param {bool} _blankenvvars - if true, deletes the env var from the current environment
    */
-  static set(_k, _blankenvvars = true) {
+  static add(_k, _blankenvvars = true) {
     if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
     module.exports._addInVars(module.exports.staticconfig.logger, [_k], module.exports.staticconfig.conf, module.exports.staticconfig.emsg, module.exports.staticconfig.wmsg, '', _blankenvvars);
     module.exports._reviewResults(module.exports.staticconfig.logger, module.exports.staticconfig.wmsg, module.exports.staticconfig.emsg);
@@ -209,11 +230,11 @@ module.exports = class Config {
 
 
   /**
-   * Secure set a value later.
+   * Secure add a value later.
    * @param {string} _k - key
    * @param {bool} _blankenvvars - if true, deletes the env var from the current environment
    */
-  static sset(_k, _blankenvvars = true) {
+  static sadd(_k, _blankenvvars = true) {
     if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
     module.exports._addInVars(module.exports.staticconfig.logger, [_k], module.exports.staticconfig.sconf, module.exports.staticconfig.emsg, module.exports.staticconfig.wmsg, 'secure ', _blankenvvars);
     module.exports._reviewResults(this.logger, this.wmsg, this.emsg);
