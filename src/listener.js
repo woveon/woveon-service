@@ -738,7 +738,12 @@ module.exports = class Listener {
 
     for (let i=1; i<paths.length; i++) {
       let p = paths[i];
+      // this.logger.info('check : ', p, cur);
+      if ( p == 'put' || p == 'get' || p == 'delete' || p == 'post' || p == 'options' ) {
+        this.logger.warn(`using http method ${p} as part of route`);
+      }
       if ( ! (p in cur) ) {
+        // this.logger.info('  adding : ', p);
         cur[p] = {};
       }
       cur = cur[p];
@@ -751,7 +756,6 @@ module.exports = class Listener {
       cur['base'] = _docdata;
     }
     else {
-      // console.log(_httpverb+' :', _route);
       cur[_httpverb] = _docdata;
       if ( cur['base'] == undefined ) cur['base'] = null;
     }
