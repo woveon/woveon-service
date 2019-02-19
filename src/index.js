@@ -55,12 +55,26 @@ module.exports = class Service {
 
 
   /**
-   * For now, just return true.
+   * For now, just return true unless this.db exists, then check connection.
    * @return {bool} - true, since still running
    */
   async onHealth() {
-    this.logger.info('woveon-service onHealth hit');
-    return WovReturn.retSuccess(true);
+    let retval = null;
+    this.logger.aspect('health', 'Woveon-service onHealth hit');
+
+    if ( this.db == null ) { retval = WovReturn.retSuccess(true); }
+    else {
+
+      let q = 'SELECT 1;';
+      let v = [];
+      this.logger.aspect('health', 'q: ', q, '\nv: ', v);
+      let r = await this.db.query(q, v);
+      this.logger.aspect('health', 'r: ', r);
+      if ( r.rowCount == 1 ) { retval = WovReturn.retSuccess(true); }
+      else { retval = WovReturn.retError(r, 'failed to find session'); }
+    }
+
+    return retval;
   };
 
   // ---------------------------------------------------------------------
