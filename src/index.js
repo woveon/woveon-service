@@ -63,6 +63,13 @@ module.exports = class Service {
     this.logger.aspect('health', 'Woveon-service onHealth hit');
 
     if ( this.db == null ) { retval = WovReturn.retSuccess(true); }
+
+    // for NoSQL, check with isConnected
+    else if ( this.db.isConnected != null ) {
+      retval = WovReturn.retSuccess(this.db.isConnected());
+    }
+
+    // assumes SQL
     else {
 
       let q = 'SELECT 1;';
