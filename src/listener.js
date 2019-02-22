@@ -32,7 +32,7 @@ module.exports = class Listener {
     this.name        = _name;
 
     if ( _port == null || typeof _port == 'object' ) {
-      this.logger.info(` args: `, typeof _port,  Array.from(arguments));
+      this.logger.info(` args: ${typeof _port}  ${Array.from(arguments)}`);
       console.trace();
       this.logger.throwError('You are not sending correct params to Listener');
     }
@@ -102,7 +102,7 @@ module.exports = class Listener {
       if (Object.keys(req.body).length)       { that.logger.aspect('listener', '  :   body : ', req.body);   }
       if (req.files)                          { that.logger.aspect('listener', '  :  files : ', req.files);  }
 
-      res.header('Access-Control-Allow-Origin', req.get('origin'); // req.headers.origin
+      res.header('Access-Control-Allow-Origin', req.get('origin')); // req.headers.origin
       res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
       res.header('Access-Control-Allow-Methods', 'POST, GET, PUT, DELETE, OPTIONS');
       res.header('Access-Control-Allow-Credentials', 'true');
@@ -254,7 +254,7 @@ module.exports = class Listener {
       if ( typeof _method === 'function' ) { result = await _method(_args, _res); }
       else { result = this.retSuccess(_method); }
 
-      if ( result == null || (! result instanceof WovReturn) ) {
+      if ( result == null || (! (result instanceof WovReturn)) ) {
         this.logger.throwError(
           'Method did not return WovReturn object. Call retSucces, retFail or retError\n'+
           '  result  : ', JSON.stringify(result, null, '  '), '\n'+
@@ -467,10 +467,10 @@ module.exports = class Listener {
           params  : [],
         }).options;
       }
-      else { 
-        if ( node.methods == null ) node.methods = {}
-        if ( node.params  == null ) node.params  = []
-        dataOverview.hasPage = true; 
+      else {
+        if ( node.methods == null ) node.methods = {};
+        if ( node.params  == null ) node.params  = [];
+        dataOverview.hasPage = true;
       } // has has path page, then link
 
       if ( node.summary ) dataOverview.summary = node.summary;
@@ -876,4 +876,5 @@ module.exports.DocPath   = DocPath;
 module.exports.DocMethod = DocMethod;
 module.exports.DocParam  = DocParam;
 module.exports.DocResp   = DocResp;
+module.exports.DocDoc    = DocDoc;
 
