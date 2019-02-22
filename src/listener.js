@@ -102,7 +102,7 @@ module.exports = class Listener {
       if (Object.keys(req.body).length)       { that.logger.aspect('listener', '  :   body : ', req.body);   }
       if (req.files)                          { that.logger.aspect('listener', '  :  files : ', req.files);  }
 
-      res.header('Access-Control-Allow-Origin', req.headers.origin);
+      res.header('Access-Control-Allow-Origin', req.get('origin'); // req.headers.origin
       res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
       res.header('Access-Control-Allow-Methods', 'POST, GET, PUT, DELETE, OPTIONS');
       res.header('Access-Control-Allow-Credentials', 'true');
@@ -128,7 +128,6 @@ module.exports = class Listener {
     if ( this.externalapp == true ) { this.islistening = true; return Promise.resolve(); }
 
     return new Promise((resolve, reject) => {
-
 
       // cap with a final error listener
       this.islistening = true;
