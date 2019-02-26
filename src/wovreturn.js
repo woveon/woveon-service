@@ -135,6 +135,7 @@ module.exports = class WovReturn {
     let attrs = _attr;
     let emsg  = {missing : [], unexpected : [] };
 
+
     // convert string/array to hash, assuming true
     if ( typeof _attr == 'string' ) { attrs = {}; attrs[_attr] = true; }
     else if ( Array.isArray(_attr) )  {
@@ -166,12 +167,12 @@ module.exports = class WovReturn {
     //    console.log('checkBodyAtribure "', emsg, '"');
     if ( emsg.missing.length == 0 && emsg.unexpected.length == 0 ) { retval = null; }
     else {
-      if ( _options.retRawError == false ) {
+      if ( _options.retRawError == true ) { retval = new Error(emsg); }
+      else {
         emsg.args = _args;
         emsg.attrs = attrs;
         retval = this.retError(emsg, `ERROR: attribute failure`);
       }
-      else { retval = new Error(emsg); }
     }
 
     return retval;
