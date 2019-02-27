@@ -4,6 +4,8 @@ const path       = require('path');
 const Handlebars = require('handlebars');
 const fs         = require('fs');
 
+const cors       = require('cors');
+
 const WovReturn  = require('./wovreturn');
 
 /**
@@ -91,6 +93,11 @@ module.exports = class Listener {
 
     this.logger.verbose('  ... listener configure routes');
     let that = this;
+
+    // set CORS to enable all CORS requests
+    this.app.use(cors());
+
+    // debugging for each call
     this.app.all('*', function(req, res, next) {
       // I think this works because shifted to function
       that.logger.aspect('listener', `*** Incoming (port ${that.port}): `+
@@ -102,11 +109,13 @@ module.exports = class Listener {
       if (Object.keys(req.body).length)       { that.logger.aspect('listener', '  :   body : ', req.body);   }
       if (req.files)                          { that.logger.aspect('listener', '  :  files : ', req.files);  }
 
+      /*
       that.logger.info('...setting Access-Control-Allow-Origin to *.');
-      res.header('Access-Control-Allow-Origin', '*'); // req.headers.origin); // req.get('origin')); // req.headers.origin
+      res.header('Access-Control-Allow-Origin', req.headers.origin); // req.get('origin')); // req.headers.origin
       res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
       res.header('Access-Control-Allow-Methods', 'POST, GET, PUT, DELETE, OPTIONS');
       res.header('Access-Control-Allow-Credentials', 'true');
+      */
       next();
     });
   };
