@@ -102,7 +102,7 @@ module.exports = class Listener {
       if (Object.keys(req.body).length)       { that.logger.aspect('listener', '  :   body : ', req.body);   }
       if (req.files)                          { that.logger.aspect('listener', '  :  files : ', req.files);  }
 
-      this.logger.info('...setting Access-Control-Allow-Origin to *.');
+      that.logger.info('...setting Access-Control-Allow-Origin to *.');
       res.header('Access-Control-Allow-Origin', '*'); // req.headers.origin); // req.get('origin')); // req.headers.origin
       res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
       res.header('Access-Control-Allow-Methods', 'POST, GET, PUT, DELETE, OPTIONS');
