@@ -52,7 +52,10 @@ const Logger = require('woveon-logger');
  *
  *
  */
+
+
 module.exports = class Config {
+
 
   /**
    * Generic function to add array of vars to the config.
@@ -89,6 +92,8 @@ module.exports = class Config {
       for (let i=0; i<_wmsg.length; i++) { _l.warn(i+1, ') ', _wmsg[i]); }
     }
   }
+
+
 
   /**
    * @param {Logger} _logger - will create one if null
@@ -161,6 +166,9 @@ module.exports = class Config {
       for (let i=0; i<this.wmsg.length; i++) { this.logger.warn(i+1, ') ', this.wmsg[i]); }
     }
     */
+
+    module.exports.blockForInit(); // call to make sure next function exists
+    module.exports.staticpromiseresolve(true);
   }
 
 
@@ -314,6 +322,20 @@ module.exports = class Config {
     return module.exports.staticconfig.logger;
   }
 
+  /**
+   * Blocks for Config to be created.
+   */
+  static async blockForInit() {
+    if ( module.exports.staticpromise == 1 ) {
+      // javascript witchcraft. this creates an external resolve function to the promise that everything is waiting on
+      module.exports.staticpromise = new Promise((res, rej)=>{ module.exports.staticpromiseresolve = res; });
+    }
+    return module.exports.staticpromise;
+  }
+
 };
 
-module.exports.staticconfig = 1;
+// module.exports = function() { return new Promise(function(res, rej) { res(true); }); };
+
+module.exports.staticconfig  = 1;
+module.exports.staticpromise = 1;
