@@ -296,7 +296,10 @@ module.exports = class Listener {
     catch (error) {
       console.log(error);
       this.logger.warn(error);
-      if ( process.env.WOV_STAGE != 'prod' ) result.error   = `${error}`;
+      if ( process.env.WOV_STAGE != 'prod' ) {
+        result.error = error.msg;
+        result.data  = error.data;
+      }
       this.logger.warn(result);
       _res.status(400).json(result);
     }
