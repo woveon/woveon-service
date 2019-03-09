@@ -264,7 +264,8 @@ module.exports = class Listener {
       if ( typeof _method === 'function' ) { result = await _method(_args, _res); }
       else { result = this.retSuccess(_method); }
 
-      if ( result == null || (! (result instanceof WovReturn)) ) {
+      // this.logger.info('result: ', result, result instanceof WovReturn );
+      if ( result == null || (! WovReturn.isValidWovReturn(result)) ) {
         this.logger.throwError(
           'Method did not return WovReturn object. Call retSucces, retFail or retError\n'+
           '  result  : ', JSON.stringify(result, null, '  '), '\n'+
@@ -324,7 +325,7 @@ module.exports = class Listener {
       let args = Object.assign(_req.query, _req.params, _req.body, _req.files, _req.wov);
       let result = await _method(args, _res);
 
-      if ( result instanceof WovReturn ) {
+      if ( result == null || (! WovReturn.isValidWovReturn(result)) ) {
         _res.status(result.code);
         delete result.code;
         if (! _res.headersSent) { _res.json(result); }
