@@ -438,7 +438,7 @@ module.exports = class Listener {
    * Take the DocPath objects in this.docs and turn in to html to be served.
    */
   _resolveDocs() {
-    if ( this.islistening ) { this.logger.throwError(`calling Listener.onDoc "${rr}" when already listening.`); }
+    if ( this.islistening ) { this.logger.throwError(`calling Listener.onDoc when already listening.`); }
     if ( this.app == null ) { this.logger.throwError('failed to call init() on this listener.'); }
 
     let cur = this.docs;

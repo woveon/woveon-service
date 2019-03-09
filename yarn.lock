@@ -646,10 +646,10 @@ wordwrap@~0.0.2:
   resolved "https://registry.yarnpkg.com/wordwrap/-/wordwrap-0.0.3.tgz#a3d5da6cd5c0bc0008d37234bbaf1bed63059107"
   integrity sha1-o9XabNXAvAAI03I0u68b7WMFkQc=
 
-woveon-logger@^0.0.16:
-  version "0.0.16"
-  resolved "https://registry.yarnpkg.com/woveon-logger/-/woveon-logger-0.0.16.tgz#a8fd25837a90a49d719a76121cfa221476490eec"
-  integrity sha512-tctBAguxoS/moCqEywedEd4rXn05KBXuexAnSxFHOoQMoh+T/1X3fOSMuPJZdyxQZBk9KkwQZW4p1BlZwP+xWA==
+woveon-logger@^0.0.17:
+  version "0.0.17"
+  resolved "https://registry.yarnpkg.com/woveon-logger/-/woveon-logger-0.0.17.tgz#7c43995ac6b3aaacc39c62d053a3e2e05608a662"
+  integrity sha512-b52JkBh/zfFNA1SVbqw/hlcEwK2PLTtr7EMPmpaVLf1bhkGRW2s71zfpD0Nl0BbNDf3aYqqnyYYavc43DJUnuQ==
   dependencies:
     colors "^1.3.x"
     reflect-args "^2.0.0"
