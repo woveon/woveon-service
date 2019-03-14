@@ -168,7 +168,8 @@ module.exports = class Config {
     */
 
     module.exports.blockForInit(); // call to make sure next function exists
-    module.exports.staticpromiseresolve(true);
+    // console.error('setting static promise resolve', module.exports.staticpromiseresolve);
+    module.exports.staticpromiseresolve(this);
   }
 
 
@@ -322,13 +323,33 @@ module.exports = class Config {
     return module.exports.staticconfig.logger;
   }
 
+
   /**
-   * Blocks for Config to be created.
+   * Blocks for Config to be created. If _class and _logger are passed, will create it here.
+   * @param {class} _class - the child class of this, which will create a Config
+   * @param {Logger} _logger - the logger to use
+   * @param {boolean} _displayOnCreation - if true, will display the config when it is created
    */
-  static async blockForInit() {
+  static async blockForInit(_class, _logger, _displayOnCreation = false) {
+    // console.error('blockForInit : called ', __filename);
     if ( module.exports.staticpromise == 1 ) {
+      // console.error('blockForInit : pre setting resolve func');
       // javascript witchcraft. this creates an external resolve function to the promise that everything is waiting on
-      module.exports.staticpromise = new Promise((res, rej)=>{ module.exports.staticpromiseresolve = res; });
+      module.exports.staticpromise = new Promise((res, rej)=>{
+        // console.error('blockForInit : setting resolve func: ', res);
+        module.exports.staticpromiseresolve = res;
+      });
+      // console.error('blockForInit : post setting resolve func');
+
+      if ( _displayOnCreation) { module.exports.staticpromise.then( () => { Config.displayMe(); }); }
+    }
+    if ( _class != null ) {
+      if ( !_class.isInited() ) {
+        // _logger.info(`Initing ${_class.constructor.name}.`);
+        new _class(_logger);
+        // _logger.info(`post Initing ${_class.constructor.name}.`);
+        // if ( _displayOnCreation) { _class.displayMe(); }
+      }
     }
     return module.exports.staticpromise;
   }
