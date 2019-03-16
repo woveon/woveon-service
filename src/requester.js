@@ -100,7 +100,7 @@ module.exports = class Requester {
             if ( WovReturn.isValidWovReturn(retval) ) {
               // this.logger.info('just adding meta to json');
               WovReturn.addMeta(retval, {url : r.url, contentmismatch});
-              this.logger.info('code ', retval);
+              // this.logger.info('code ', retval);
               retval.code = r.status; // adding back in
             }
             else if ( r.status == 200 ) {

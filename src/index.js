@@ -49,7 +49,7 @@ module.exports = class Service {
    * NOTE: Call child's onShutdown first, since this is a virtual destructor.
   */
   async onShutdown() {
-    await this.listener.close();
+    if ( this.listener.islistening) await this.listener.close();
     this.listener = null;
   };
 
