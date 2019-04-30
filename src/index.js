@@ -12,6 +12,7 @@ const Config        = require('./config');
 
 const Logger        = require('woveon-logger');
 const ModelLoader   = require('./modelloader');
+const WovModelClient   = require('./wovmodelclient');
 
 
 module.exports = class Service {
@@ -272,4 +273,5 @@ module.exports.WovReturn   = WovReturn;
 module.exports.Requester   = Requester;
 module.exports.Logger      = Logger;
 module.exports.ModelLoader = ModelLoader;
+module.exports.WovModelClient = ModelClient;
 module.exports.Config      = Config;

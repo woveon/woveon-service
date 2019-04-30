@@ -135,43 +135,49 @@ module.exports = class WovReturn {
     let attrs = _attr;
     let emsg  = {missing : [], unexpected : [] };
 
-
-    // convert string/array to hash, assuming true
-    if ( typeof _attr == 'string' ) { attrs = {}; attrs[_attr] = true; }
-    else if ( Array.isArray(_attr) )  {
-      attrs = {}; _attr.forEach((e) => {
-        // console.log('setting ', e);
-        attrs[e] = true;
-      });
+    if ( _args == null ) {
+      retval = this.retError(emsg, `ERROR: checkAttributes called with null object (_args is null).`);
     }
 
-//    console.log('_args: ', _args);
-//    console.log('attrs: ', attrs);
+    if ( retval == null ) {
 
-    // check all in args are in acceptable attrs (required or not)
-    if ( _options.checkStrict == true ) {
-      for (let k in _args) {
-        // console.log('sadf: k ', k, attrs);
-        if ( attrs[k] === undefined ) { emsg.unexpected.push(k); }
+      // convert string/array to hash, assuming true
+      if ( typeof _attr == 'string' ) { attrs = {}; attrs[_attr] = true; }
+      else if ( Array.isArray(_attr) )  {
+        attrs = {}; _attr.forEach((e) => {
+          // console.log('setting ', e);
+          attrs[e] = true;
+        });
       }
-    }
-    // check all required attrs are in args
-    for (let k in attrs) {
-      // console.log('check : ', k, _args[k]);
-      if ( attrs[k] == true && _args[k] === undefined) {
-        // console.log('err');
-        emsg.missing.push(k);
-      }
-    }
 
-    //    console.log('checkBodyAtribure "', emsg, '"');
-    if ( emsg.missing.length == 0 && emsg.unexpected.length == 0 ) { retval = null; }
-    else {
-      if ( _options.retRawError == true ) { retval = new Error(emsg); }
+      //    console.log('_args: ', _args);
+      //    console.log('attrs: ', attrs);
+
+      // check all in args are in acceptable attrs (required or not)
+      if ( _options.checkStrict == true ) {
+        for (let k in _args) {
+          // console.log('sadf: k ', k, attrs);
+          if ( attrs[k] === undefined ) { emsg.unexpected.push(k); }
+        }
+      }
+      // check all required attrs are in args
+      for (let k in attrs) {
+        // console.log('check : ', k, _args[k]);
+        if ( attrs[k] == true && _args[k] === undefined) {
+          // console.log('err');
+          emsg.missing.push(k);
+        }
+      }
+
+      //    console.log('checkBodyAtribure "', emsg, '"');
+      if ( emsg.missing.length == 0 && emsg.unexpected.length == 0 ) { retval = null; }
       else {
-        emsg.args = _args;
-        emsg.attrs = attrs;
-        retval = this.retError(emsg, `ERROR: attribute failure`);
+        if ( _options.retRawError == true ) { retval = new Error(emsg); }
+        else {
+          emsg.args = _args;
+          emsg.attrs = attrs;
+          retval = this.retError(emsg, `ERROR: attribute failure`);
+        }
       }
     }
 
