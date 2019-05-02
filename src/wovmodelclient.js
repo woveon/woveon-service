@@ -80,11 +80,10 @@ module.exports = class WovModelClient {
    * @param {string} _t - table name
    */
   async _selectAll(_t) {
-    if ( _id == null ) throw Error(`selection of '${_t}' has ${_id} id.`);
     if ( this.safeTables[_t] === undefined ) { this.l.throwError(_t, `***Unknown _selectByID type '${_t}'. Possibly an attack!!!!`); }
 
     let q = `SELECT * FROM ${_t}`;
-    let d = [_id];
+    let d = [];
     return this._runQuery(q, d, `selectAll${_t}`);
   }
 

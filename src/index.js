@@ -268,10 +268,10 @@ module.exports = class Service {
 
 };
 
-module.exports.Listener    = Listener;
-module.exports.WovReturn   = WovReturn;
-module.exports.Requester   = Requester;
-module.exports.Logger      = Logger;
-module.exports.ModelLoader = ModelLoader;
-module.exports.WovModelClient = ModelClient;
-module.exports.Config      = Config;
+module.exports.Listener       = Listener;
+module.exports.WovReturn      = WovReturn;
+module.exports.Requester      = Requester;
+module.exports.Logger         = Logger;
+module.exports.ModelLoader    = ModelLoader;
+module.exports.WovModelClient = WovModelClient;
+module.exports.Config         = Config;
