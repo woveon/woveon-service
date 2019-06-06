@@ -7,11 +7,10 @@ module.exports = class WovModel {
 
   /**
    */
-  constructor(_data) {
-    this.data = _data;
-  }
+  constructor(_data) { this.data = _data; }
 
   /**
+   * @param {Logger}         _logger         - woveon logger
    * @param {WovModelClient} _wovmodelclient -
    * @param {object}         _schema         - ?Do I have a need for this yet?
    * @param {string}         _tablename      - The name of the database table this accesses. Defaults to class name lowercase.
@@ -24,23 +23,27 @@ module.exports = class WovModel {
     this.l.aspect('wovmodelinit', `...init model '${this.name}', table '${this.tablename}', schema : `, this.schema);
   }
 
+
   /**
-   * @param {integer} _id
-   * @return {instance of User}
+   * @param {integer} _id -
+   * @return {WovModel} -
    */
   static async readByID(_id) {
-    console.log('readByID : this: ', this, this.tablename);
+    let retval = null;
+    // console.log('readByID : this: ', this, this.tablename);
     let data = await this.cl._selectByID(_id, this.tablename);
-    return new this(data);
+    // console.log('data is ', data);
+    if ( data != null ) { retval = new this(data); }
+    return retval;
   }
 
   /**
    * @param {integer} _id
    */
   static async deleteByID(_id) {
-    let q = `DELETE FROM ${this.name} WHERE id=$1::integer`;
+    let q = `DELETE FROM ${this.tablename} WHERE id=$1::integer RETURNING id`;
     let d = [_id];
-    return this.cl._runSingularQuery(q, d, `deleteOne${this.name}`);
+    return this.cl._runSingularQuery(q, d, `deleteByID${this.name}`);
   }
 
   /**
