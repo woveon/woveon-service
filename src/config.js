@@ -106,6 +106,9 @@ module.exports = class Config {
     if ( module.exports.staticconfig != 1 ) { _logger.throwError('Calling Config constructor multiple times'); }
     module.exports.staticconfig = this;
 
+    if ( _conf == null )  _logger.throwError(`Config constructor requires an array for '_conf'.`);
+    if ( _sconf == null ) _logger.throwError(`Config constructor requires an array for '_sconf'.`);
+
     this.conf  = {};
     this.sconf = {};
     this._data  = {};

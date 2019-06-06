@@ -1,5 +1,5 @@
 
-const WovReturn = require('./WovReturn');
+const WovReturn = require('./wovreturn');
 
 module.exports = class WovModelClient {
 
@@ -29,7 +29,11 @@ module.exports = class WovModelClient {
       this.l.with('add_to_stacklvl', 1).aspect(`model ${_aspect}`, `Query '${_aspect}'`);
       this.l.with('add_to_stacklvl', 1).aspect(`modelquery ${_aspect}`, `Q(${_aspect}): `, _q);
       this.l.with('add_to_stacklvl', 1).aspect(`modeldata ${_aspect}`, `D(${_aspect}): `, _d);
-      try { let r= await this.db.query(_q, _d); this.l.aspect(`modelresult ${_aspect}`, `R(${_aspect}): `, r.rows); retval = r.rows; }
+      try {
+        let r = await this.db.query(_q, _d);
+        this.l.with('add_to_stacklvl', 0).aspect(`modelresult ${_aspect}`, `R(${_aspect}): `, r.rows);
+        retval = r.rows;
+      }
       catch (e) {
         this.l.with('add_to_stacklvl', 1).error(`FAILED Postgres Query '${_aspect}'`);
         this.l.with('add_to_stacklvl', 1).error(`Q: `, _q);
@@ -54,7 +58,7 @@ module.exports = class WovModelClient {
   _runSingularQuery(_q, _d, _aspect, _wr = false) {
     return new Promise( async function(ret, rej) {
       this._runQuery(_q, _d, _aspect, false)
-        .then( function(r) { let retval = r[0]; if ( _wr ) retval = WovReturn.retSuccess(retval); ret(retval); })
+        .then( function(r) { let retval = r[0] || null; if ( _wr ) retval = WovReturn.retSuccess(retval); ret(retval); })
         .catch( function(e) { if ( _wr ) e = WovReturn.retError(e, `FAILED Postgres Query '${_aspect}'`); rej(e); } );
     }.bind(this));
   }
@@ -67,7 +71,7 @@ module.exports = class WovModelClient {
    * @param {string} _t - table name
    */
   async _selectByID(_id, _t) {
-    if ( _id == null ) throw Error(`selection of '${_t}' has ${_id} id.`);
+    if ( _id == null ) throw Error(`selection from table '${_t}' has id of: '${_id}'.`);
     if ( this.safeTables[_t] === undefined ) { this.l.throwError(_t, `***Unknown _selectByID type '${_t}'. Possibly an attack!!!!`); }
 
     let q = `SELECT * FROM ${_t} WHERE id=$1::integer`;

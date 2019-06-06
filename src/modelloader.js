@@ -13,7 +13,7 @@ const autoBind = require('auto-bind-inheritance');
  *   foo/bar/c.js
  *  returns:  this.foo = { a : ..., b : ..., bar : { c : ... } }
  */
-module.exports = class ModelManager {
+module.exports = class ModelLoader {
 
   /**
    * @param {string} _basepath  - Path to model start location. ex. '/User/foo/path/to/model'

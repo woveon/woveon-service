@@ -172,7 +172,8 @@ module.exports = class WovReturn {
       //    console.log('checkBodyAtribure "', emsg, '"');
       if ( emsg.missing.length == 0 && emsg.unexpected.length == 0 ) { retval = null; }
       else {
-        if ( _options.retRawError == true ) { retval = new Error(emsg); }
+        // console.log('consoleCheckAttributes: ', JSON.stringify(emsg));
+        if ( _options.retRawError == true ) { retval = new Error(JSON.stringify(emsg)); }
         else {
           emsg.args = _args;
           emsg.attrs = attrs;

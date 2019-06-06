@@ -33,6 +33,8 @@ module.exports = class Listener {
     this.externalapp = false;
     this.name        = _name;
 
+    this._routers     = []; // listing of Express routers that build the endpoints/routes of listener: [[subroute, router, array],...]
+
     if ( _port == null || typeof _port == 'object' ) {
       this.logger.info(` args: ${typeof _port}  ${Array.from(arguments)}`);
       console.trace();
@@ -309,38 +311,118 @@ module.exports = class Listener {
 
   /**
    * This 'protects' a route you pass in, selected from root, and any variables you
-   * return in _method are then passed to your regular leaf function.
+   * return in _method's WovReturn.data are then included in req.wov, a compiling 
+   * object of values, eventually passed to your regular leaf handling function.
    *
-   *   ex. /user/:sessionid/widgets/:widgetid  - use onRoute('/user/:sessionid') to
+   *   ex. /user/:sessionid/widgets/:widgetid  - use onProtect('/user/:sessionid') to
    *       make calls to databases to see if session is valid, then return userid
    *       so the leaf method can lookup and see if user can access that widget.
    *
    * NOTE: vals stored in _req.wov.
    * @param {url} _route -
-   * @param {string} _method - http method
+   * @param {function} _method - callback
+   * @param {object} _attr - attributes required when reaching this route
    */
-  async onRoute(_route, _method) {
-    this.logger.aspect('listener.route', `onRoute : ${_route}`);
-    this.app.use(_route, async function(_req, _res, next) {
+  async onProtect(_route, _method, _attr, _attrpost) {
+    let rr = this.root + _route;
+    this.logger.aspect('listener.protect', `onProtect: ${rr} / ${_route}`);
+    this.app.use(rr, async function(_req, _res, next) {
       let args = Object.assign(_req.query, _req.params, _req.body, _req.files, _req.wov);
-      let result = await _method(args, _res);
 
-      if ( result == null || (! WovReturn.isValidWovReturn(result)) ) {
+      // this.logger.info('onProtect hit: ', rr, args, _attr);
+
+      // check that required attributes exist
+      let result = WovReturn.checkAttributes(args, _attr, null, {retRawError : true, checkStrict : false});
+
+      // call method if all ok so far
+      if ( result == null ) { result = await _method(args, _res); }
+
+      // this.logger.h3().info('result: ', result);
+      if ( result instanceof Error ) {
+        this.logger.error(result.message);
+        _res.status(404).json(WovReturn.retError(result.message));
+        // return next(WovReturn.retError(result.message));
+      }
+      else if ( result == null || (! WovReturn.isValidWovReturn(result)) ) {
         _res.status(result.code);
         delete result.code;
         if (! _res.headersSent) { _res.json(result); }
         return next(result);
       }
-      else if ( result instanceof Error ) {
-        this.logger.throwError(result);
-      }
       else {
         // add in params
-        _req.wov = Object.assign({}, _req.wov, result);
+        if ( (typeof result.data ) == 'object' ) {
+          this.logger.aspect('listener.protect', 'add in params:', result.data);
+          _req.wov = Object.assign({}, _req.wov, result.data);
+        }
+
+        // check post attributes
+        let argspost = Object.assign(_req.query, _req.params, _req.body, _req.files, _req.wov);
+        let resultpost = WovReturn.checkAttributes(argspost, _attrpost, null, {retRawError : true, checkStrict : false});
+        if ( resultpost != null ) {
+          this.logger.error(resultpost.message);
+          _res.status(404).json(WovReturn.retError(resultpost.message));
+        }
+        else { return next(); }
       }
-      return next();
     }.bind(this));
   }
+
+
+  /*
+  async onMidpoint(_preroute, _method, _postroute, _method, _mfilename, _docMethod = null) {
+  }
+  */
+
+  /**
+   * Find the express router that matches subroutes in the routes with _route.
+   *
+   * @return {object} - the routers entry of last match, with subroute that remains : {entry : array, subroute : string}
+   *
+   * ex. /A/:a/B if matched /A/:a, would return {entry: [], subroute: '/B'} if this.routes had [['/A/:a', router, []].
+   */
+  /*
+  _matchRoute(_route, _curroutes) {
+    let retval = null;
+    let curroutes = _curroutes;
+    if ( curroutes == null ) curroutes = this._routers;
+
+    // walk down routers at this level
+    for (let i=0; (i<curroutes.length) && ( retval == null); i++) {
+      let r = curroutes[parseInt(i)];
+      this.logger.info(`  ... check ${r[0]}`);
+      if ( _route.startsWith(r[0]) ) {
+        this.logger.info('matched start of route : ', _route, r[0]);
+        let subroute = _route.substring(r[0].length);
+        retval = this._matchRoute(subroute, r[2]);
+      }
+    }
+
+    if ( retval == null ) retval = {entry : curroutes, subroute : _route};
+
+    return retval;
+  }
+  */
+
+
+  /** called at listen time.
+   * Puts all the express.Routers in this._routers into app
+   */
+  /*
+  async connectSubrouteEntries(_subroute = null, _entry = null) {
+    let entry = _entry || this._routers;
+    let curroute = _subroute || '';
+
+    this.logger.info(`connectSubrouteEntries @(${curroute}): `, entry);
+
+    for (let i=0; i<entry.length; i++) {
+      let e = entry[parseInt(i)];
+      this.logger.info(`  - add entry (this.app.use(${curroute}${e[0]}, e[1]): `, e);
+      this.app.use(`${curroute}${e[0]}`, e[1]);
+      if ( e[2].length != 0 ) this.connectSubrouteEntries(`${curroute}${e[0]}`, e[2]);
+    }
+  }
+  */
 
 
   /**
