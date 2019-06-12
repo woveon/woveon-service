@@ -195,6 +195,7 @@ module.exports = class Config {
     }
     return retval;
   }
+  static gET(_v) { return this.sget(_v); }
   static sget(_v) { 
     if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
     let retval = module.exports.staticconfig.sconf[_v];
