@@ -64,8 +64,9 @@ module.exports = class Service {
     let retval = null;
     this.logger.aspect('health', 'Woveon-service onHealth hit');
 
-    if ( this.db == null ) { 
-      retval = WovReturn.retSuccess(true); }
+    if ( this.db == null ) {
+      retval = WovReturn.retSuccess(true);
+    }
 
     // for NoSQL, check with isConnected
     else if ( this.db.isConnected != null ) {
@@ -79,14 +80,15 @@ module.exports = class Service {
       retval = await new Promise( (async function(res, rej)  {
 
         // allow 3 seconds before timeout
-        let t = setTimeout(function() { 
-          // l.info('db connection timeout hit');
-          rej(WovReturn.retError(null, 'DB Connection timeout.')); }, 3000); 
+        let t = setTimeout(function() {
+          l.aspect('health', '!!! db connection timeout hit');
+          rej(WovReturn.retError(null, 'DB Connection timeout.'));
+        }, 3000);
         let q = 'SELECT 1;';
-        let v = [];
-        l.aspect('health', 'q: ', q, '\nv: ', v);
-        let r = await this.db.query(q, v);
-        l.aspect('health', 'r: ', r);
+        let d = [];
+        l.aspect('health2', 'q: ', q, '\nd: ', d);
+        let r = await this.db.query(q, d);
+        l.aspect('health2', 'r: ', r);
         clearTimeout(t);
         if ( r.rowCount == 1 ) { res(WovReturn.retSuccess(true)); }
         else { rej(WovReturn.retError(r, 'failed db query.')); }
