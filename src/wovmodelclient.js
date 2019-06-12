@@ -6,13 +6,25 @@ module.exports = class WovModelClient {
   /**
    * @param {WoveonLogger} _l -
    * @param {PGClient} _dbclient - postgres client (does not have to be connected yet)
-   * @param {array} _safeTables - database tables user can directly call selects on
+   * @param {Array<string>} _safeTables - database tables user can directly call selects on
+   * @param {Array<models>} _models - the models this loads onto this
    */
-  constructor(_l, _dbclient, _safeTables) {
+  constructor(_l, _dbclient, _safeTables, _models) {
     this.l = _l; this.db = _dbclient;
-    this.safeTables = {}; for (let i=0; i<_safeTables.length; i++) { this.safeTables[_safeTables[i]] = true; } // create hashtable
+    this.safeTables = {}; for (let i=0; i<_safeTables.length; i++) { this.safeTables[_safeTables[parseInt(i)]] = true; } // create hash
+
+    // Add each model to this, with its name. ex. this.User is a class for the User model
+    this.table2model = {};
+    _models.forEach( function(m) { m.init(this.l, this); this[m.name] = m; this[WovModelClient.uncapitalize(m.name)] = m; this.table2model[m.tablename] = m; }.bind(this));
   }
 
+
+  /**
+   * Lookup model by the table in the database it is attached to.
+   * @param {string} _t - table name
+   * @return {WovModel}
+   */
+  getModelByTablename(_t) { return this.table2model[_t]; }
 
   /**
    * Runs a query, handles errors, standardizes Logging aspects. Returns a promise (as opposed to being async) so these can be chained.
@@ -111,4 +123,15 @@ module.exports = class WovModelClient {
     return this._runSingularQuery(q, d, `selectByRef${_t}`);
   }
 
+  /** Capitalize string.
+   * @param {string} _s -
+   * @return {string}
+   */
+  static capitalize(_s)   { return _s.charAt(0).toUpperCase() + _s.slice(1); };
+
+  /** Uncapitalize string.
+   * @param {string} _s -
+   * @return {string}
+   */
+  static uncapitalize(_s) { return _s.charAt(0).toLowerCase() + _s.slice(1); };
 };
