@@ -322,6 +322,7 @@ module.exports = class Listener {
    * @param {url} _route -
    * @param {function} _method - callback
    * @param {object} _attr - attributes required when reaching this route
+   * @param {object} _attrpost - attributes required when leaving this route
    */
   async onProtect(_route, _method, _attr, _attrpost) {
     let rr = this.root + _route;
@@ -344,8 +345,7 @@ module.exports = class Listener {
         // return next(WovReturn.retError(result.message));
       }
       else if ( result == null || (! WovReturn.isValidWovReturn(result)) ) {
-        _res.status(result.code);
-        delete result.code;
+        if ( result != null ) { _res.status(result.code); delete result.code; }
         if (! _res.headersSent) { _res.json(result); }
         return next(result);
       }
