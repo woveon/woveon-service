@@ -17,6 +17,7 @@ module.exports = class WovReturn {
     this.msg     = _data.msg;
     if (this.msg == null ) delete this.msg;
 
+    if ( _data.error ) this.error = _data.error;
     if ( _meta != null ) this.meta = _meta; // if has it
   }
 
@@ -70,6 +71,7 @@ module.exports = class WovReturn {
   /**
    * Redirect to path.
    * @param {string} _path - the redirect URL
+   * @param {object}  _meta - metadata about the returned object (ex. for fetch, a url)
    * @return {object} - res object for sender
    */
   static retRedirect(_path, _meta = null) {
@@ -85,6 +87,7 @@ module.exports = class WovReturn {
    * Route had error in performing its function. NOTE: not a system level error
    * @param {object}  _data - returned object
    * @param {string}   _msg - message describing the failure
+   * @param {object}  _meta - metadata about the returned object (ex. for fetch, a url)
    * @return {object} - res object for sender
    */
   static retError(_data, _msg='General Error', _meta = null) {
@@ -98,10 +101,43 @@ module.exports = class WovReturn {
 
 
   /**
+   * Create a file with these errors and load it. Should be of format:
+   *   { ERRORCODE : { code : XXX, text : string }, ... }
+   * @param {Object} _errordefs - a hash of all the errors
+   */
+  static defineCodedErrors(_errordefs) { WovReturn._errordefs = _errordefs; }
+
+
+  /**
+   * @param {string} _errcode - The identifying name of the code.
+   * @param {object} _data - returned object
+   * @param {string}  _msg - message describing the failure
+   * @param {object}  _meta - metadata about the returned object (ex. for fetch, a url)
+   * @return {object} - res object for sender
+   */
+  static retCodedError(_errname, _data, _msg, _meta = null) {
+    if ( WovReturn._errordefs == undefined ) {
+      throw new Error(`WovReturn::retCodedError: no error definitions; need to call defineCodedErrors`);
+    }
+    let ec = WovReturn._errordefs[_errname];
+    if ( ec == null ) { throw new Error(`WovReturn::retCodedError: unknown error of '${_errname}'.`); }
+    let retval = new WovReturn({
+      success : false,
+      code    : 200,
+      data    : _data,
+      error   : {code : ec.code, name : _errname, text : ec.text},
+      msg     : `ERROR(${ec.code}) '${_errname}': ${ec.text}\n  ${_msg}.`,
+    }, _meta);
+    return retval;
+  }
+
+
+  /**
    * Route had system failure.
    * @param {object}  _data - returned object
    * @param {integer} _code - http response code
    * @param {string}   _msg - message describing the failure
+   * @param {object}  _meta - metadata about the returned object (ex. for fetch, a url)
    * @return {object} - res object for sender
    */
   static retFail(_data, _code=400, _msg='Failure', _meta = null) {
