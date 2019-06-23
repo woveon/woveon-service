@@ -1,4 +1,5 @@
 
+const Logger = require('woveon-logger');
 
 /**
  * Created a class so I can do 'instanceof WovReturn'
@@ -149,6 +150,16 @@ module.exports = class WovReturn {
     }, _meta);
   }
 
+  /**
+   * DEPRECATED
+   */
+  static checkAttributes(_args, _attr, _val, _options = {
+      retRawError : false,  // - on true, instead returns Error object
+      checkStrict : true,   // - toggles strict enforcement of only named _attr
+  }) {
+    Logger.g().logDeprecated('woveon-service.WovReturn.checkAttributes: use checkProperties');
+    return WovReturn.checkProperties(_args, _attr, _val, _options);
+  }
 
   /**
    * This checks that the passed in args have the _attr... val skipped for now.
@@ -161,7 +172,7 @@ module.exports = class WovReturn {
    * @param {boolean} _options - options to change behavior
    * @return {Error/retError} - null on success or Error/retError depending on _retError
    */
-  static checkAttributes(_args, _attr, _val, _options = {
+  static checkProperties(_args, _attr, _val, _options = {
       retRawError : false,  // - on true, instead returns Error object
       checkStrict : true,   // - toggles strict enforcement of only named _attr
                             //   should exist. when false, only checks _attr provided.
