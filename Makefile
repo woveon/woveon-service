@@ -14,21 +14,26 @@ include ./wovtoolscheat.mk
 
 all:
 
+pg-start : pg-docker-start pg-docker-start-delay pg-create-db
 
-pg-start :
-	docker run --rm --name postgres-local -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} -d -p 5432:5432 postgres
-	sleep 5
+pg-docker-start :
+	@docker run --rm --name postgres-local -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} -d -p 5432:5432 postgres
+
+pg-docker-start-delay :
+	@sleep 5
+
+pg-create-db :
 	@PGPASSWORD=${POSTGRES_PASSWORD} psql -h localhost -U postgres -c "create database ${WOV_DB}"
 
 pg-stop :
-	docker stop postgres-local
+	@docker stop postgres-local
 
 pg :
 	PGPASSWORD=${POSTGRES_PASSWORD} psql -h localhost -U postgres -d "${WOV_DB}" || printf '\nERROR: run "make pg-start" to start postgres (and make pg-db to populate it)\n\n'
 
 test : .FORCE
-	if [ -e "dist" ]; then \
-		cd dist ; ${ENVS} mocha -b $$TEST --timeout ${DEFAULTTESTTIMEOUT}; \
-		else \
-		${ENVS} mocha -b $$TEST --timeout ${DEFAULTTESTTIMEOUT}; \
-  fi
+	@${ENVS} mocha -b $$TEST --timeout ${DEFAULTTESTTIMEOUT}
+
+test-html : .FORCE
+	${ENVS} WOV_TEST=$$TEST mocha -b $$TEST --timeout ${DEFAULTTESTTIMEOUT} --reporter mochawesome --reporter-options reportDir=.mochawesome-report ; open -g ./.mochawesome-report/mochawesome.html
+

@@ -28,5 +28,5 @@ if ( ! C.isInited() ) {
     password : C.sget('WOV_apidb_password'),
   };
   C.setData('db', new Pg(dbconf));
-  C.displayMe();
+  // C.displayMe();
 }

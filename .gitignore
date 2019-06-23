@@ -6,3 +6,6 @@ _old
 
 node_modules
 wovtoolscheat.mk
+
+.mochawesome-report
+yarn-error.log
