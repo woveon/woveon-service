@@ -7,7 +7,7 @@ const Pg     = require('pg').Client;
 
 if ( ! C.isInited() ) {
   let logger = new Logger('config', {debug : true, showName : true, dbCharLen : 40, color : 'bgBlue white'}, {});
-  logger.info('INITING in init.js');
+  // logger.info('INITING in init.js');
 
   // Set up config
   new C(logger, [

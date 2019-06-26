@@ -9,15 +9,21 @@ module.exports = class WovModelClient {
    * @param {Array<string>} _safeTables - database tables user can directly call selects on
    * @param {Array<models>} _models - the models this loads onto this
    */
-  constructor(_l, _dbclient, _safeTables, _models) {
+  constructor(_l, _dbclient, _models, _safeTables) {
     this.l = _l; this.db = _dbclient;
-    this.safeTables = {}; for (let i=0; i<_safeTables.length; i++) { this.safeTables[_safeTables[parseInt(i)]] = true; } // create hash
+    this._safeTables = {};
+    if ( _safeTables != null && Array.isArray(_safeTables) ) {
+      for (let i=0; i<_safeTables.length; i++) { this._safeTables[_safeTables[parseInt(i)]] = true; } // create hash
+    }
 
     // Add each model to this, with its name. ex. this.User is a class for the User model
     this.table2model = {};
-    _models.forEach( function(m) { 
-      this.l.aspect('ms.wovmodel.constructor', `...loading WovModel : '${m.name}'`);
-      m.init(this.l, this); this[m.name] = m; this[`model_${m.name.toLowerCase()}`] = m; this.table2model[m.tablename] = m; }.bind(this));
+    _models.forEach( function(m) {
+      this.l.aspect('ms.wovmodelclient.constructor', `...loading WovModel : '${m.name}'. has child: ${m._haschildren}`);
+      this.l.aspect('ms.wovmodelclient.constructor', `...loading WovModel : '${m.name}' on client as 'model_${m.name.toLowerCase()}' and '${m.name}'`);
+      m.init(this.l, this); this[m.name] = m; this[`model_${m.name.toLowerCase()}`] = m; this.table2model[m.tablename] = m;
+      this._safeTables[m.tablename] = true; // auto-add each model's table
+    }.bind(this));
   }
 
 
@@ -171,7 +177,7 @@ module.exports = class WovModelClient {
    */
   async _selectByID(_id, _t) {
     if ( _id == null ) throw Error(`selection from table '${_t}' has id of: '${_id}'.`);
-    if ( this.safeTables[_t] === undefined ) { this.l.throwError(_t, `***Unknown _selectByID type '${_t}'. Possibly an attack!!!!`); }
+    if ( this._safeTables[_t] === undefined ) { this.l.throwError(_t, `***Unknown _selectByID type '${_t}'. Possibly an attack!!!!`); }
 
     let q = `SELECT * FROM ${_t} WHERE id=$1::integer`;
     let d = [_id];
@@ -183,7 +189,7 @@ module.exports = class WovModelClient {
    * @param {string} _t - table name
    */
   async _selectAll(_t) {
-    if ( this.safeTables[_t] === undefined ) { this.l.throwError(_t, `***Unknown _selectByID type '${_t}'. Possibly an attack!!!!`); }
+    if ( this._safeTables[_t] === undefined ) { this.l.throwError(_t, `***Unknown _selectByID type '${_t}'. Possibly an attack!!!!`); }
 
     let q = `SELECT * FROM ${_t}`;
     let d = [];
@@ -201,7 +207,7 @@ module.exports = class WovModelClient {
     if ( _k == null   || _k == '' )   this.l.throwError(`selectionByRef of '${_t}' has ${_k} k.`);
     if ( _v == null   || _v == '' )   this.l.throwError(`selectionByRef of '${_t}' has ${_v} v.`);
     if ( _v_t == null || _v_t == '' ) this.l.throwError(`selectionByRef of '${_t}' has ${_v_t} v_t.`);
-    if ( this.safeTables[_t] === undefined ) { this.l.throwError(_t, `***Unknown _selectByRef type '${_t}'. Possibly an attack!!!!`); }
+    if ( this._safeTables[_t] === undefined ) { this.l.throwError(_t, `***Unknown _selectByRef type '${_t}'. Possibly an attack!!!!`); }
 
     let vt = _v_t.replace(/[^A-Za-z_0-9\(\)]+/g, ''); // remove all but these characters ex. varchar(2)
     let k  = _k.replace(/[^A-Za-z_0-9\"]+/g, '');     // remove all but these characters ex. "ATable"
