@@ -29,7 +29,7 @@ describe(`> ${mtag}: `, async function() {
       .then(() => { logger.verbose('  ... db connected'); })
       .catch( (e) => { logger.throwError('  ... db connection error', e.stack); });
     cl = new Service.WovModelClient(logger, C.data('db'), [M.ParentModel, M.ChildModel, M.ChildChildModel, M.AssModelP, M.AssModelC]);
-    await M.onBefore(C);
+    await cl.initModelDB(true, true, true);
   });
 
   describe('> WovModel Associations and Polymorphic tests', async function() {
@@ -81,9 +81,9 @@ describe(`> ${mtag}: `, async function() {
       let result = await c.readInMany('AssModelC');
       logger.info('AssModelCs on c result: ', result);
       logger.info('c: ', c);
-      logger.info('AssModelCs on c result: ', c.AssModelCs);
-      expect(c.AssModelCs[0] instanceof M.AssModelC).to.be.true;
-      expect(c.AssModelCs[1] instanceof M.AssModelC).to.be.true;
+      logger.info('AssModelCs on c result: ', c.assmodelcs);
+      expect(c.assmodelcs[0] instanceof M.AssModelC).to.be.true;
+      expect(c.assmodelcs[1] instanceof M.AssModelC).to.be.true;
 
     });
 

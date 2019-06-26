@@ -40,7 +40,7 @@ describe(`> ${mtag}: `, async function() {
       .then(() => { logger.verbose('  ... db connected'); })
       .catch( (e) => { logger.throwError('  ... db connection error', e.stack); });
     cl = new Service.WovModelClient(logger, C.data('db'), [TestModel, TestModel2, TestModel3], ['testtable', 'testtable2', 'testmodel3']);
-    await TMS.onBefore(C);
+    await cl.initModelDB(true, true, true);
   });
 
   describe('> WovModelClient', async function() {

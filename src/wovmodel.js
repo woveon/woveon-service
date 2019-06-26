@@ -199,7 +199,7 @@ class WovModel {
         }
       }
     }
-    this.constructor.l.info(`readIn : modelname(${_modelname}) propname(${propname}) : mod : `, mod.name, ` cid(${cid})`);
+    this.constructor.l.info(`readIn : modelname(${_modelname}) propname(${propname}) : mod : `, mod, ` cid(${cid})`);
 
     // this.constructor.l.info(`retval 1: `, retval);
     if ( retval == null ) {
@@ -296,12 +296,19 @@ class WovModel {
       if ( result != null ) {
         if (result instanceof Error) { retval = result; }
         else {
-          let models = [];
-          result.forEach( function(_row) {
-            let m = new omod(_row); // eslint-disable-line new-cap
-            models.push(m);
-          });
-          let plural = omod._plural || `${_modelname}s`;
+          let models = null;
+          let proms  = [];
+          for (let i in result ) {
+            if ( result.hasOwnProperty(i) ) {
+              let row = result[i];
+              let m = this.constructor._polyReadCheck(row, omod);
+              // let m = new omod(_row); // eslint-disable-line new-cap
+              proms.push(m);
+            }
+          }
+          await Promise.all(proms).then(function(_models) { models = _models; });
+          this.constructor.l.info('Models: ', models);
+          let plural = omod._plural || `${_modelname.toLowerCase()}s`;
           this[plural] = models;
           retval = models;
         }
@@ -339,10 +346,12 @@ class WovModel {
    * @param {WovModelClient} _wovmodelclient -
    */
   static init(_logger, _wovmodelclient) {
-    // _logger.info('this name : ', this.name, Object.getPrototypeOf(this).name);
-    if ( this.name != WovModel.name ) { Object.getPrototypeOf(this).markHasChild();  }
     this.l = _logger;
     this.cl= _wovmodelclient;
+    let parent = Object.getPrototypeOf(this);
+
+    _logger.info(`init: this('${this.name}') parent('${parent.name}')  WovModel('${WovModel.name}').`);
+    if ( parent.name != WovModel.name ) { parent.markHasChild();  }
     if ( this.tablename   == null ) throw Error(`WovModel of class '${this.name}' requires model to set static: 'tablename'.`);
     if ( this._transmodel == null ) throw Error(`WovModel of class '${this.name}' requires model to set static: '_transmodel'.`);
     if ( this._schema     == null ) throw Error(`WovModel of class '${this.name}' requires model to call : '${this.name}.updateSchema'.`);
@@ -352,7 +361,7 @@ class WovModel {
 
   /**
    */
-  static markHasChild() { this._haschildren = true; }
+  static markHasChild() { this._haschildren = true; this.l.info(`marking '${this.name}' as having children'.`); }
 
 
   /**
@@ -370,7 +379,7 @@ class WovModel {
   static async readByID(_id) {
     let retval = null;
     // console.log('readByID : this: ', this, this.tablename);
-    let data = await this.cl._selectByID(_id, this.tablename);
+    let data = await this.cl._selectByID(_id, `wsv_${this.tablename}`);
     // console.log('data is ', data);
     if ( data != null && !(data instanceof Error) ) {
       retval = await this._polyReadCheck(data);
@@ -387,15 +396,22 @@ class WovModel {
   }
 
   /**
-   * Internal function that is passed the data from a read of a model's table. If the _model_t matches the model, reread.
+   * Internal function that is passed the data from a read of a model's table. If the _model_t does not match the model, reread correct table.
    * @param {Object} _data - data read in from some other read. (readByID, readByXID, readIn, readInMany, etc)
+   * @param {WovModel} _model - this model that the _data matches to; could be this, or another model 
+   *      if reading in from another; creates an instance of this normally, if the _model_t matches. 
+   *      Otherwise, gets the model of _model_t and creates.
    * @return {WovModel} - the object.
    */
-  static async _polyReadCheck(_data) {
+  static async _polyReadCheck(_data, _model = null) {
     let retval = null;
-    if ( _data._model_t === undefined || _data._model_t == this.name ) { retval = new this(_data); }
+    let Mod = _model || this;
+
+    this.cl.l.info('_polyReadCheck: ', _data, _model);
+    if ( _data._model_t === undefined ) { throw Error('How did this happen.', _data, _model); }
+    else if ( _data._model_t == Mod.name ) { retval = new Mod(_data); }
     else { // polymorphic
-      let Mod = this.cl[_data._model_t];
+      Mod = this.cl[_data._model_t]; // get the model
       if ( Mod == null ) { this.cl.l.throwError(`ms.WovModel_readByID for '${this.name}' returned _model_t of '${_data._model_t}' which does not exist on client.`); }
       retval = await Mod.readByID(_data.id);
     }
@@ -478,18 +494,20 @@ class WovModel {
 
   /**
    */
-  static async doCreateTableQuery() {
+  static async doInitDB(_doDrop, _doTable, _doView) {
     if ( this._schema == undefined ) { this.cl.l.throwError(`For '${this.name}', No schema.`); }
 
     let q1 = `DROP TABLE IF EXISTS ${this.tablename} CASCADE;`;
     let q2 = null; // create table
+    let q3a = `DROP VIEW IF EXISTS "wsv_${this.tablename}"`;
     let q3 = null; // create view
-    let qp = null;
+    let qp = null; // query parameters
     let schematouse = null;
     let parent = Object.getPrototypeOf(this);
+    let d = []; // data
 
     // handle inheritance tables
-    this.cl.l.aspect('ms.WovModel_doCreateTableQuery', `Model ${this.name} has parent of ${parent.name}.`);
+    this.cl.l.aspect('ms.WovModel_doCreateTableQuery', `Model ${this.name} has parent of ${parent.name}, haschildren ${this._haschildren}.`);
     if ( parent.name == 'WovModel' ) { schematouse = this._schema; }
     else { schematouse = this._ownschema; }
 
@@ -510,26 +528,31 @@ class WovModel {
     // Create tables so that _model_t is only in tables with inheritance. Create the views to fill in model_t.
     if ( parent.name == 'WovModel' ) {
       if ( this._haschildren == false ) {
-        q2 = `CREATE TABLE ${this.tablename} ( id SERIAL PRIMARY KEY, ${cols.join(', ')} )`;
-        q3 = `CREATE VIEW wsv_${this.tablename} AS SELECT *, "${this.name}" as _model_t FROM ${this.tablename}`;
+        q2 = `CREATE TABLE "${this.tablename}" ( id SERIAL PRIMARY KEY, ${cols.join(', ')} )`;
+        q3 = `CREATE VIEW "wsv_${this.tablename}" AS SELECT *, text '${this.name}' as _model_t FROM "${this.tablename}"`;
       }
       else {
-        q2 = `CREATE TABLE ${this.tablename} ( id SERIAL PRIMARY KEY, _model_t varchar default '${this.name}', ${cols.join(', ')} )`;
-        q3 = `CREATE VIEW wsv_${this.tablename} AS SELECT * FROM ${this.tablename}`;
+        q2 = `CREATE TABLE "${this.tablename}" ( id SERIAL PRIMARY KEY, _model_t varchar default '${this.name}', ${cols.join(', ')} )`;
+        q3 = `CREATE VIEW "wsv_${this.tablename}" AS SELECT * FROM "${this.tablename}"`;
       }
     }
     else  {
-      q2 = `CREATE TABLE ${this.tablename} ( _model_t varchar default '${this.name}', ${cols.join(', ')} ) INHERITS ( ${parent.tablename} )`;
-      q3 = `CREATE VIEW wsv_${this.tablename} AS SELECT * FROM ${this.tablename}`;
+      q2 = `CREATE TABLE ${this.tablename} ( _model_t varchar default '${this.name}', ${cols.join(', ')} ) INHERITS ( "${parent.tablename}" )`;
+      q3 = `CREATE VIEW "wsv_${this.tablename}" AS SELECT * FROM "${this.tablename}"`;
     }
 
-    // this.cl.l.info('q1: ', q1); this.cl.l.info('q2: ', q2);
+    this.cl.l.aspect('ms.WovModel_doCreateTableQuery', `q1(${_doDrop}): `, q1);
+    this.cl.l.aspect('ms.WovModel_doCreateTableQuery', `q2(${_doTable}): `, q2);
+    this.cl.l.aspect('ms.WovModel_doCreateTableQuery', `q3(${_doView}): `, q3);
 
-    let d = [];
-    return this.cl._runQuery(q1, d, 'ms.WovModel_doCreateTableQuery')
-      .then(function() { return this.cl._runQuery(q2, d, 'ms.WovModel_doCreateTableQuery'); }.bind(this))
-      .then(function() { return this.cl._runQuery(q3, d, 'ms.WovModel_doCreateTableQuery'); }.bind(this))
-      .catch(function(e) { this.cl.l.info('error:', e); return WovReturn.retError(e, `Failed to create table for '${this.tablename}'.`); }.bind(this));
+    return (async function() { if ( _doDrop  ) await this.cl._runQuery(q1,  d, 'ms.WovModel__doCreateTableQuery'); }.bind(this))()
+      .then(async function() { if ( _doTable ) await this.cl._runQuery(q2,  d, 'ms.WovModel__doCreateTableQuery'); }.bind(this))
+      .then(async function() { if ( _doView  ) await this.cl._runQuery(q3a, d, 'ms.WovModel__doCreateTableQuery'); }.bind(this))
+      .then(async function() { if ( _doView  ) await this.cl._runQuery(q3,  d, 'ms.WovModel__doCreateTableQuery'); }.bind(this))
+      .catch(function(e) {
+        this.cl.l.info('error:', e);
+        return WovReturn.retError(e, `Failed to create table for '${this.tablename}'.`);
+      }.bind(this));
   }
 
 

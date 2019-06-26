@@ -67,7 +67,6 @@ module.exports = function() {
   TestModel3.updateSchema({_testtable_ref : 'integer', title : 'text'});
 
 
-
   // ---------------------------------------------------------------------
   // Model with one-to-many-AssModelP
   const ParentModel = class ParentModel extends Service.WovModel {
@@ -110,6 +109,7 @@ module.exports = function() {
 
   let models = {TestModel, TestModel2, TestModel3, ParentModel, ChildModel, ChildChildModel, AssModelP, AssModelC};
 
+  /*
   const onBefore = async function(_C) {
 
     // create the tables for all models
@@ -117,7 +117,7 @@ module.exports = function() {
       if ( models.hasOwnProperty(k) ) {
         let m = models[k];
         if ( m.isInited() ) {
-          let result = await models[k].doCreateTableQuery();
+          let result = await models[k].doInitDB(true, true, true);
           if ( result instanceof WR ) {
             Logger.g().info('result: ', result);
             Logger.g().rethrowError(result.data, `Error creating table for model '${m.name}'.`);
@@ -127,7 +127,9 @@ module.exports = function() {
       }
     }
   };
+  */
 
-  return Object.assign({}, models, {onBefore});
+  // return Object.assign({}, models, {onBefore});
+  return models;
 };
 

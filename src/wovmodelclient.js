@@ -6,10 +6,10 @@ module.exports = class WovModelClient {
   /**
    * @param {WoveonLogger} _l -
    * @param {PGClient} _dbclient - postgres client (does not have to be connected yet)
-   * @param {Array<string>} _safeTables - database tables user can directly call selects on
    * @param {Array<models>} _models - the models this loads onto this
+   * @param {Array<string>} _safeTables - database tables user can directly call selects on
    */
-  constructor(_l, _dbclient, _models, _safeTables) {
+  constructor(_l, _dbclient, _models, _safeTables, _modelInitOptions) {
     this.l = _l; this.db = _dbclient;
     this._safeTables = {};
     if ( _safeTables != null && Array.isArray(_safeTables) ) {
@@ -22,10 +22,32 @@ module.exports = class WovModelClient {
       this.l.aspect('ms.wovmodelclient.constructor', `...loading WovModel : '${m.name}'. has child: ${m._haschildren}`);
       this.l.aspect('ms.wovmodelclient.constructor', `...loading WovModel : '${m.name}' on client as 'model_${m.name.toLowerCase()}' and '${m.name}'`);
       m.init(this.l, this); this[m.name] = m; this[`model_${m.name.toLowerCase()}`] = m; this.table2model[m.tablename] = m;
-      this._safeTables[m.tablename] = true; // auto-add each model's table
+      this._safeTables[m.tablename] = true;          // auto-add each model's table
+      this._safeTables[`wsv_${m.tablename}`] = true; // auto-add each model's view
     }.bind(this));
   }
 
+  /**
+   * A helper function to run WovModel.doInitDB on the Wovclient WovModels.
+   * @param {bool} _doDrop  - if true, drop the table
+   * @param {bool} _doTable - if true, create the table
+   * @param {bool} _doView  - if true, create the view
+   */
+  async initModelDB(_doDrop, _doTable, _doView) {
+    let models = Object.values(this.table2model);
+    for (let k in models ) {
+      if ( models.hasOwnProperty(k) ) {
+        let m = models[k];
+        if ( m.isInited() ) {
+          let result = await models[k].doInitDB(_doDrop, _doTable, _doView);
+          if ( result instanceof WovReturn ) {
+            this.l.info('result: ', result);
+            this.l.rethrowError(result.data, `Error creating table for model '${m.name}'.`);
+          }
+        }
+      }
+    }
+  }
 
   /**
    * NOTE: when switching to pools, have to set a client, cleared on endTransaction()
