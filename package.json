@@ -1,6 +1,6 @@
 {
   "name": "woveon-service",
-  "version": "0.1.46",
+  "version": "0.1.47",
   "description": "Tools to build a microservice.",
   "main": "src/index.js",
   "scripts": {
@@ -23,7 +23,7 @@
     "node-fetch": "^2.2.0",
     "pg": "^7.11.0",
     "uuid": "^3.3.2",
-    "woveon-logger": "^0.0.18"
+    "woveon-logger": "^0.0.19"
   },
   "devDependencies": {
     "chai": "^4.1.2",
