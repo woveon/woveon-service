@@ -2,6 +2,7 @@
 const expect    = require('chai').expect;
 const Logger    = require('woveon-logger');
 const WovReturn = require('../src/wovreturn');
+const WovModelMany = require('../src/wovmodelmany');
 const Service   = require('../src/index');
 const C         = require('woveon-service').Config;
 
@@ -9,6 +10,7 @@ const TMS        = (require('./testmodels'))();
 const TestModel  = TMS.TestModel;
 const TestModel2 = TMS.TestModel2;
 const TestModel3 = TMS.TestModel3;
+const MP         = TMS.MP;
 
 
 let mtag ='7a_model';
@@ -28,6 +30,8 @@ describe(`> ${mtag}: `, async function() {
   let data   = {id : 1, name : 'name'};
   let data2  = {id : 1, title : 'title2.1', _testtable_ref : data.id};
   let data3  = {id : 101, title : 'title3.1', _testtable_ref : data.id};
+  let data3a = {id : 102, title : 'title3.2', _testtable_ref : data.id};
+  let data3b = {id : 103, title : 'title3.3', _testtable_ref : data.id};
   let fdata  = {name : data.name};
   let fdata2 = {title : data2.title};
   let fdata3 = {title : data3.title};
@@ -39,9 +43,11 @@ describe(`> ${mtag}: `, async function() {
     await C.data('db').connect()
       .then(() => { logger.verbose('  ... db connected'); })
       .catch( (e) => { logger.throwError('  ... db connection error', e.stack); });
-    cl = new Service.WovModelClient(logger, C.data('db'), [TestModel, TestModel2, TestModel3], ['testtable', 'testtable2', 'testmodel3']);
+    cl = new Service.WovModelClient(logger, C.data('db'),
+      [TestModel, TestModel2, TestModel3, MP, TMS.Car, TMS.Tire, TMS.Wheel]); // , ['testtable', 'testtable2', 'testmodel3', 'mp']);
     await cl.initModelDB(true, true, true);
   });
+
 
   describe('> WovModelClient', async function() {
 
@@ -109,6 +115,34 @@ describe(`> ${mtag}: `, async function() {
     it('> client transaction');
   });
 
+  describe('> WovModelMany', async function() {
+    let wmm = null;
+
+    before(function() {
+      wmm = new WovModelMany();
+      wmm[1] = new TestModel({id : 1, name : 'A'});
+      wmm[2] = new TestModel({id : 2, name : 'B'});
+      wmm[3] = new TestModel({id : 3, name : 'C'});
+      logger.info('wmm: ', wmm);
+    });
+
+    it('> pos', async function() {
+      expect(wmm.pos(0)).to.deep.equal(wmm[1]);
+      expect(wmm.pos(1)).to.deep.equal(wmm[2]);
+      expect(wmm.pos(2)).to.deep.equal(wmm[3]);
+    });
+
+    it('> get', async function() {
+      expect(wmm.get('id')).to.deep.equal([1, 2, 3]);
+    });
+
+    it('> id', async function() {
+      expect(wmm.id(1)).to.deep.equal(wmm[1]);
+      expect(wmm.id(2)).to.deep.equal(wmm[2]);
+      expect(wmm.id(3)).to.deep.equal(wmm[3]);
+    });
+  });
+
   describe('> WovModel', async function() {
 
     it(`> set / get : ${__fileloc}`, async function() {
@@ -165,9 +199,9 @@ describe(`> ${mtag}: `, async function() {
       expect(tm2.isRef('id')).to.be.false;
       expect(tm2.isRef('title')).to.be.false;
       expect(tm2.isRef('_testtable_ref')).to.be.true;
-      expect(TestModel.isRef(tm1, 'name')).to.be.false;
-      expect(TestModel2.isRef(tm2, 'title')).to.be.false;
-      expect(TestModel2.isRef(tm2, '_testtable_ref')).to.be.true;
+      expect(TestModel.isRef('name')).to.be.false;
+      expect(TestModel2.isRef('title')).to.be.false;
+      expect(TestModel2.isRef('_testtable_ref')).to.be.true;
     });
 
     it(`> flatten : ${__fileloc}`, async function() {
@@ -208,6 +242,31 @@ describe(`> ${mtag}: `, async function() {
 
     });
 
+    it(`> readInMany partially : ${__fileloc}`, async function() {
+      await TestModel3.createOne(data3a);
+      await TestModel3.createOne(data3b);
+      let tm1 = await TestModel.readByID(data.id);
+      await tm1.readInMany('TestModel3', {title : data3a.title});
+      expect(Object.keys(tm1.testmodels3).length).to.equal(1);
+      await tm1.readInMany('TestModel3', {title : data3b.title});
+      expect(Object.keys(tm1.testmodels3).length).to.equal(2);
+
+      delete tm1.testmodels3;
+      await tm1.readInMany('TestModel3', {'or' : [{title : data3a.title}, {title : data3b.title}] });
+      expect(Object.keys(tm1.testmodels3).length).to.equal(2);
+
+      delete tm1.testmodels3;
+      await tm1.readInMany('TestModel3', {'and' : [{title : data3a.title}, {title : data3b.title}] });
+      expect(Object.keys(tm1.testmodels3).length).to.equal(0);
+      await tm1.readInMany('TestModel3', {'and' : [{title : data3a.title}] });
+      expect(Object.keys(tm1.testmodels3).length).to.equal(1);
+
+      delete tm1.testmodels3;
+      await tm1.readInMany('TestModel3', {'and' : {title : data3a.title} });
+      expect(Object.keys(tm1.testmodels3).length).to.equal(1);
+
+    });
+
 
     it(`> flatten component : ${__fileloc}`, async function() {
       let tm2 = await TestModel2.readByID(data2.id);
@@ -235,6 +294,68 @@ describe(`> ${mtag}: `, async function() {
       // logger.info('tm1a: ', tm1a);
       expect(tm1b.get('name')).to.equal('newname');
     });
+  });
+
+  describe('> WovModel schema checks', async function() {
+    it(`> schema basic test: ${__fileloc}`);
+
+    it(`> schema private : ${__fileloc}`, async function() {
+      let mp = await MP.createOne({title : 'mp', pp : 'secret'});
+      logger.info('mp         : ', mp);
+      logger.info('mp get     : ', mp.get());
+      logger.info('mp flatten : ', mp.flatten());
+
+      expect(mp.get()).to.deep.equal({id : 1, title : 'mp', pp : 'secret'});
+      expect(mp.flatten()).to.deep.equal({title : 'mp'});
+    });
+
+    it(`> schema ignore additional attributes : ${__fileloc}`);
+
+    it(`> schema inheritance tests : ${__fileloc}`);
+
+  });
+
+
+  describe('> WovModel examples', async function() {
+
+    it(`> car.tires.wheel : ${__fileloc}`, async function() {
+      let car = await TMS.Car.createOne({nameplate : 'Pilot', make : 'Honda', license : 'AGH432', state : 'GA'});
+      let tires = [
+        await TMS.Tire.createOne({brand : 'Michelin', model : '1', position : 'FL', wear : '.76', _car_ref : car.get('id')}),
+        await TMS.Tire.createOne({brand : 'Michelin', model : '1', position : 'FR', wear : '.78', _car_ref : car.get('id')}),
+        await TMS.Tire.createOne({brand : 'Michelin', model : '1', position : 'RL', wear : '.86', _car_ref : car.get('id')}),
+        await TMS.Tire.createOne({brand : 'Michelin', model : '1', position : 'RR', wear : '.91', _car_ref : car.get('id')}),
+      ];
+      let wheels = [
+        await TMS.Wheel.createOne({style : 'chrome', _tire_ref : tires[0].get('id')}),
+        await TMS.Wheel.createOne({style : 'chrome', _tire_ref : tires[1].get('id')}),
+        await TMS.Wheel.createOne({style : 'chrome', _tire_ref : tires[2].get('id')}),
+        await TMS.Wheel.createOne({style : 'chrome', _tire_ref : tires[3].get('id')}),
+      ];
+
+      logger.info('car   : ', car.get());
+      logger.info('tire  : ', tires[0].get());
+      logger.info('tire  : ', tires[1].get());
+      logger.info('tire  : ', tires[2].get());
+      logger.info('tire  : ', tires[3].get());
+      logger.info('wheel : ', wheels[0].get());
+      logger.info('wheel : ', wheels[1].get());
+      logger.info('wheel : ', wheels[2].get());
+      logger.info('wheel : ', wheels[3].get());
+
+      await car.readInMany('Tire');
+      logger.info('Car Tires : ', car.tires.get());
+      car.tires.get().forEach( function(t, i) { expect(t).to.deep.equal(tires[i].get()); });
+
+      logger.info('Car Tires : ', car.tires);
+      await car.tires.readIn('Wheel');
+      logger.info('Car Tires (post): ', car.tires);
+      logger.info('Car Tires Wheels: ', car.tires.select('wheel'));
+      await car.tires.select('wheel').readIn('Tire');
+      logger.info('Car Tires Wheels Tire: ', car.tires.select('wheel').select('tire'));
+
+    });
+
   });
 
   after(async function() {

@@ -107,27 +107,24 @@ module.exports = function() {
   };
   AssModelC.updateSchema({title : 'text', _childmodel_ref : 'integer'});
 
-  let models = {TestModel, TestModel2, TestModel3, ParentModel, ChildModel, ChildChildModel, AssModelP, AssModelC};
-
-  /*
-  const onBefore = async function(_C) {
-
-    // create the tables for all models
-    for (let k in models ) {
-      if ( models.hasOwnProperty(k) ) {
-        let m = models[k];
-        if ( m.isInited() ) {
-          let result = await models[k].doInitDB(true, true, true);
-          if ( result instanceof WR ) {
-            Logger.g().info('result: ', result);
-            Logger.g().rethrowError(result.data, `Error creating table for model '${m.name}'.`);
-          }
-        }
-        // else { Logger.g().info('... skipping creating tables for model '); }
-      }
-    }
+  const MP = class MP extends Service.WovModel {
+    static tablename = 'modelp';
+    constructor(_data) { super(_data); } // eslint-disable-line require-jsdoc
   };
-  */
+  MP.updateSchema({title : 'text', pp : 'text',  sensitive : ['pp'] });
+
+
+  const Car = class Car extends Service.WovModel { static tablename = 'car'; constructor(_data) { super(_data); } }; // eslint-disable-line require-jsdoc
+  Car.updateSchema({nameplate : 'text', make : 'text', license : 'text', state : 'text'});
+
+  const Tire = class Tire extends Service.WovModel { static tablename = 'tire'; constructor(_data) { super(_data); } }; // eslint-disable-line require-jsdoc
+  Tire.updateSchema({brand : 'text', model : 'text', position : 'text', wear : 'float', _car_ref : 'integer'});
+
+  const Wheel = class Wheel extends Service.WovModel { static tablename = 'wheel'; constructor(_data) { super(_data); } }; // eslint-disable-line require-jsdoc
+  Wheel.updateSchema({style : 'text', _tire_ref : 'integer'});
+
+
+  let models = {TestModel, TestModel2, TestModel3, ParentModel, ChildModel, ChildChildModel, AssModelP, AssModelC, MP, Car, Tire, Wheel};
 
   // return Object.assign({}, models, {onBefore});
   return models;

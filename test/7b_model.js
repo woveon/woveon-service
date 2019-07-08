@@ -82,8 +82,8 @@ describe(`> ${mtag}: `, async function() {
       logger.info('AssModelCs on c result: ', result);
       logger.info('c: ', c);
       logger.info('AssModelCs on c result: ', c.assmodelcs);
-      expect(c.assmodelcs[0] instanceof M.AssModelC).to.be.true;
-      expect(c.assmodelcs[1] instanceof M.AssModelC).to.be.true;
+      expect(c.assmodelcs.pos(0) instanceof M.AssModelC).to.be.true;
+      expect(c.assmodelcs.pos(1) instanceof M.AssModelC).to.be.true;
 
     });
 
