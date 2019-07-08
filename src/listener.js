@@ -185,7 +185,7 @@ module.exports = class Listener {
   checkBodyAttribute(_args, _attr, _val, _retRawError= false) {
     this.logger.logDeprecated('should just call WovReturn.checkBodyAttribute directly.');
     console.trace();
-    return WovReturn.checkAttributes(_args, _attr, _val, _retRawError);
+    return WovReturn.checkProperties(_args, _attr, _val, _retRawError);
   }
 
 
@@ -326,14 +326,16 @@ module.exports = class Listener {
    */
   async onProtect(_route, _method, _attr, _attrpost) {
     let rr = this.root + _route;
-    this.logger.aspect('listener.protect', `onProtect: ${rr} / ${_route}`);
+    // this.logger.aspect('listener.protect', `onProt  : ${rr} / ${_route}`);
+    this.logger.aspect('listener.protect', `PROT  : ${this._getFunctionRawName(_method).padEnd(20, ' ')} : ${rr}`);
+    // this.logger.aspect('listener.protect', `PROT  : ${this._getFunctionRawName(_method).padEnd(20, ' ')} : ${rr} / ${_route}`);
     this.app.use(rr, async function(_req, _res, next) {
       let args = Object.assign(_req.query, _req.params, _req.body, _req.files, _req.wov);
 
       // this.logger.info('onProtect hit: ', rr, args, _attr);
 
       // check that required attributes exist
-      let result = WovReturn.checkAttributes(args, _attr, null, {retRawError : true, checkStrict : false});
+      let result = WovReturn.checkProperties(args, _attr, null, {retRawError : true, checkStrict : false});
 
       // call method if all ok so far
       if ( result == null ) { result = await _method(args, _res); }
@@ -352,13 +354,14 @@ module.exports = class Listener {
       else {
         // add in params
         if ( (typeof result.data ) == 'object' ) {
-          this.logger.aspect('listener.protect', 'add in params:', result.data);
-          _req.wov = Object.assign({}, _req.wov, result.data);
+          this.logger.aspect('listener.protect', 'PROTECT: adding to wov:', Object.keys(result.data));
+          if ( _req.wov == null ) _req.wov = {};
+          Object.assign(_req.wov, result.data);
         }
 
         // check post attributes
         let argspost = Object.assign(_req.query, _req.params, _req.body, _req.files, _req.wov);
-        let resultpost = WovReturn.checkAttributes(argspost, _attrpost, null, {retRawError : true, checkStrict : false});
+        let resultpost = WovReturn.checkProperties(argspost, _attrpost, null, {retRawError : true, checkStrict : false});
         if ( resultpost != null ) {
           this.logger.error(resultpost.message);
           _res.status(404).json(WovReturn.retError(resultpost.message));
@@ -426,6 +429,21 @@ module.exports = class Listener {
 
 
   /**
+   * Returns the raw name (i.e. remove 'get', 'set', or 'bound').
+   * @param {Function} _f -
+   * @return {string}
+   */
+  _getFunctionRawName(_f) {
+    let retval = '';
+    if ( _f != null && _f.name != null ) {
+      let n = _f.name.split(' ');
+      retval = n[n.length-1];
+    }
+    return retval;
+  }
+
+
+  /**
    * RESTFUL GET route managed with method.
    * @param {string} _route - partial route, appended to this.root
    * @param {function} _method - method to call
@@ -441,7 +459,7 @@ module.exports = class Listener {
 
     if ( this.islistening ) { this.logger.throwError(`calling Listener.onGet "${rr}" when already listening.`); }
     if ( this.app == null ) { this.logger.throwError('failed to call init() on this listener.'); }
-    this.logger.aspect('listener.route', `onGet   : ${rr}`);
+    this.logger.aspect('listener.route', `GET   : ${this._getFunctionRawName(_method).padEnd(20, ' ')} : ${rr}`);
 
     this.app.get(rr, (req, res) => {
       this.responseHandler(rr, _method, _mfilename, Object.assign(req.query, req.params, req.wov), res);
@@ -463,7 +481,7 @@ module.exports = class Listener {
 
     if ( this.islistening ) { this.logger.throwError(`calling Listener.onPost ${rr} when already listening.`); }
     if ( this.app == null ) { this.throwError('failed to call init() on this listener.'); }
-    this.logger.aspect('listener.route', `onPost  : ${rr}`);
+    this.logger.aspect('listener.route', `POST  : ${this._getFunctionRawName(_method).padEnd(20, ' ')} : ${rr}`);
     this.app.post(rr, (req, res) => {
       this.logger.info(' parmas: ', req.params);
       this.logger.info('  query: ', req.query);
@@ -490,7 +508,7 @@ module.exports = class Listener {
 
     if ( this.islistening ) { this.logger.throwError(`calling Listener.onPut ${rr} when already listening.`); }
     if ( this.app == null ) { this.logger.throwError('failed to call init() on this listener.'); }
-    this.logger.aspect('listener.route', `onPut   : ${rr}`);
+    this.logger.aspect('listener.route', `PUT   : ${this._getFunctionRawName(_method).padEnd(20, ' ')} : ${rr}`);
     this.app.put(rr, (req, res) =>
       this.responseHandler(rr, _method, _mfilename,
         Object.assign(req.query, req.params, req.body, req.files, req.wov), res));
@@ -510,7 +528,7 @@ module.exports = class Listener {
 
     if ( this.islistening ) { this.logger.throwError(`calling Listener.onDelete ${rr} when already listening.`); }
     if ( this.app == null ) { this.logger.throwError('failed to call init() on this listener.'); }
-    this.logger.aspect('listener.route', `onDelete: ${rr}`);
+    this.logger.aspect('listener.route', `DELETE: ${this._getFunctionRawName(_method).padEnd(20, ' ')} : ${rr}`);
     this.app.delete(rr, (req, res) =>
       this.responseHandler(rr, _method, _mfilename,
         Object.assign(req.query, req.params, req.body, req.files, req.wov), res));
@@ -693,7 +711,7 @@ module.exports = class Listener {
     let rr = this.root + '/doc' + _route;
 
     // create static html
-    this.logger.aspect('listener.route', `onDoc   : ${rr} - GET`);
+    this.logger.aspect('listener.route', `DOC   : ${rr} - GET`);
 
     // Templates for Handlebars
     let hPath = `
