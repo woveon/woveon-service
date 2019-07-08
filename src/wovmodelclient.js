@@ -50,6 +50,23 @@ module.exports = class WovModelClient {
   }
 
   /**
+   * Helper function to get all GraphQL schemas in the model.
+   * @return {string} - all schemas
+   */
+  getGraphQLSchemas() {
+    let models = Object.values(this.table2model);
+    let retval = '';
+    for (let k in models ) {
+      if ( models.hasOwnProperty(k) ) {
+        let m = models[k];
+        let s = m.getGraphQLSchema();
+        retval += '\n'+s;
+      }
+    }
+    return retval;
+  }
+
+  /**
    * NOTE: when switching to pools, have to set a client, cleared on endTransaction()
    * @return {bool|Error} - true on success, Error on failure
    */
