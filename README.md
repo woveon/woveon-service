@@ -4,6 +4,8 @@
 
 In production. TODO: document a bit.
 
+This will be updated shortly when I explain this tool in a LinkedIn blog post.
+
 
 
 ## Woveon is an enterprise conversation management software. Using AI and machine learning, it helps businesses take control of their conversations - to provide exceptional customer experience, audit for compliance, and maximize revenue.
