@@ -31,8 +31,8 @@ module.exports = class Service {
   */
   async onInit() {
     this.logger.info('onInit woveon-service');
-    this.listener.onGet('/shutdown', this.doShutdown, __filename);
-    this.listener.onGet('/health', this.onHealth, __filename);
+    this.listener.onGet('/priv/shutdown', this.doShutdown, __filename);
+    this.listener.onGet('/pub/health', this.onHealth, __filename);
   };
 
   /**
