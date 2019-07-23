@@ -728,7 +728,7 @@ module.exports = class Listener {
 
   <blockquote>{{summary}}</blockquote>
 
-  <p><strong>Description</strong>: {{desc}}</p>
+  <p><strong>Description</strong>: {{{desc}}}</p>
 
   {{#if docs}}
   <div class='wov-docs'>
@@ -835,7 +835,7 @@ module.exports = class Listener {
    * If _docdata is null, then at least we know that the route exists, tho undocumented.
    *
    * @param {string} _route - rest path
-   * @param {object} _docdata -  follows teh DocPath or DocMethod schema, based upon _httpverb
+   * @param {object} _docdata -  follows the DocPath or DocMethod schema, based upon _httpverb
    * @param {string} _httpverb - http verb, or null for Path documentation
    */
   onDoc(_route, _docdata, _httpverb = null) {
