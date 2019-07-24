@@ -32,7 +32,12 @@ module.exports = class Service {
   async onInit() {
     this.logger.info('onInit woveon-service');
     this.listener.onGet('/priv/shutdown', this.doShutdown, __filename);
-    this.listener.onGet('/pub/health', this.onHealth, __filename);
+    this.listener.onGet('/pub/health', this.onHealth, __filename, new Listener.DocMethod({
+      summary   : 'A simple health check',
+      desc      : 'This just returns true. If there is a db, this also makes sure the db connection is good.',
+      params    : [],
+      responses : {},
+    }));
   };
 
   /**

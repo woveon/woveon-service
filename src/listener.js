@@ -299,9 +299,10 @@ module.exports = class Listener {
     catch (error) {
       console.log(error);
       this.logger.warn(error);
+      result = WovReturn.retError(error, error.msg);
       if ( process.env.WOV_STAGE != 'prod' ) {
         result.error = error.msg;
-        result.data  = error.data;
+        result.data  = {}; // error.data;
       }
       this.logger.warn(result);
       _res.status(400).json(result);
@@ -455,7 +456,22 @@ module.exports = class Listener {
 //    this.logger.info('onGet : root: ', this.root);
     let rr = this.root + _route;
 //    this.logger.info('onGet : rr: ', rr);
+
+
+    // Self documentation
+    if ( _docMethod == null ) {
+      _docMethod = new DocMethod({
+        summary   : null,
+        desc      : null,
+        docs      : [],      // DocDoc
+        params    : [],      // DocParam
+        responses : {},      // DocResp
+      });
+    }
+    if ( _docMethod.filename == null ) _docMethod.filename = _mfilename;
+    if ( _docMethod.funcname == null ) _docMethod.funcname = this._getFunctionRawName(_method);
     this.onDoc(rr, _docMethod, 'get');
+
 
     if ( this.islistening ) { this.logger.throwError(`calling Listener.onGet "${rr}" when already listening.`); }
     if ( this.app == null ) { this.logger.throwError('failed to call init() on this listener.'); }
@@ -477,6 +493,19 @@ module.exports = class Listener {
   async onPost(_route, _method, _mfilename, _docMethod = null ) {
     if ( _mfilename == null ) { this.logger.throwError('Need to append "__filename" to listener function.'); }
     let rr = this.root + _route;
+
+    // Self documentation
+    if ( _docMethod == null ) {
+      _docMethod = new DocMethod({
+        summary   : null,
+        desc      : null,
+        docs      : [],      // DocDoc
+        params    : [],      // DocParam
+        responses : {},      // DocResp
+      });
+    }
+    if ( _docMethod.filename == null ) _docMethod.filename = _mfilename;
+    if ( _docMethod.funcname == null ) _docMethod.funcname = this._getFunctionRawName(_method);
     this.onDoc(rr, _docMethod, 'post');
 
     if ( this.islistening ) { this.logger.throwError(`calling Listener.onPost ${rr} when already listening.`); }
@@ -504,6 +533,19 @@ module.exports = class Listener {
   async onPut(_route, _method, _mfilename, _docMethod = null) {
     if ( _mfilename == null ) { this.logger.throwError('Need to append "__filename" to listener function.'); }
     let rr = this.root + _route;
+
+    // Self documentation
+    if ( _docMethod == null ) {
+      _docMethod = new DocMethod({
+        summary   : null,
+        desc      : null,
+        docs      : [],      // DocDoc
+        params    : [],      // DocParam
+        responses : {},      // DocResp
+      });
+    }
+    if ( _docMethod.filename == null ) _docMethod.filename = _mfilename;
+    if ( _docMethod.funcname == null ) _docMethod.funcname = this._getFunctionRawName(_method);
     this.onDoc(rr, _docMethod, 'put');
 
     if ( this.islistening ) { this.logger.throwError(`calling Listener.onPut ${rr} when already listening.`); }
@@ -524,6 +566,19 @@ module.exports = class Listener {
   async onDelete(_route, _method, _mfilename, _docMethod = null) {
     if ( _mfilename == null ) { this.logger.throwError('Need to append "__filename" to listener function.'); }
     let rr = this.root + _route;
+
+    // Self documentation
+    if ( _docMethod == null ) {
+      _docMethod = new DocMethod({
+        summary   : null,
+        desc      : null,
+        docs      : [],      // DocDoc
+        params    : [],      // DocParam
+        responses : {},      // DocResp
+      });
+    }
+    if ( _docMethod.filename == null ) _docMethod.filename = _mfilename;
+    if ( _docMethod.funcname == null ) _docMethod.funcname = this._getFunctionRawName(_method);
     this.onDoc(rr, _docMethod, 'delete');
 
     if ( this.islistening ) { this.logger.throwError(`calling Listener.onDelete ${rr} when already listening.`); }
@@ -579,7 +634,7 @@ module.exports = class Listener {
           desc    : '',
           methods : {},
           params  : [],
-        }).options;
+        });
       }
       else {
         if ( node.methods == null ) node.methods = {};
@@ -620,10 +675,12 @@ module.exports = class Listener {
               node.methods[verb] = new DocMethod({
                 summary   : null,
                 desc      : null,
+                filename  : null,
+                funcname  : null,
                 docs      : [],
                 params    : [],
                 responses : {},
-              }).options;
+              });
               // dataOverview.hasPage = true; // has verb path page, then link
             }
           }
@@ -711,7 +768,7 @@ module.exports = class Listener {
     let rr = this.root + '/doc' + _route;
 
     // create static html
-    this.logger.aspect('listener.route', `DOC   : ${rr} - GET`);
+    this.logger.aspect('listener.route', `DOC   : ${JSON.stringify(rr, null, 2)} - GET`);
 
     // Templates for Handlebars
     let hPath = `
@@ -748,12 +805,15 @@ module.exports = class Listener {
   </div>
   {{/if}}
 
+  <hr />
+
   <div class='container container-methods'>
     {{#each methods}}
     <div>
 
-      <h2 style='text-transform: uppercase;'>{{@key}}</h2>
+      <h2><span style='text-transform: uppercase;'>{{@key}}</span> {{#if funcname}}: {{funcname}}{{/if}}</h2>
       <p><i>{{summary}}</i></p>
+      {{#if funcname}}<p><strong>Function</strong>: {{funcname}} {{#if filename}}in {{filename}}{{/if}}</p>{{/if}}
       {{#if desc}}<p><strong>Description</strong>: {{desc}}</p>{{/if}}
 
       {{#if docs}}
@@ -896,7 +956,8 @@ class DocPath {
       methods : {}, // description of each method, via DocMethod object
       params  : [], // description of each param, via DocParam object
     };
-    this.options = Object.assign({}, base, _options);
+    // this.options = Object.assign({}, base, _options);
+    Object.assign(this, base, _options);
    // if ( this.options.route == null || this.options.route == '' ) {throw new Error('Needs a route');}
   }
 
@@ -915,12 +976,14 @@ class DocMethod {
   constructor(_options) {
     let base = {
       summary   : null,
+      filename  : null,
+      funcname  : null,
       desc      : null,
       docs      : [],      // DocDoc
       params    : [],      // DocParam
       responses : {},      // DocResp
     };
-    this.options = Object.assign({}, base, _options);
+    Object.assign(this, base, _options);
   }
 };
 
@@ -940,7 +1003,7 @@ class DocDoc {
       desc  : null,
       link  : null,
     };
-    this.options = Object.assign({}, base, _options);
+    Object.assign(this, base, _options);
   }
 };
 
@@ -961,7 +1024,7 @@ class DocParam {
       in       : null,
       required : null,
     };
-    this.options = Object.assign({}, base, _options);
+    Object.assign(this, base, _options);
   }
 };
 
@@ -980,7 +1043,8 @@ class DocResp {
       desc   : null,
       params : [],  // DocParam
     };
-    this.options = Object.assign({}, base, _options);
+    // this.options = Object.assign(this, base, _options);
+    Object.assign(this, base, _options);
   }
 };
 
