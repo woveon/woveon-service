@@ -15,6 +15,8 @@ const ModelLoader   = require('./modelloader');
 const WovModelClient= require('./wovmodelclient');
 const WovModel      = require('./wovmodel');
 
+const {DocMethod, DocParam} = Listener;
+
 
 module.exports = class Service {
 
@@ -31,13 +33,17 @@ module.exports = class Service {
   */
   async onInit() {
     this.logger.info('onInit woveon-service');
-    this.listener.onGet('/priv/shutdown', this.doShutdown, __filename);
-    this.listener.onGet('/pub/health', this.onHealth, __filename, new Listener.DocMethod({
+    this.listener.onGet('/priv/shutdown', new DocMethod({
+      summary : 'A route to shut down the server',
+      handler : this.doShutdown,
+    }), __filename);
+    this.listener.onGet('/pub/health', new DocMethod({
       summary   : 'A simple health check',
+      handler   : this.onHealth,
       desc      : 'This just returns true. If there is a db, this also makes sure the db connection is good.',
       params    : [],
       responses : {},
-    }));
+    }), __filename);
   };
 
   /**

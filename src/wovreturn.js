@@ -85,7 +85,8 @@ module.exports = class WovReturn {
 
 
   /**
-   * Route had error in performing its function. NOTE: not a system level error
+   * Route had error in performing its function.
+   * NOTE: This is http code 200 since message was received, executed and handled correctly. This is not a client or system level error.
    * @param {object}  _data - returned object
    * @param {string}   _msg - message describing the failure
    * @param {object}  _meta - metadata about the returned object (ex. for fetch, a url)
@@ -120,6 +121,9 @@ module.exports = class WovReturn {
     if ( WovReturn._errordefs == undefined ) {
       throw new Error(`WovReturn::retCodedError: no error definitions; need to call defineCodedErrors`);
     }
+
+    if ( _data == null ) { throw new Error('retCodedError called with null _data parameter'); }
+
     let ec = WovReturn._errordefs[_errname];
     if ( ec == null ) { throw new Error(`WovReturn::retCodedError: unknown error of '${_errname}'.`); }
     let retval = new WovReturn({
@@ -134,14 +138,14 @@ module.exports = class WovReturn {
 
 
   /**
-   * Route had system failure.
+   * Route had system failure. Not a bad user data error or missing data. Something in the server blew up.
    * @param {object}  _data - returned object
-   * @param {integer} _code - http response code
+   * @param {integer} _code - http response code.
    * @param {string}   _msg - message describing the failure
    * @param {object}  _meta - metadata about the returned object (ex. for fetch, a url)
    * @return {object} - res object for sender
    */
-  static retFail(_data, _code=400, _msg='Failure', _meta = null) {
+  static retFail(_data, _code=500, _msg='Failure', _meta = null) {
     return new WovReturn({
       success : false,
       code    : _code,
@@ -193,12 +197,18 @@ module.exports = class WovReturn {
       else if ( Array.isArray(_attr) )  {
         attrs = {}; _attr.forEach((e) => {
           // console.log('setting ', e);
-          attrs[e] = true;
+          if ( typeof e == 'string' ) attrs[e] = true;  // _attr is Array of stirngs
+          else attrs[e.name] = e.required;              // _attr is Array of DocParams
         });
       }
 
-      //    console.log('_args: ', _args);
-      //    console.log('attrs: ', attrs);
+      /*
+      console.log('checkproperties');
+      console.log('options: ', _options);
+      console.log('_args : ', _args);
+      console.log('attrs1: ', _attr);
+      console.log('attrs2: ', attrs);
+      */
 
       // check all in args are in acceptable attrs (required or not)
       if ( _options.checkStrict == true ) {
@@ -210,7 +220,7 @@ module.exports = class WovReturn {
       // check all required attrs are in args
       for (let k in attrs) {
         // console.log('check : ', k, _args[k]);
-        if ( attrs[k] == true && _args[k] === undefined) {
+        if ( (attrs[k] == true || attrs[k].required) && _args[k] === undefined) {
           // console.log('err');
           emsg.missing.push(k);
         }

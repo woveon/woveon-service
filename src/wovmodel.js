@@ -75,12 +75,13 @@ class WovModel {
     }
 
     // delete all 'sensitive' members
-    this.constructor.l.info(`delete all 'sensitive' members`, this.constructor._sensitive);
+    // this.constructor.l.info(`delete all 'sensitive' members`, this.constructor._sensitive);
     for ( let i in this.constructor._sensitive) {
       let k = this.constructor._sensitive[i];
-      this.constructor.l.info('delete sensitive member : ', k);
+      // this.constructor.l.info('delete sensitive member : ', k);
       delete retval[k];
     }
+    // console.log('flatten2: ', retval);
 
     // flatten component WovModels recursively
     if ( _recurse ) {
@@ -619,7 +620,7 @@ class WovModel {
     let retval = null;
     let Mod = _model || this;
 
-    this.cl.l.info('_polyReadCheck: ', _data); // , _model);
+    // this.cl.l.info('_polyReadCheck: ', _data); // , _model);
     if ( _data._model_t === undefined ) { throw Error('How did this happen. You have failed me.', _data, _model); }
     else if ( _data._model_t == Mod.name ) { retval = new Mod(_data); }
     else { // polymorphic
@@ -715,7 +716,7 @@ class WovModel {
 
     // skip if already done
     if ( this.hasOwnProperty('_graphQL') == false ) {
-      this.l.info(`initGraphQLSchema: ${this.name}: `, this._ownschema);
+      // this.l.info(`initGraphQLSchema: ${this.name}: `, this._ownschema);
       this._graphQL = {
         model : this.name,
         vars  : [],
@@ -788,7 +789,7 @@ class WovModel {
       let models = Object.values(this.cl.table2model);
       for (let i in models) {
         let m = models[i];
-        this.l.info(`${this.name} <== ${m.name} : (tablename '${m.tablename}') : transmodel of : `, m._transmodel);
+        // this.l.info(`${this.name} <== ${m.name} : (tablename '${m.tablename}') : transmodel of : `, m._transmodel);
 
         // for all in schema
         for (let k in m._ownschema) {
@@ -1054,7 +1055,7 @@ class WovModel {
 
     this._ownschema = _schema;
     if ( this._ownschema.sensitive ) {
-      Logger.g().info(`- found sensitive entry(s) : `, this._ownschema['sensitive']);
+      // Logger.g().info(`- found sensitive entry(s) : `, this._ownschema['sensitive']);
       Object.assign(this._sensitive, this._ownschema['sensitive']);
       delete this._ownschema.sensitive;
     }

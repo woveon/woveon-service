@@ -3,10 +3,35 @@ const bodyParser = require('body-parser');
 const path       = require('path');
 const Handlebars = require('handlebars');
 const fs         = require('fs');
+const Logger     = require('woveon-logger');
 
 const cors       = require('cors');
 
 const WovReturn  = require('./wovreturn');
+
+
+Handlebars.registerHelper('json', function(context) { return JSON.stringify(context); });
+Handlebars.registerHelper('JSON', function(context) { return `<pre style="font-size: 8px"><code>${JSON.stringify(context, null, 2)}</code></pre>`; });
+Handlebars.registerHelper('upper', function(context) { return context.toUpperCase(); });
+Handlebars.registerHelper('docParam', function(context, _ispost) {
+  let retval = null;
+  let t = _ispost || 'Param';
+
+  // Logger.g().info('docParam: ', context, _ispost);
+  if ( typeof context == 'string' ) {
+    retval=
+      `<dt>${t}: ${context} <span> (required)</span></dt>`;
+  }
+  else { // DocParam
+    retval=
+      `<dt>${t}: ${context.name}`+
+      `${ (context.in)?` - in ${context.in}`:''}`+
+      `${ (context.required)?` <span> (required)</span>`:''}`+
+      `</dt>`;
+    if ( context.desc ) retval += `<dd>${context.desc}</dd>`;
+  }
+  return retval;
+});
 
 /**
  * Class that manages RESTFUL listening via ExpressJS.
@@ -44,7 +69,7 @@ module.exports = class Listener {
     this.docs        = {};
     this.views       = {};
     this.templateNode = null;
-    this.verbs = ['get', 'post', 'put', 'delete'];
+    this.verbs = ['get', 'post', 'put', 'delete', 'protect'];
   };
 
 
@@ -143,10 +168,13 @@ module.exports = class Listener {
 
       // cap with a final error listener
       this.islistening = true;
-      this.app.all('*', (req, res) => {
-        let str = `REST LISTENER: Failed to match endpoint '${req.method}' '${req.originalUrl}' ${this.port}`;
-        this.logger.warn(str);
-        res.status(404).json({success : false, data : str});
+      this.app.all('*', (_req, _res) => {
+        let args = Object.assign({}, _req.query, _req.body, _req.files, _req.wov);
+        this.logger.aspect('listener.incoming', `Handling : '${_req.originalUrl}' with: 'no method'`);
+        this.logger.warn(`No route '${_req.originalUrl} ${_req.method}' `+
+                         `from : ${_req.headers.host} ${_req.headers['user-agent']} with : `, args);
+        let str = `Failed to match endpoint '${_req.method}' '${_req.originalUrl}' ${this.port}`;
+        this.sendWovReturnResponse(_res, WovReturn.retError(str), 'no method');
       });
 
       this.server = this.app.listen(this.port, '0.0.0.0', () => {
@@ -194,11 +222,13 @@ module.exports = class Listener {
    * @param {object}  _data - returned object
    * @return {WovReturn} -
    */
+  /*
   retSuccess(_data) {
     this.logger.logDeprecated('should just call WovReturn.retSuccess directly.');
     console.trace();
     return WovReturn.retSuccess(_data);
   }
+  */
 
 
   /**
@@ -206,11 +236,13 @@ module.exports = class Listener {
    * @param {string} _path - the redirect URL
    * @return {WovReturn} -
    */
+  /*
   retRedirect(_path) {
     this.logger.logDeprecated('should just call WovReturn.retRedirect directly.');
     console.trace();
     return WovReturn.retRedirect(_path);
   }
+  */
 
 
   /**
@@ -219,11 +251,13 @@ module.exports = class Listener {
    * @param {string}   _msg - message describing the failure
    * @return {object} - res object for sender
    */
+  /*
   retError(_data, _msg='General Error') {
     this.logger.logDeprecated('should just call WovReturn.retError directly.');
     console.trace();
     return WovReturn.retError(_data, _msg);
   }
+  */
 
 
   /**
@@ -233,11 +267,13 @@ module.exports = class Listener {
    * @param {string}   _msg - message describing the failure
    * @return {object} - res object for sender
    */
+  /*
   retFail(_data, _code=400, _msg='Failure') {
     this.logger.logDeprecated('should just call WovReturn.retFail directly.');
     console.trace();
     return WovReturn.retFail(_data, _code, _msg);
   }
+  */
 
 
   /**
@@ -249,70 +285,103 @@ module.exports = class Listener {
    * NOTE: Not responding on error with error codes?
    * @param {string} _route - full route
    * @param {*} _method - a function that returns WovReturn, or an object/value, with success assumed
+   * @param {Array<string>, Array<DocParam>, Object} _paramDefs - definition of the parms to check : array are required, object has true/false values
    * @param {string} _mfilename - name of method's file
    * @param {*} _args
    * @param {*} _res
    * @param {object} _options - further instructions to this handler
    */
-  async responseHandler(_route, _method, _mfilename, _args, _res, _options = {}) {
+  async responseHandler(_route, _method, _paramDefs, _mfilename, _args, _res, _options = {}) {
     this.logger.verbose(`...listener heard route: ${_route}`);
     let fn = this.logger.trimpath(_mfilename, this.logger.options.trimTo); // _mfilename.split(this.logger.options.trimTo+'/')[1] || _mfilename;
-    this.logger.aspect('listener.incoming', `Handling : '${_route}' with: '${fn}::${_method.name}' :`, _args);
+    this.logger.aspect('listener.incomingfull', `Handling : '${_route}' with: '${fn}::${_method.name}' :`, _args);
+    this.logger.aspect('listener.incoming', `Handling : '${_route}' with: '${fn}::${_method.name}'`);
     this.logger.aspect('thread', `>>>arriving at ${fn}::${_method.name} in ${_mfilename}`);
-    let result = {success : false};
 
-    // call method and return result
-    try {
-      if ( typeof _method === 'function' ) { result = await _method(_args, _res); }
-      else { result = this.retSuccess(_method); }
+    let retval = WovReturn.checkProperties(_args, _paramDefs);
 
-      // this.logger.info('result: ', result, result instanceof WovReturn );
-      if ( result == null || (! WovReturn.isValidWovReturn(result)) ) {
-        this.logger.throwError(
-          'Method did not return WovReturn object. Call retSucces, retFail or retError\n'+
-          '  result  : ', JSON.stringify(result, null, '  '), '\n'+
-          '  @route  : ', _route, '\n'+
-          '  @method : ', _method, '\n'+
-          '  @file   : ', _mfilename);
-      }
+    if ( retval == null ) { if ( (typeof _method) != 'function' ) { retval = this.retSuccess(_method); } }
 
+    // call method and catch Errors thrown
+    if ( retval == null ) {
 
-      // perform any additional actions, based upon _options
-      if ( _options.addRoute == true ) {
-        result.data.route = _route;
-      }
-
-      this.logger.aspect('listener.result', '  ... result: ', result);
-      this.logger.aspect('thread', `<<<leaving from ${fn}::${_method.name}`, result);
-
-      // Redirect
-      if ( result.code == 302 ) {
-        // this.logger.info('redirect: ', result, _res);
-        _res.redirect(302, result.data);
-      }
-      else { // Success, Fail, Error
-        _res.status(result.code);
-        delete result.code;
-        if (! _res.headersSent) { _res.json(result); } // Check if response has been sent
+      try { retval = await _method(_args, _res); }
+      catch (error) {
+        this.logger.warn(error);
+        retval = WovReturn.retError(error, error.msg);
+        if ( process.env.WOV_STAGE != 'prod' ) {
+          retval.error = error.msg;
+          retval.data  = {}; // error.data;
+        }
+        this.logger.warn(retval);
       }
     }
-    catch (error) {
-      console.log(error);
-      this.logger.warn(error);
-      result = WovReturn.retError(error, error.msg);
-      if ( process.env.WOV_STAGE != 'prod' ) {
-        result.error = error.msg;
-        result.data  = {}; // error.data;
+
+    // check for WovReturn (or object representing it)
+    // this.logger.info('retval: ', retval, retval instanceof WovReturn );
+    if ( retval == null ) {
+      retval = new Error(
+        'Method returned null, not WovReturn object.\n'+
+        '  retval  : ', JSON.stringify(retval, null, '  '), '\n'+
+        '  @route  : ', _route, '\n'+
+        '  @method : ', _method, '\n'+
+        '  @file   : ', _mfilename);
+      this.sendWovReturnResponse(_res, WovReturn.retFail(retval, 500), _method.name);
+    }
+    else if (! WovReturn.isValidWovReturn(retval) ) {
+      retval = new Error(
+        `Method did not return WovReturn object, but "${JSON.stringify(retval, null, 2)}"\n`+
+        '  retval  : ', JSON.stringify(retval, null, '  '), '\n'+
+        '  @route  : ', _route, '\n'+
+        '  @method : ', _method, '\n'+
+        '  @file   : ', _mfilename);
+      this.sendWovReturnResponse(_res, WovReturn.retFail(retval, 500), _method.name);
+    }
+
+    else {
+
+      // perform any additional actions, based upon _options
+      if ( _options.addRoute == true ) { retval.data.route = _route; }
+
+      // Redirect if it's a redirect
+      if ( retval.code == 302 ) {
+        // this.logger.info('redirect: ', retval, _res);
+        this.logger.aspect('listener.result listener.redirect', `  ... redirect(${retval.code}): `, retval);
+        this.logger.aspect('thread', `>>>redirect to ${fn}::${_method.name}`, retval);
+        _res.redirect(302, retval.data);
       }
-      this.logger.warn(result);
-      _res.status(400).json(result);
+
+      // all WovReturns
+      else { this.sendWovReturnResponse(_res, retval, _method.name); }
     }
   }
 
 
   /**
+   * Common function called by onProtect and responseHandler to return data to the client.
+   * @param {Response} _res -
+   * @param {WovReturn} _wr - object to be sent to client
+   * @param {string} _methodname - name of the handling method
+   */
+  async sendWovReturnResponse(_res, _wr, _methodname) {
+
+    if ( _wr.code != 200 ) { this.logger.warn(_wr); this.logger.throwError(); }
+
+    // don't return useful Error objects and messages in production (but they are logged)
+    if ( process.env.WOV_STAGE == 'prod' && retval.error !== undefined ) { retval.error = null; retval.msg = 'error'; }
+
+    this.logger.aspect('listener.result', `  ... returning(${_wr.code}): `, _wr);
+    this.logger.aspect('thread', `<<<leaving from ${_methodname}`, _wr);
+
+    // send with code
+    if (! _res.headersSent) { await _res.status(_wr.code).json(_wr); }
+    else this.logger.throwError('ALREADY SENT?!?! How?');
+  }
+
+
+  /**
    * This 'protects' a route you pass in, selected from root, and any variables you
-   * return in _method's WovReturn.data are then included in req.wov, a compiling 
+   * return in _method's WovReturn.data are then included in req.wov, a compiling
    * object of values, eventually passed to your regular leaf handling function.
    *
    *   ex. /user/:sessionid/widgets/:widgetid  - use onProtect('/user/:sessionid') to
@@ -321,53 +390,65 @@ module.exports = class Listener {
    *
    * NOTE: vals stored in _req.wov.
    * @param {url} _route -
-   * @param {function} _method - callback
-   * @param {object} _attr - attributes required when reaching this route
-   * @param {object} _attrpost - attributes required when leaving this route
+   * @param {function} _methodOrDocMethod - method to call or DocMethod
+   * @param {string} _mfilename - method's file
    */
-  async onProtect(_route, _method, _attr, _attrpost) {
-    let rr = this.root + _route;
-    // this.logger.aspect('listener.protect', `onProt  : ${rr} / ${_route}`);
-    this.logger.aspect('listener.protect', `PROT  : ${this._getFunctionRawName(_method).padEnd(20, ' ')} : ${rr}`);
-    // this.logger.aspect('listener.protect', `PROT  : ${this._getFunctionRawName(_method).padEnd(20, ' ')} : ${rr} / ${_route}`);
-    this.app.use(rr, async function(_req, _res, next) {
-      let args = Object.assign(_req.query, _req.params, _req.body, _req.files, _req.wov);
+  async onProtect(_route, _methodOrDocMethod, _mfilename) {
+    let result = this.onXCommon('protect', _route, _methodOrDocMethod, _mfilename);
 
-      // this.logger.info('onProtect hit: ', rr, args, _attr);
+    if ( result.docmethod.params == null ) this.logger.throwError('onProtect has no params');
+    if ( result.docmethod.paramspost == null ) this.logger.throwError('onProtect has no paramspost');
+
+    // add middlewear on the route
+    this.app.use(result.fullroute, async function(_req, _res, next) {
+      let args = Object.assign({}, _req.query, _req.params, _req.body, _req.files, _req.wov);
 
       // check that required attributes exist
-      let result = WovReturn.checkProperties(args, _attr, null, {retRawError : true, checkStrict : false});
+      let retval = WovReturn.checkProperties(args, result.docmethod.params, null, {retRawError : true, checkStrict : false});
 
       // call method if all ok so far
-      if ( result == null ) { result = await _method(args, _res); }
-
-      // this.logger.h3().info('result: ', result);
-      if ( result instanceof Error ) {
-        this.logger.error(result.message);
-        _res.status(404).json(WovReturn.retError(result.message));
-        // return next(WovReturn.retError(result.message));
+      if ( retval == null ) {
+        try { retval = await result.method(args, _res); }
+        catch (e) { retval = e; }
       }
-      else if ( result == null || (! WovReturn.isValidWovReturn(result)) ) {
-        if ( result != null ) { _res.status(result.code); delete result.code; }
-        if (! _res.headersSent) { _res.json(result); }
-        return next(result);
+
+      // this.logger.info('retval from protect method: ', retval);
+
+      // handle return types: failed: access denied, failed:null, failed:unknown object, good: all else
+      if ( retval instanceof Error ) {
+        this.sendWovReturnResponse(_res, WovReturn.retFail(retval.message, 401), result.method.name);
+      }
+      else if ( retval == null ) {
+        retval = new Error('onProtect method returned null, not a WovReturn object');
+        this.sendWovReturnResponse(_res, WovReturn.retFail(retval.message, 500), result.method.name);
+      }
+      else if (! WovReturn.isValidWovReturn(retval) ) {
+        retval = new Error(`onProtect method returned object not of WovReturn form but of: "${JSON.stringify(retval, null, 2)}".`);
+        this.sendWovReturnResponse(_res, WovReturn.retFail(retval.message, 500), result.method.name);
+      }
+      else if ( retval.success == false ) {
+        this.sendWovReturnResponse(_res, retval, result.method.name);
       }
       else {
-        // add in params
-        if ( (typeof result.data ) == 'object' ) {
-          this.logger.aspect('listener.protect', 'PROTECT: adding to wov:', Object.keys(result.data));
+
+        // add in params from onProtect method's retval to the req.wov values
+        if ( (typeof retval.data ) == 'object' ) {
+          this.logger.aspect('listener.protect.data', 'PROTECT: adding to wov:', Object.keys(retval.data));
           if ( _req.wov == null ) _req.wov = {};
-          Object.assign(_req.wov, result.data);
+          Object.assign(_req.wov, retval.data);
         }
 
-        // check post attributes
-        let argspost = Object.assign(_req.query, _req.params, _req.body, _req.files, _req.wov);
-        let resultpost = WovReturn.checkProperties(argspost, _attrpost, null, {retRawError : true, checkStrict : false});
+        // check post attributes match to method definition
+        let argspost = Object.assign({}, _req.query, _req.params, _req.body, _req.files, _req.wov);
+        let resultpost = WovReturn.checkProperties(argspost, result.docmethod.paramspost, null, {retRawError : true, checkStrict : false});
         if ( resultpost != null ) {
-          this.logger.error(resultpost.message);
-          _res.status(404).json(WovReturn.retError(resultpost.message));
+          this.logger.warn('Failed post arguments: ', resultpost.message);
+          retval = new Error(`onProtect: "${resultpost.message}".`);
+          this.sendWovReturnResponse(_res, WovReturn.retFail(retval.message, 500), result.method.name);
         }
-        else { return next(); }
+
+        // success and continue
+        else next();
       }
     }.bind(this));
   }
@@ -443,42 +524,68 @@ module.exports = class Listener {
     return retval;
   }
 
-
   /**
-   * RESTFUL GET route managed with method.
-   * @param {string} _route - partial route, appended to this.root
-   * @param {function} _method - method to call
-   * @param {string} _mfilename - name of method's file
-   * @param {Docmethod} _docMethod - documentation of this method
+   * Call for all onX https verbs. Common functionality across them.
    */
-  async onGet(_route, _method, _mfilename, _docMethod = null) {
+  onXCommon(_verb, _route, _methodOrDocMethod, _mfilename) {
+    let retval = {
+      fullroute : this.root + _route,
+      docmethod : null,
+      method    : null,
+    };
+
+    // Check state of system and called params
     if ( _mfilename == null ) { this.logger.throwError('Need to append "__filename" to listener function.'); }
-//    this.logger.info('onGet : root: ', this.root);
-    let rr = this.root + _route;
-//    this.logger.info('onGet : rr: ', rr);
+    if ( this.islistening )   { this.logger.throwError(`calling Listener.onX "${retval.fullroute}" when already listening.`); }
+    if ( this.app == null )   { this.logger.throwError(`failed to call init() on this listener before onX route ${retval.fullroute}.`); }
 
+    if ( typeof _methodOrDocMethod == 'object' ) {
+      // this.logger.info('onXCommon1: ', _methodOrDocMethod);
+      retval.docmethod = _methodOrDocMethod;
+      retval.method    = retval.docmethod.handler;
 
-    // Self documentation
-    if ( _docMethod == null ) {
-      _docMethod = new DocMethod({
+    }
+    else  if ( typeof _methodOrDocMethod == 'function' ) {
+      retval.docmethod = new DocMethod({
         summary   : null,
         desc      : null,
+        verb      : _verb,
+        route     : _route,
         docs      : [],      // DocDoc
         params    : [],      // DocParam
         responses : {},      // DocResp
       });
+      retval.method = _methodOrDocMethod;
     }
-    if ( _docMethod.filename == null ) _docMethod.filename = _mfilename;
-    if ( _docMethod.funcname == null ) _docMethod.funcname = this._getFunctionRawName(_method);
-    this.onDoc(rr, _docMethod, 'get');
+    else { throw Error(`Unknown "_methodOrDocMethod" passed to "on${_verb.charAt(0).toUpperCase()+_verb.slice(1)}" route "${_route}"`); }
 
+    // Self documentation
+    if ( retval.docmethod.filename == null ) retval.docmethod.filename = _mfilename;
+    if ( retval.docmethod.funcname == null ) retval.docmethod.funcname = this._getFunctionRawName(retval.method);
+    if ( retval.docmethod.verb     == null ) retval.docmethod.verb     = _verb;
+    if ( retval.docmethod.route    == null ) retval.docmethod.route    = _route;
+    this.onDoc(retval.fullroute, retval.docmethod, _verb);
 
-    if ( this.islistening ) { this.logger.throwError(`calling Listener.onGet "${rr}" when already listening.`); }
-    if ( this.app == null ) { this.logger.throwError('failed to call init() on this listener.'); }
-    this.logger.aspect('listener.route', `GET   : ${this._getFunctionRawName(_method).padEnd(20, ' ')} : ${rr}`);
+    // this.logger.info('onXCommon : ', retval.docmethod);
 
-    this.app.get(rr, (req, res) => {
-      this.responseHandler(rr, _method, _mfilename, Object.assign(req.query, req.params, req.wov), res);
+    this.logger.aspect('listener.route listener.protect', `${_verb.toUpperCase().padEnd(7)} : `+
+                                         `${this._getFunctionRawName(retval.method).padEnd(20, ' ')} : ${retval.fullroute}`);
+
+    return retval;
+  }
+
+  /**
+   * RESTFUL GET route managed with method.
+   * @param {string} _route - partial route, appended to this.root
+   * @param {function} _methodOrDocMethod - method to call or DocMethod
+   * @param {string} _mfilename - name of method's file
+   */
+  async onGet(_route, _methodOrDocMethod, _mfilename) {
+    let result = this.onXCommon('get', _route, _methodOrDocMethod, _mfilename);
+
+    this.app.get(result.fullroute, (req, res) => {
+      this.responseHandler(result.fullroute, result.method, result.docmethod.params, _mfilename,
+                           Object.assign({}, req.query, req.params, req.wov), res);
     });
   }
 
@@ -486,11 +593,11 @@ module.exports = class Listener {
   /**
    * RESTFUL POST route managed with method.
    * @param {string} _route - partial route, appended to this.root
-   * @param {function} _method - method to call
+   * @param {function} _methodOrDocMethod - method to call or DocMethod
    * @param {string} _mfilename - name of method's file
-   * @param {Docmethod} _docMethod - documentation of this method
    */
-  async onPost(_route, _method, _mfilename, _docMethod = null ) {
+  async onPost(_route, _methodOrDocMethod, _mfilename) {
+    /*
     if ( _mfilename == null ) { this.logger.throwError('Need to append "__filename" to listener function.'); }
     let rr = this.root + _route;
 
@@ -520,17 +627,23 @@ module.exports = class Listener {
       this.logger.info(' resulting args: ', args);
       this.responseHandler(rr, _method, _mfilename, args, res);
     });
+    */
+    let result = this.onXCommon('post', _route, _methodOrDocMethod, _mfilename);
+    this.app.post(result.fullroute, (req, res) => {
+      this.responseHandler(result.fullroute, result.method, result.docmethod.params, _mfilename,
+                           Object.assign({}, req.query, req.params, req.body, req.files, req.wov), res);
+    });
   };
 
 
   /**
    * RESTFUL PUT route managed with method.
    * @param {string} _route - partial route, appended to this.root
-   * @param {function} _method - method to call
+   * @param {function} _methodOrDocMethod - method to call or DocMethod
    * @param {string} _mfilename - name of method's file
-   * @param {Docmethod} _docMethod - documentation of this method
    */
-  async onPut(_route, _method, _mfilename, _docMethod = null) {
+  async onPut(_route, _methodOrDocMethod, _mfilename) {
+    /*
     if ( _mfilename == null ) { this.logger.throwError('Need to append "__filename" to listener function.'); }
     let rr = this.root + _route;
 
@@ -554,16 +667,23 @@ module.exports = class Listener {
     this.app.put(rr, (req, res) =>
       this.responseHandler(rr, _method, _mfilename,
         Object.assign(req.query, req.params, req.body, req.files, req.wov), res));
+    */
+
+    let result = this.onXCommon('put', _route, _methodOrDocMethod, _mfilename);
+    this.app.put(result.fullroute, (req, res) => {
+      this.responseHandler(result.fullroute, result.method, result.docmethod.params, _mfilename,
+                           Object.assign({}, req.query, req.params, req.body, req.files, req.wov), res);
+    });
   }
 
   /**
    * RESTFUL DELETE route managed with method.
    * @param {string} _route - partial route, appended to this.root
-   * @param {function} _method - method to call
+   * @param {function} _methodOrDocMethod - method to call or DocMethod
    * @param {string} _mfilename - name of method's file
-   * @param {Docmethod} _docMethod - documentation of this method
    */
-  async onDelete(_route, _method, _mfilename, _docMethod = null) {
+  async onDelete(_route, _methodOrDocMethod, _mfilename) {
+    /*
     if ( _mfilename == null ) { this.logger.throwError('Need to append "__filename" to listener function.'); }
     let rr = this.root + _route;
 
@@ -587,6 +707,12 @@ module.exports = class Listener {
     this.app.delete(rr, (req, res) =>
       this.responseHandler(rr, _method, _mfilename,
         Object.assign(req.query, req.params, req.body, req.files, req.wov), res));
+    */
+    let result = this.onXCommon('delete', _route, _methodOrDocMethod, _mfilename);
+    this.app.delete(result.fullroute, (req, res) => {
+      this.responseHandler(result.fullroute, result.method, result.docmethod.params, _mfilename,
+                           Object.assign({}, req.query, req.params, req.body, req.files, req.wov), res);
+    });
   }
 
 
@@ -610,12 +736,18 @@ module.exports = class Listener {
    */
   _resolveDocNode(_cur, _curpath) {
     let retval = '';
+
+    // this template is for the listing of routes... quick info
     let endpointTemplate = `
 <div>
-  <div>{{#if hasPage}}<a href='{{docroute}}'>{{/if}}{{route}} - {{#each vlist}}{{this}} {{/each}}{{#if hasPage}}</a>{{/if}}
+  <div>
+  {{#if hasPage}}<a href='{{docroute}}'>{{/if}}{{route}} - {{#each vlist}}{{/each}}{{#if hasPage}}</a>{{/if}}
   {{#if summary}}
   <div style='margin-left: 15px'><i>{{summary}}</i></div>
   {{/if}}
+  <ul style='list-style-type: none'>
+  {{#each node.methods}}<li><i>{{#if funcname}}{{funcname}}{{else}}(unnamed){{/if}} - {{upper verb}}{{#if summary}} - {{summary}}{{/if}}</i></li>{{/each}}
+  </ul>
 </div>
 `;
     let compiledTemplate = Handlebars.compile(endpointTemplate);
@@ -624,8 +756,10 @@ module.exports = class Listener {
     if ( _cur.hasOwnProperty('base') ) {
       let node = _cur['base'];
       let dataOverview = {
-        route    : this.root+_curpath,
-        docroute : this.root+'/doc'+_curpath,
+        route    : _curpath,
+        docroute : this.root + '/doc' + _curpath,
+        // route    : this.root+_curpath,
+        // docroute : this.root+'/doc'+_curpath,
       };
       if (node == null) {
         node = new DocPath({
@@ -671,12 +805,14 @@ module.exports = class Listener {
               dataOverview.hasPage = true; // has verb path page, then link
             }
             else {
-              // this.logger.info(` -- ${_curpath} : creating ${verb}`);
+              this.logger.info(` -- ${_curpath} : creating ${verb}`);
               node.methods[verb] = new DocMethod({
                 summary   : null,
+                route     : _curpath,
                 desc      : null,
                 filename  : null,
                 funcname  : null,
+                verb      : verb,
                 docs      : [],
                 params    : [],
                 responses : {},
@@ -686,6 +822,7 @@ module.exports = class Listener {
           }
         }
       }
+      dataOverview.node = node;
 
       // add  line to the overview page
       dataOverview.vlist = vlist;
@@ -785,7 +922,7 @@ module.exports = class Listener {
 
   <blockquote>{{summary}}</blockquote>
 
-  <p><strong>Description</strong>: {{{desc}}}</p>
+  <p><strong>Path Description</strong>: {{{desc}}}</p>
 
   {{#if docs}}
   <div class='wov-docs'>
@@ -809,40 +946,49 @@ module.exports = class Listener {
 
   <div class='container container-methods'>
     {{#each methods}}
-    <div>
+    <div class='card'>
 
-      <h2><span style='text-transform: uppercase;'>{{@key}}</span> {{#if funcname}}: {{funcname}}{{/if}}</h2>
-      <p><i>{{summary}}</i></p>
-      {{#if funcname}}<p><strong>Function</strong>: {{funcname}} {{#if filename}}in {{filename}}{{/if}}</p>{{/if}}
-      {{#if desc}}<p><strong>Description</strong>: {{desc}}</p>{{/if}}
+      <div class='card-body'>
+        <h2><span style='text-transform: uppercase;'>{{@key}}</span> : {{#if funcname}}{{funcname}}{{else}}(unnamed){{/if}}</h2>
+        <p><i>{{summary}}</i></p>
+        {{#if funcname}}<div><strong>Function</strong>: {{funcname}} {{#if filename}}in {{filename}}{{/if}}</div>{{/if}}
+        {{#if desc}}<div><strong>Description</strong>: {{desc}}</div>{{/if}}
 
-      {{#if docs}}
-      <div class='wov-docs'>
-      {{#each docs}}
-        <dt>Document: <a href="{{link}}" target="_blank">{{title}}</a></dt>
-        <dd>{{description}}</dd>
-      {{/each}}
-      </div> <!-- end wov-docs -->
-      {{/if}}
+        {{#if docs}}
+        <div class='wov-docs'>
+        {{#each docs}}
+          <dt>Document: <a href="{{link}}" target="_blank">{{title}}</a></dt>
+          <dd>{{description}}</dd>
+        {{/each}}
+        </div> <!-- end wov-docs -->
+        {{/if}}
 
-      {{#if params}}
-      <div class='wov-params'>
-      {{#each params}}
-        <dt>Parameter: {{name}}{{#if in}} - in {{in}}{{/if}}{{#if required}}<strong> (required)</strong><br />{{/if}}</dt>
-        <dd>{{desc}}</dd>
-      {{/each}}
-      </div> <!-- ends wov-params -->
-      {{/if}}
+        {{#if params}}
+        <div class='wov-params'>
+        {{#each params}}
+          {{{docParam this 'Param'}}}
+        {{/each}}
+        </div> <!-- ends wov-params -->
+        {{/if}}
 
-      {{#if responses}}
-      <div>
-      {{#each responses}}
-        <div><strong>{{@key}} Response</strong>: {{desc}}</div>
-      {{/each}}
-      </div>
-      {{/if}}
+        {{#if paramspost.length}}
+        <div class='wov-params'>
+        {{#each paramspost}}
+          {{{docParam this 'PostParam'}}}
+        {{/each}}
+        </div> <!-- ends wov-params -->
+        {{/if}}
 
-    </div> <!-- ends method -->
+        {{#if responses}}
+        <div>
+        {{#each responses}}
+          <div><strong>{{@key}} Response</strong>: {{desc}}</div>
+        {{/each}}
+        </div>
+        {{/if}}
+      </div> <!-- ends card body-->
+
+    </div> <!-- ends method - card -->
     {{/each}}
   </div> <!-- ends container-methods -->
 
@@ -975,15 +1121,26 @@ class DocMethod {
    */
   constructor(_options) {
     let base = {
-      summary   : null,
-      filename  : null,
-      funcname  : null,
-      desc      : null,
-      docs      : [],      // DocDoc
-      params    : [],      // DocParam
-      responses : {},      // DocResp
+      summary    : null,    // quick summary of method
+      filename   : null,    // filename where function is. Will be set by onX methods.
+      funcname   : null,    // name of the function being called. Will be set by onX methods.
+      handler    : null,    // actual function called
+      desc       : null,    // more in-depth description of method
+      verb       : null,    // one of this.verbs
+      route      : null,    // the route without the domain but including root
+      docs       : [],      // DocDoc
+      params     : [],      // DocParam
+      paramspost : [],      // DocParam for after called (only on onProtect)
+      responses  : {},      // DocResp
     };
     Object.assign(this, base, _options);
+
+    // expand params object to an array of DocParams
+    if ( typeof this.params == 'object' && Array.isArray(this.params) == false) {
+      let p = [];
+      for (let k in this.params ) { p.push(new DocParam({name : k, required : this.params[k]})); }
+      this.params = p;
+    }
   }
 };
 
