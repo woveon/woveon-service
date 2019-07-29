@@ -46,7 +46,7 @@ class _WovModelMany {
     let proms = [];
     for (let k in this) {
       if ( this.hasOwnProperty(k) ) {
-        Logger.g().info(`${this[k].constructor.name}(id ${k}).readInMany ${_t}`);
+        // Logger.g().info(`${this[k].constructor.name}(id ${k}).readInMany ${_t}`);
         proms.push( this[k].readInMany(_t, _limiters).then( function(_m) { retval.push(_m); })); // does this maintain the order?
       }
     }
@@ -64,7 +64,7 @@ class _WovModelMany {
 
     for (let k in this) {
       if ( this.hasOwnProperty(k) ) {
-        Logger.g().info(`WovModelMany(${_t}) '${k}' :`);
+        // Logger.g().info(`WovModelMany(${_t}) '${k}' :`);
         proms.push( this[k].readIn(_t).then( function(_m) { retval.push(_m); })); // does this maintain the order?
       }
     }

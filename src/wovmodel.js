@@ -56,30 +56,100 @@ class WovModel {
     }.bind(this));
   }
 
+  /**
+   * Goes through an Object (not class) and deletes it's ids.
+   * @param {Object} _objOrArray -
+   * @param {bool} _recurse - if true, go down all paths
+   * @param {bool} _deleteid -
+   * @param {bool} _deleterefs -
+   * @return {Object} -
+   */
+  static flattenObj(_objOrArray, _recurse = true, _deleteid = true, _deleterefs = true) {
+    let retval = null;
+
+    // Logger.g().info(`flattenObj recurse(${_recurse}) deleteid(${_deleteid}) deleterefs(${_deleterefs}): `, _objOrArray);
+
+
+    // Array
+    if ( Array.isArray(_objOrArray) ) {
+      // Logger.g().info(`  array:`);
+      let arr = _objOrArray;
+      for (let k=0; k<arr.length; k++) {
+        arr[k] = WovModel.flattenObj(arr[k], _recurse);
+      }
+      retval = arr;
+    }
+
+    // Object
+    else {
+      let obj = _objOrArray;
+      // Logger.g().info(`  object:`);
+
+      if ( _deleteid ) delete obj.id;
+
+
+      // delete all refs
+      if ( _deleterefs ) {
+        for (let k in obj) {
+          if ( WovModel.isRef(k) ) {
+            // Logger.g().info(`  object: ${k}: delete ref`);
+            delete obj[k];
+          }
+        }
+      }
+
+      // delete recursively
+      if ( _recurse ) {
+        for (let k in obj) {
+          // Logger.g().info(`  object rec: ${k}`);
+          // Logger.g().info(`  object rec:`, JSON.stringify(obj[k]));
+          let v = obj[k];
+
+          // if it's an object (or array) it recurses
+          if ( v != null && typeof v == 'object' ) obj[k] = WovModel.flattenObj(v, _recurse);
+        }
+      }
+
+      retval = obj;
+    }
+
+    // Logger.g().info(`  retval: `, retval);
+    return retval;
+  }
+
 
   /**
+   * Flattens a class.
    * Returns the data of this object, without ids and refs. Any components are flattened by default.
    * @param {bool} _recurse - if true, flattens components that have been dereferenced
+   * @param {bool} _deleteid -
+   * @param {bool} _deleterefs -
+   * @param {bool} _deletesensitive -
    * @return {Object}
    */
-  flatten(_recurse = true) {
+  flatten(_recurse = true, _deleteid = true, _deleterefs = true, _deletesensitive = true) {
     let retval = JSON.parse(JSON.stringify(this._data)); // duplicate data
-    // console.log('flatten : ', retval);
 
     // delete id
-    delete retval.id;
+    if ( _deleteid ) {
+      delete retval.id;
+    }
 
     // delete all refs
-    for ( let k in retval ) {
-      if ( retval.hasOwnProperty(k) ) { if ( this.isRef(k) ) { delete retval[k]; } }
+    if ( _deleterefs ) {
+      for ( let k in retval ) {
+        if ( retval.hasOwnProperty(k) ) { if ( this.isRef(k) ) { delete retval[k]; } }
+      }
     }
 
     // delete all 'sensitive' members
     // this.constructor.l.info(`delete all 'sensitive' members`, this.constructor._sensitive);
-    for ( let i in this.constructor._sensitive) {
-      let k = this.constructor._sensitive[i];
-      // this.constructor.l.info('delete sensitive member : ', k);
-      delete retval[k];
+    if ( _deletesensitive ) {
+      for ( let i in this.constructor._sensitive) {
+        let k = this.constructor._sensitive[i];
+        // this.constructor.l.info('delete sensitive member : ', k);
+        delete retval[k];
+      }
     }
     // console.log('flatten2: ', retval);
 
@@ -89,7 +159,7 @@ class WovModel {
         if ( this.hasOwnProperty(k) ) {
           let v = this[k];
           if ( v instanceof WovModel ) {
-            retval[k] = v.flatten();
+            retval[k] = v.flatten(_recurse, _deleteid, _deleterefs, _deletesensitive);
           }
         }
       }
