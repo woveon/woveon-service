@@ -1,19 +1,20 @@
 
 // let wtf = require('wtfnode'); // debugging code for not cleanly shutting down
 
-const autoBind      = require('auto-bind-inheritance');
-const CryptoJS      = require('crypto-js'); // library with convenient syntax
-const crypto        = require('crypto');    // part of nodejs
-const uuidv4        = require('uuid/v4');
-const Listener      = require('./listener');
-const Requester     = require('./requester');
-const WovReturn     = require('./wovreturn');
-const Config        = require('./config');
+const autoBind       = require('auto-bind-inheritance');
+const CryptoJS       = require('crypto-js'); // library with convenient syntax
+const crypto         = require('crypto');    // part of nodejs
+const uuidv4         = require('uuid/v4');
+const Listener       = require('./listener');
+const Requester      = require('./requester');
+const WovReturn      = require('./wovreturn');
+const Config         = require('./config');
 
-const Logger        = require('woveon-logger');
-const ModelLoader   = require('./modelloader');
-const WovModelClient= require('./wovmodelclient');
-const WovModel      = require('./wovmodel');
+const Logger         = require('woveon-logger');
+const ModelLoader    = require('./modelloader');
+const WovModelClient = require('./wovmodelclient');
+const WovModel       = require('./wovmodel');
+const WovDB          = require('./wovdb');
 
 const {DocMethod, DocParam} = Listener;
 
@@ -75,36 +76,9 @@ module.exports = class Service {
     let retval = null;
     this.logger.aspect('health', 'Woveon-service onHealth hit');
 
-    if ( this.db == null ) {
-      retval = WovReturn.retSuccess(true);
-    }
+    if ( this.db == null ) { retval = WovReturn.retSuccess(true); }
 
-    // for NoSQL, check with isConnected
-    else if ( this.db.isConnected != null ) {
-      retval = WovReturn.retSuccess(this.db.isConnected());
-    }
-
-    // for SQL
-    else {
-
-      let l = this.logger;
-      retval = await new Promise( (async function(res, rej)  {
-
-        // allow 3 seconds before timeout
-        let t = setTimeout(function() {
-          l.aspect('health', '!!! db connection timeout hit');
-          rej(WovReturn.retError(null, 'DB Connection timeout.'));
-        }, 3000);
-        let q = 'SELECT 1;';
-        let d = [];
-        l.aspect('health2', 'q: ', q, '\nd: ', d);
-        let r = await this.db.query(q, d);
-        l.aspect('health2', 'r: ', r);
-        clearTimeout(t);
-        if ( r.rowCount == 1 ) { res(WovReturn.retSuccess(true)); }
-        else { rej(WovReturn.retError(r, 'failed db query.')); }
-      }).bind(this));
-    }
+    else retval = WovReturn.retSuccess(this.db.isConnected());
 
     return retval;
   };
@@ -289,4 +263,5 @@ module.exports.Logger         = Logger;
 module.exports.ModelLoader    = ModelLoader;
 module.exports.WovModelClient = WovModelClient;
 module.exports.WovModel       = WovModel;
+module.exports.WovDB          = WovDB;
 module.exports.Config         = Config;

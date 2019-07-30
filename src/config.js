@@ -61,13 +61,15 @@ module.exports = class Config {
    * Generic function to add array of vars to the config.
    */
   static _addInVars(_l, _vars, _dest, _emsg, _wmsg, _extra, _blankenvvars) {
+//    _l.info(`  _addInVars : _blankenvvars ${_blankenvvars} : `, _vars)
 
     for (let i=0; i<_vars.length; i++) {
       let vn = _vars[i];
       let v = process.env[vn];
       // console.log('v: un', v, ' ', v === undefined, ' ', v == undefined, ' ', v == 'undefined');
       // console.log('v: nu', v, ' ', v === null, ' ', v == null, ' ', v == 'null');
-      if ( v == 'undefined') { _emsg.push(`env variable ${vn} is not defined`); v = undefined; }
+      // console.log('v : ', v, _extra, v == 'undefined');
+      if ( v == 'undefined') { _emsg.push(`${_extra}env variable ${vn} is not defined`); v = undefined; }
       else {
         if ( v == 'null' ) v = null;
         if ( v == null || v == '' ) { _wmsg.push(`${_extra}env variable ${vn} is '${v}'`); }
@@ -101,7 +103,12 @@ module.exports = class Config {
    * @param {array} _sconf - private/secure environment variables this microservice uses (for K8s Secrets)
    * @param {boolean} blankenvvars - by default, sets all env vars to undefined, so your program MUST pull from config
    */
-  constructor(_logger, _conf, _sconf, {blankenvvars} = {blankenvvars : true}) {
+  constructor(_logger, _conf, _sconf, _options = null) {
+
+    let options = Object.assign({}, {blankenvvars : true, wovtools : true}, _options);
+//    _logger.info('options : ', options, _options);
+    // _logger.info('***Config constructor called');
+    // _logger.printStack();
 
     if ( module.exports.staticconfig != 1 ) { _logger.throwError('Calling Config constructor multiple times'); }
     module.exports.staticconfig = this;
@@ -119,15 +126,15 @@ module.exports = class Config {
     this.emsg = [];
     this.wmsg = [];
 
-    // all should have this:
+    // all WovTools configs should have this:
     //   - WOV_PROJECT - the name of the project
     //   - WOV_STAGE - the curret stage the microservice is running in
     //   - WOV_ME    - who the developer is (which may be the stagename)
-    _conf.push('WOV_STAGE', 'WOV_ME', 'WOV_PROJECT');
+    if ( options.wovtools ) _conf.push('WOV_STAGE', 'WOV_ME', 'WOV_PROJECT');
 
     // Apply each in _conf and _sconf
-    module.exports._addInVars(this.logger, _conf,  this.conf,  this.emsg, this.wmsg, '',        blankenvvars);
-    module.exports._addInVars(this.logger, _sconf, this.sconf, this.emsg, this.wmsg, 'secret ', blankenvvars);
+    module.exports._addInVars(this.logger, _conf,  this.conf,  this.emsg, this.wmsg, '',        options.blankenvvars);
+    module.exports._addInVars(this.logger, _sconf, this.sconf, this.emsg, this.wmsg, 'secure ', options.blankenvvars);
 
     /*
     for (let i=0; i<_conf.length; i++) {

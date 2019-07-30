@@ -9,10 +9,18 @@ include ./wovtoolscheat.mk
 #> WOV_wstests_port=3007
 #> WOV_DB=wovservice
 #> ENVS=WOV_STAGE=cw WOV_ME=cw WOV_PROJECT=wstests \
-#>   WOV_apidb_username=postgres WOV_apidb_host=localhost WOV_apidb_database=${WOV_DB} WOV_apidb_password=${POSTGRES_PASSWORD} \
-#>   WOV_apidb_port=5432 WOV_apidb_type=postgres WOV_apimatch_port=${WOV_apimatch_port}
+#>   WOV_testdb_username=postgres WOV_testdb_host=localhost WOV_testdb_database=${WOV_DB} WOV_testdb_password=${POSTGRES_PASSWORD} \
+#>   WOV_testdb_port=5432 WOV_testdb_type=postgres WOV_apimatch_port=${WOV_apimatch_port}
 
 all:
+	@echo ""
+	@echo "See the makefile for more."
+	@echo "  : make pg-start   -> launches local db as Docker container"
+	@echo "  : make pg-stop    -> stops local db Docker container"
+	@echo "  : make test       -> run tests"
+	@echo "  : make test-html  -> run tests with GUI output"
+	@echo "       TEST=test/X ----> add to make test/test-html to select a specific test"
+	@echo ""
 
 pg-start : pg-docker-start pg-docker-start-delay pg-create-db
 

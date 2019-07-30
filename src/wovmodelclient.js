@@ -5,12 +5,19 @@ module.exports = class WovModelClient {
 
   /**
    * @param {WoveonLogger} _l -
-   * @param {PGClient} _dbclient - postgres client (does not have to be connected yet)
+   * @param {WovDBPostgres} _wmdb - WovDBPostgres (does not have to be connected yet)
    * @param {Array<models>} _models - the models this loads onto this
    * @param {Array<string>} _safeTables - database tables user can directly call selects on
+   * @param {Object} _modelInitOptions -
    */
-  constructor(_l, _dbclient, _models, _safeTables, _modelInitOptions) {
-    this.l = _l; this.db = _dbclient;
+  constructor(_l, _wmdb, _models, _safeTables, _modelInitOptions) {
+    this.l = _l; this.wmdb = _wmdb;
+
+    // only Postgres for now (maybe additional sql servers as well, but untested)
+    if ( _wmdb.constructor.name != 'WovDBPostgres' ) {
+      this.l.throwError('ERROR: wovmodelclient only works for Postgres wovdbs. TODO.', _wmdb.name, _wmdb.constructor.name);
+    }
+
     this._safeTables = {};
     if ( _safeTables != null && Array.isArray(_safeTables) ) {
       for (let i=0; i<_safeTables.length; i++) { this._safeTables[_safeTables[parseInt(i)]] = true; } // create hash
@@ -68,16 +75,19 @@ module.exports = class WovModelClient {
 
   /**
    * NOTE: when switching to pools, have to set a client, cleared on endTransaction()
+   * NOTE2: never tested this so commenting out for now
    * @return {bool|Error} - true on success, Error on failure
    */
+  /*
   async transactionBegin()    { return this._transaction('BEGIN'); }
   async transactionCommit()   { return this._transaction('COMMIT'); }
   async transactionRollback() { return this._transaction('ROLLBACK'); }
   async _transaction(_cmd) {
     let retval = false;
-    await this.db.query(_cmd).then(function() { retval = true; }).catch(function(e) { retval = e; });
+    await this.wmdb.client.query(_cmd).then(function() { retval = true; }).catch(function(e) { retval = e; });
     return retval;
   };
+  */
 
 
   /**
@@ -104,7 +114,7 @@ module.exports = class WovModelClient {
       this.l.with('add_to_stacklvl', 1).aspect(`modelquery ${_aspect}`, `Q(${_aspect}): `, _q);
       this.l.with('add_to_stacklvl', 1).aspect(`modeldata ${_aspect}`, `D(${_aspect}): `, _d);
       try {
-        let r = await this.db.query(_q, _d);
+        let r = await this.wmdb.client.query(_q, _d);
         this.l.with('add_to_stacklvl', 0).aspect(`modelresult ${_aspect}`, `R(${_aspect}): `, r.rows);
         retval = r.rows;
       }
@@ -139,7 +149,7 @@ module.exports = class WovModelClient {
       this.l.with('add_to_stacklvl', 1).aspect(`modelquery ${_aspect}`, `Q(${_aspect}): `, _q);
       this.l.with('add_to_stacklvl', 1).aspect(`modeldata ${_aspect}`, `D(${_aspect}): `, _d);
       try {
-        let r = await this.db.query(_q, _d);
+        let r = await this.wmdb.client.query(_q, _d);
         this.l.with('add_to_stacklvl', 0).aspect(`modelresult ${_aspect}`, `R(${_aspect}): `, r.rows);
         retval = [r.rowCount, r.rows];
       }
@@ -169,7 +179,7 @@ module.exports = class WovModelClient {
       this.l.with('add_to_stacklvl', 1).aspect(`modelquery ${_aspect}`, `Q(${_aspect}): `, _q);
       this.l.with('add_to_stacklvl', 1).aspect(`modeldata ${_aspect}`, `D(${_aspect}): `, _d);
       try {
-        let r = await this.db.query(_q, _d);
+        let r = await this.wmdb.client.query(_q, _d);
         this.l.with('add_to_stacklvl', 0).aspect(`modelresult ${_aspect}`, `R(${_aspect}): `, r.rows);
         if ( r.rowCount != 1 ) {
           if ( _wr ) e = WovReturn.retError(e, `FAILED Postgres Update Query '${_aspect}'`);

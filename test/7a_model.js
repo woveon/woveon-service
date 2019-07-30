@@ -2,9 +2,11 @@
 const expect    = require('chai').expect;
 const Logger    = require('woveon-logger');
 const WovReturn = require('../src/wovreturn');
-const WovModelMany = require('../src/wovmodelmany');
 const Service   = require('../src/index');
 const C         = require('woveon-service').Config;
+
+const WovModelMany    = require('../src/wovmodelmany');
+const {WovDBPostgres} = require('../src/wovdb');
 
 const TMS        = (require('./testmodels'))();
 const TestModel  = TMS.TestModel;
@@ -26,7 +28,9 @@ let logger = new Logger(mtag, {
 
 describe(`> ${mtag}: `, async function() {
 
-  let cl = null;
+  let cl     = null;
+  let testdb = null;
+
   let data   = {id : 1, name : 'name'};
   let data2  = {id : 1, title : 'title2.1', _testtable_ref : data.id};
   let data3  = {id : 101, title : 'title3.1', _testtable_ref : data.id};
@@ -34,16 +38,20 @@ describe(`> ${mtag}: `, async function() {
   let data3b = {id : 103, title : 'title3.3', _testtable_ref : data.id};
   let fdata  = {name : data.name};
   let fdata2 = {title : data2.title};
-  let fdata3 = {title : data3.title};
+//  let fdata3 = {title : data3.title};
 
   // setup the service
   before(async function() {
     this.timeout(3000);
 
+    /*
     await C.data('db').connect()
       .then(() => { logger.verbose('  ... db connected'); })
       .catch( (e) => { logger.throwError('  ... db connection error', e.stack); });
-    cl = new Service.WovModelClient(logger, C.data('db'),
+      */
+    testdb = new WovDBPostgres('testdb');
+    await testdb.connect();
+    cl = new Service.WovModelClient(logger, testdb,
       [TestModel, TestModel2, TestModel3, MP, TMS.Car, TMS.Tire, TMS.Wheel]); // , ['testtable', 'testtable2', 'testmodel3', 'mp']);
     await cl.initModelDB(true, true, true);
   });
