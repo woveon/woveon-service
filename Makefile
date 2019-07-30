@@ -15,12 +15,28 @@ include ./wovtoolscheat.mk
 all:
 	@echo ""
 	@echo "See the makefile for more."
-	@echo "  : make pg-start   -> launches local db as Docker container"
-	@echo "  : make pg-stop    -> stops local db Docker container"
-	@echo "  : make test       -> run tests"
-	@echo "  : make test-html  -> run tests with GUI output"
+	@echo "  : make pg-start    -> launches local db as Docker container"
+	@echo "  : make pg-stop     -> stops local db Docker container"
+	@echo "  : make mongo-start -> launches local db as Docker container"
+	@echo "  : make mongo-stop  -> stops local db Docker container"
+	@echo "  : make test        -> run tests"
+	@echo "  : make test-html   -> run tests with GUI output"
 	@echo "       TEST=test/X ----> add to make test/test-html to select a specific test"
 	@echo ""
+
+
+mongo-start : mongo-docker-start
+
+mongo-docker-start:
+	@docker run --rm --name mongo-local -d \
+		-p 27017:27017 \
+		mongo:3.6-xenial
+
+#		-e MONGO_INITDB_ROOT_USERNAME=${WOV_testdb_username} \
+#		-e MONGO_INITDB_ROOT_PASSWORD=${WOV_testdb_password} \
+
+mongo-stop:
+	@docker stop mongo-local
 
 pg-start : pg-docker-start pg-docker-start-delay pg-create-db
 

@@ -28,7 +28,7 @@ describe(`> ${mtag}: `, async function() {
   before(async function() {
     this.timeout(3000);
 
-    testdb = new WovDBPostgres('testdb');
+    testdb = new WovDBPostgres('testdb', logger);
     await testdb.connect();
     /*
     await C.data('db').connect()

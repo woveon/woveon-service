@@ -49,7 +49,7 @@ describe(`> ${mtag}: `, async function() {
       .then(() => { logger.verbose('  ... db connected'); })
       .catch( (e) => { logger.throwError('  ... db connection error', e.stack); });
       */
-    testdb = new WovDBPostgres('testdb');
+    testdb = new WovDBPostgres('testdb', logger);
     await testdb.connect();
     cl = new Service.WovModelClient(logger, testdb,
       [TestModel, TestModel2, TestModel3, MP, TMS.Car, TMS.Tire, TMS.Wheel]); // , ['testtable', 'testtable2', 'testmodel3', 'mp']);

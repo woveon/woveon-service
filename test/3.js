@@ -90,53 +90,53 @@ describe(`${mtag}: WovReturn tests`, async function() {
   });
 
 
-  describe.only(`> checkAttributes`, async function() {
+  describe.only(`> checkProperties`, async function() {
 
     it('> single attr', function() {
       logger.h2('titles').aspect('titles', this.test.title);
-      let r = WovReturn.checkAttributes({'a': true}, 'a');
+      let r = WovReturn.checkProperties({'a': true}, 'a');
       // logger.info('r: ', r);
       expect(r).to.equal(null);
     });
 
     it('> array attr', function() {
       logger.h2('titles').aspect('titles', this.test.title);
-      let r = WovReturn.checkAttributes({'a' : true}, ['a']);
+      let r = WovReturn.checkProperties({'a' : true}, ['a']);
       // logger.info('r: ', r);
       expect(r).to.equal(null);
     });
 
     it('> object attr required, exists', function() {
       logger.h2('titles').aspect('titles', this.test.title);
-      let r = WovReturn.checkAttributes({'a' : true}, {'a' : true});
+      let r = WovReturn.checkProperties({'a' : true}, {'a' : true});
       // logger.info('r: ', r);
       expect(r).to.equal(null);
     });
 
     it('> object attr required, not exists', function() {
       logger.h2('titles').aspect('titles', this.test.title);
-      let r = WovReturn.checkAttributes({}, {'a' : true});
+      let r = WovReturn.checkProperties({}, {'a' : true});
       // logger.info('r: ', r);
       expect(r.success).to.equal(false);
     });
 
     it('> object attr not required', function() {
       logger.h2('titles').aspect('titles', this.test.title);
-      let r = WovReturn.checkAttributes({'a' : true}, {'a' : false});
+      let r = WovReturn.checkProperties({'a' : true}, {'a' : false});
       // logger.info('r: ', r);
       expect(r).to.equal(null);
     });
 
     it('> object attr not required, not exists', function() {
       logger.h2('titles').aspect('titles', this.test.title);
-      let r = WovReturn.checkAttributes({}, {'a' : false});
+      let r = WovReturn.checkProperties({}, {'a' : false});
       // logger.info('r: ', r);
       expect(r).to.equal(null);
     });
 
     it('> mixed requirements', function() {
       logger.h2('titles').aspect('titles', this.test.title);
-      let r = WovReturn.checkAttributes(
+      let r = WovReturn.checkProperties(
         {'a' : true, 'b' : false, 'c' : 1},
         {'a' : false, 'b' : true, 'd' : false, 'e' : true});
       // logger.info('r: ', r);

@@ -14,9 +14,9 @@ const Logger         = require('woveon-logger');
 const ModelLoader    = require('./modelloader');
 const WovModelClient = require('./wovmodelclient');
 const WovModel       = require('./wovmodel');
-const WovDB          = require('./wovdb');
 
-const {DocMethod, DocParam} = Listener;
+const {WovDBPostgres, WovDBMongo} = require('./wovdb');
+const {DocMethod}                 = Listener;
 
 
 module.exports = class Service {
@@ -263,5 +263,6 @@ module.exports.Logger         = Logger;
 module.exports.ModelLoader    = ModelLoader;
 module.exports.WovModelClient = WovModelClient;
 module.exports.WovModel       = WovModel;
-module.exports.WovDB          = WovDB;
+module.exports.WovDBPostgres  = WovDBPostgres;
+module.exports.WovDBMongo     = WovDBMongo;
 module.exports.Config         = Config;

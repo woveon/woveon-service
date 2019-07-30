@@ -20,14 +20,20 @@ let logger = new Logger(mtag, {
 
 describe(`> ${mtag}: `, async function() {
   let cl = null;
+  let testdb = null;
 
   // setup the service
   before(async function() {
     this.timeout(3000);
 
+    testdb = new Service.WovDBPostgres('testdb', logger);
+    await testdb.connect();
+    C.setData('db', testdb);
+    /*
     await C.data('db').connect()
       .then(() => { logger.verbose('  ... db connected'); })
       .catch( (e) => { logger.throwError('  ... db connection error', e.stack); });
+      */
     cl = new Service.WovModelClient(logger, C.data('db'), [M.ParentModel, M.ChildModel, M.ChildChildModel, M.AssModelP, M.AssModelC, M.MP]);
     await cl.initModelDB(true, true, true);
   });

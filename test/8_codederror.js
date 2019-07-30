@@ -37,12 +37,12 @@ describe(`> ${mtag}: `, async function() {
 
     let err = 'A';
     let e = WR.retCodedError(err, d, m);
-    // logger.info('e : ', e);
+    logger.info('e : ', e);
     expect(e).to.not.be.null;
     expect(e.success).to.be.false;
     expect(e.code).to.equal(200);
-    expect(e.meta.code).to.equal(errorcodes[err].code);
-    expect(e.meta.text).to.equal(errorcodes[err].text);
+    expect(e.error.code).to.equal(errorcodes[err].code);
+    expect(e.error.text).to.equal(errorcodes[err].text);
     expect(e.data).to.deep.equal(d);
   });
 
