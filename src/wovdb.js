@@ -1,7 +1,8 @@
 
-const Logger = require('woveon-logger');
-const C      = require('./config');
-const Pg     = require('pg').Client;
+const Logger    = require('woveon-logger');
+const C         = require('./config');
+const Pg        = require('pg').Client;
+const WovReturn = require('./wovreturn');
 
 let Mongoose = require('mongoose');
 Mongoose.Promise = Promise;
@@ -198,7 +199,7 @@ class WovDBPostgres extends WovDB {
    * @return {WovReturn} -
    */
   async isConnected() {
-    return await new Promise( (async function(res, rej)  {
+    return new Promise( (async function(res, rej)  {
 
       // NOTE: for mongo this.client.isConnected() works
 

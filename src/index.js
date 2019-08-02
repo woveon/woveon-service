@@ -78,7 +78,7 @@ module.exports = class Service {
 
     if ( this.db == null ) { retval = WovReturn.retSuccess(true); }
 
-    else retval = WovReturn.retSuccess(this.db.isConnected());
+    else retval = await this.db.isConnected();
 
     return retval;
   };
