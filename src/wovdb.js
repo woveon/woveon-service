@@ -3,7 +3,7 @@ const Logger = require('woveon-logger');
 const C      = require('./config');
 const Pg     = require('pg').Client;
 
-let Mongoose = require('Mongoose');
+let Mongoose = require('mongoose');
 Mongoose.Promise = Promise;
 Mongoose.set('useFindAndModify', false); // see https://mongoosejs.com/docs/deprecations.html
 require('mongoose-long')(Mongoose);
