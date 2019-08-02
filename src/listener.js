@@ -403,6 +403,8 @@ module.exports = class Listener {
     this.app.use(result.fullroute, async function(_req, _res, next) {
       let args = Object.assign({}, _req.query, _req.params, _req.body, _req.files, _req.wov);
 
+      this.logger.aspect('listener.protect', `Protecting : '${_route}' with: '${JSON.stringify(args, null, 2)}'`);
+
       // check that required attributes exist
       let retval = WovReturn.checkProperties(args, result.docmethod.params, null, {retRawError : true, checkStrict : false});
 
@@ -411,8 +413,6 @@ module.exports = class Listener {
         try { retval = await result.method(args, _res); }
         catch (e) { retval = e; }
       }
-
-      // this.logger.info('retval from protect method: ', retval);
 
       // handle return types: failed: access denied, failed:null, failed:unknown object, good: all else
       if ( retval instanceof Error ) {
@@ -435,11 +435,14 @@ module.exports = class Listener {
         if ( (typeof retval.data ) == 'object' ) {
           this.logger.aspect('listener.protect.data', 'PROTECT: adding to wov:', Object.keys(retval.data));
           if ( _req.wov == null ) _req.wov = {};
+          // this.logger.aspect('listener.protect.data', 'PROTECT: adding to wov:', _req.wov, retval.data);
           Object.assign(_req.wov, retval.data);
+          // this.logger.aspect('listener.protect.data', 'PROTECT: added  to wov:', _req.wov, retval.data);
         }
 
         // check post attributes match to method definition
         let argspost = Object.assign({}, _req.query, _req.params, _req.body, _req.files, _req.wov);
+        this.logger.aspect('listener.protect', `Protecting : (post) '${_route}' with: '${JSON.stringify(argspost, null, 2)}'`);
         let resultpost = WovReturn.checkProperties(argspost, result.docmethod.paramspost, null, {retRawError : true, checkStrict : false});
         if ( resultpost != null ) {
           this.logger.warn('Failed post arguments: ', resultpost.message);
@@ -585,7 +588,7 @@ module.exports = class Listener {
 
     this.app.get(result.fullroute, (req, res) => {
       this.responseHandler(result.fullroute, result.method, result.docmethod.params, _mfilename,
-                           Object.assign({}, req.query, req.params, req.wov), res);
+                           Object.assign({}, req.query, req.params, req.body, req.files, req.wov), res);
     });
   }
 
