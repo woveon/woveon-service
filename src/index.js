@@ -31,7 +31,9 @@ module.exports = class Service {
   /**
    * The listener has been created but not started. This is where you
    * add routes.
-  */
+   *
+   * @return {null} -
+   */
   async onInit() {
     this.logger.info('onInit woveon-service');
     this.listener.onGet('/priv/shutdown', new DocMethod({
@@ -45,7 +47,14 @@ module.exports = class Service {
       params    : [],
       responses : {},
     }), __filename);
+
+    // set up the protects routes
+    if ( this._options.protect ) this._options.protect.call(this);
+
+    // set up the routes
+    if ( this._options.routes ) this._options.routes.call(this);
   };
+
 
   /**
    * Listener just started.
@@ -96,32 +105,41 @@ module.exports = class Service {
    *     : logger - pass in a logger
    *     : staticdir - where static html is served from, null means no staticdir
    *     : baseroute - prepended to each endpoint ex. https://host/baseroute/route
+   *
+   *     : controllers - object with controller functions that get bound to this service (called in constructor)
+   *     : protects    - function that adds routes to the listener (bound to this service when called in onInit)
+   *     : routes      - function that adds routes to the listener (bound to this service when called in onInit)
+   *
    * NOTE: recently changed arguments to use nodejs defaults... bound to screw this up
    */
-  constructor(_options = {}) {
+  constructor(_options) {
     autoBind(this);
 
+    /*
     if ( typeof _options != 'object' ) {
       throw Error(`Woveon-Service service is not being initialized with an object, but a "${typeof _options}", with value: "${_options}".`);
     }
+    */
 
     this._options = Object.assign({}, {
-      port      : 80,
-      ver       : 'v1',
-      staticdir : null,
-      baseroute : null,
+      port       : 80,
+      ver        : 'v1',
+      staticdir  : null,
+      baseroute  : null,
+      protects   : null,
+      routes     : null,
+      controller : null,
     }, _options);
 
     this.name     = _options.name || 'unnamed';
+    this.model    = _options.model;
     this.internal_address = null;
     this.external_address = null;
 
     if ( this._options.baseroute == null ) this._options.baseroute = `/${this.name}/${this._options.ver}`;
 
     this.logger = _options.logger || new Logger(this.name, {showname : true}, {'service' : {'color' : 'blue'}});
-    // this.logger.info(`  options: ${JSON.stringify(this._options)}`);
-
-    // this.logger.info('static dir : ', this._options.staticdir);
+    this.l = this.logger;
 
     this.logger.aspect('service', '---------------------------------------------------------------------');
     this.logger.aspect('service', '--------------------------------------------------------------------');
@@ -137,7 +155,42 @@ module.exports = class Service {
       this.name,
     );
 
+    if ( this._options.controller ) this.bindControllers(this._options.controller);
+
     this.logger.verbose(`...created service ${this.name}`);
+  };
+
+
+  /**
+   * Call this to define the controller methods for a REST API.
+   *
+   * This takes all the functions defined in this file and binds them to this object.
+   * NOTE: if 'controller' object passed to options of this service in constructor, this will be called for you.
+   *
+   * @param {object} _funcs - an object of DocMethods or functions, where the keys are the controller names.
+   * @return {null} - no return
+   */
+  bindControllers(_funcs) {
+
+    for (let k in _funcs) {
+      if ( _funcs.hasOwnProperty(k) ) {
+        let f = _funcs[k];
+        if ( typeof f == 'object' ) {
+          if ( f.handler != undefined ) {
+            this[k] = f;
+            this[k].handler = f.handler.bind(this);
+            Object.defineProperty(this[k].handler, 'name', {value : k}); // retain name of function after binding
+          }
+          else throw Error(`Controller has entry '${k}' that is not a function or a DocMethod with a handler function.`);
+        }
+        else if ( typeof f == 'function' ) {
+          this[k] = f.bind(this);
+        }
+        else { throw Error(`Controller file has entry '${k}' that is not a function or a DocMethod with a handler function.`); }
+      }
+    }
+
+    return null;
   };
 
 
