@@ -1049,6 +1049,18 @@ module.exports = class Listener {
    */
   onDoc(_route, _docdata, _httpverb = null) {
     // this.logger.aspect('listener.route', 'onDoc ', _route,  _httpverb, ': ', _docdata);
+    //
+
+    if ( this.funcs == null ) this.funcs = {};
+    if ( _docdata.verb == null ) {
+      this.logger.error(_docdata);
+      throw Error('onDoc _docdata requires verb to be set');
+    }
+    else if ( _docdata.verb != 'protect' ) {
+      // this.logger.info('adding func: ', _docdata.funcname, _route, _docdata.verb, _docdata);
+      this.funcs[_docdata.funcname] = `"${_route}", ${_docdata.verb.toUpperCase()}`;
+    }
+
 
     if ( !(_httpverb == null || this.verbs.indexOf(_httpverb) != -1) ) {
       this.logger.throwError(`Unknown http verb '${_httpverb}'.`);

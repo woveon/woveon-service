@@ -174,7 +174,7 @@ module.exports = class Service {
 
     for (let k in _funcs) {
       if ( _funcs.hasOwnProperty(k) ) {
-        this.logger.info(`bindController ${k}`);
+        // this.logger.info(`bindController ${k}`);
         let f = _funcs[k];
         if ( typeof f == 'object' ) {
           if ( f.handler != undefined ) {
