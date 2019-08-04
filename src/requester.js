@@ -1,48 +1,62 @@
 const fetch = require('node-fetch');
 const WovReturn = require('./wovreturn');
+const Config = require('./config.js');
+
+/**
+ * @typedef Requester
+ * @typedef Promise
+ * @typedef Logger
+ */
 
 module.exports = class Requester {
 
   /**
    * Attaches logger to this.
+   *
    * @param {Logger} _logger -
-   * @param {url} _baseurl - If set, then all urls used to this requester are
-   *                         considered paths and appended to this _baseurl.
-   * @param {boo} _defaultContent - default, assumes json content
+   * @param {string} _baseurl - If set, then all urls used to this requester are considered paths and appended to this _baseurl.
+   * @param {boolean} _defaultContent - default, assumes json content
    */
   constructor(_logger, _baseurl = null, _defaultContent = 'application/json') {  // alt: text/html
     this.logger = _logger;
     this.logger.verbose(`init requester with baseurl ${_baseurl}`);
 //    try { this.logger.throwError('where is this'); } catch(e) { console.log(e); }
     this._baseurl = _baseurl;
+    this._onetimebaseurl= null;  // a one-time use url
 
     // json by default, otherwise empty
     this.headerbase = {'Content-Type' : _defaultContent};
+
 
     // this.logger.info('...init Requester');
   };
 
 
   /**
-   * does nothing unless overridden, but I like to call close to be clear
+   * This does nothing unless overridden, but I like to call close to be clear.
+   *
+   * @return {undefined}
    **/
   close() { this._baseurl = null; this.logger = null; }
 
 
   /**
    * The main function that performs the request.
-   * @param {string} _url -
+   *
+   * @param {string} _url    - if baseurl is set, this is only the route. otherwise it is the full url, unless _onetimebaseurl is set
    * @param {string} _method - http methods
    * @param {object} _headers - http headers
    * @param {object} _body - data
-   * @param {bool} _rawresult - should this return the data or the result object
+   * @param {boolean} _rawresult - should this return the data or the result object
+   * @param {boolean} _throwOnError -
    * @return {object} - the result of the request, with http status and url appended
    */
   async request(_url, _method, _headers, _body, _rawresult = false, _throwOnError = false) {
     let retval = null;
     let fetchfail = false;
     this.logger.verbose(` url '${_url}'  baseurl '${this._baseurl}'  method '${_method}'`);
-    let fullurl = (this._baseurl ? this._baseurl+_url: _url);
+    let fullurl = (this._onetimebaseurl ? this._onetimebaseurl+_url : (this._baseurl ? this._baseurl+_url: _url));
+    this._onetimebaseurl = null;
     this.logger.aspect('requester', `requester '${_method}' '${fullurl}' '${JSON.stringify(_body)}'`);
     let r = null;
 
@@ -53,22 +67,24 @@ module.exports = class Requester {
     if ( _body != null ) fetchoptions.body = (_body ? JSON.stringify(_body) : '');
 
     // this.logger.info('fetchOptions ', fetchoptions);
-    this.logger.aspect('request.full', `url: ${fullurl} : `, fetchoptions);
+    this.logger.aspect('requester.full', `url: ${fullurl} : `, fetchoptions);
     this.logger.aspect('thread', `>>>transfer to ${fullurl}`);
     r = await fetch(fullurl, fetchoptions)
       .catch( (err) => {
         this.logger.aspect('thread', `<<<return to error from ${fullurl}`);
-        this.logger.error(err);
+        // this.logger.error(err);
         if ( _throwOnError ) { throw err; }
         else fetchfail = err.message;
       });
     this.logger.aspect('thread', `<<<return from ${fullurl}`);
 
     if ( fetchfail !== false ) {
+      this.logger.aspect('requester.result', `  ... url: ${fullurl} : `, fetchfail);
       retval = WovReturn.retError(fetchfail);
       // retval = {success : false, status : 400, data : fetchfail};
     }
     else {
+      this.logger.aspect('requester.result', `  ... url: ${fullurl} : `, r.ok, r.status);
       if ( _rawresult) retval = r;
       else {
         try {
@@ -81,16 +97,20 @@ module.exports = class Requester {
 
           if ( r.ok == true ) {
 
+            // ??? does this get skipped?
             if ( ! r.headers.get('content-type').startsWith(this.headerbase['Content-Type']) ) {
               this.logger.warn(`Content type mismatch: expected(${this.headerbase['Content-Type']}) received(${r.headers.get('content-type')})`);
               contentmismatch = true;
               if ( r.headers.get('content-type').startsWith('text/html') ) {
                 retval = await r.text();
-                this.logger.warn('text: ', retval);
+                this.logger.aspect('requester.resultfull', `  ... url: ${fullurl} : html: `, retval);
               }
               else if ( r.headers.get('content-type').startsWith('application/json') ) {
                 retval = await r.json();
-                this.logger.warn('json: ', retval);
+                this.logger.aspect('requester.resultfull', `  ... url: ${fullurl} : json: `, retval);
+              }
+              else {
+                this.logger.throwError(`requester reply "${fullurl}": Unknown content-type : "${r.headers.get('content-type')}"`);
               }
 
             }
@@ -153,12 +173,14 @@ module.exports = class Requester {
         }
       }
     }
+    this.logger.aspect('requester.resultfull', `  ... url: ${fullurl} : `, retval);
     return retval;
   }
 
 
   /**
    * RESTFUL Get
+   *
    * @param {*} url -
    * @param {*} headers -
    * @param {*} _rawresult - should this retunull, null, rn the data or the result object
@@ -204,11 +226,43 @@ module.exports = class Requester {
    * @param {*} headers -
    * @param {*} body -
    * @param {*} _rawresult - should this return the data or the result object
-   * @return {promise}
+   * @return {Promise}
    */
   async delete(url, headers, body, _rawresult = false) {
     // let fullurl = (this._baseurl ? this._baseurl+url: url);
     return this.request(url, 'delete', headers, body, _rawresult);
   }
 
+
+  /**
+   * Alters the base URL for next call to a request by setting the this._onetimebaseurl.
+   *
+   * @param {string} _msname - name of the microservice to send to
+   * @return {Requester} - returns this so you can chain calls
+   */
+  toMSOnce(_msname) { this._onetimebaseurl = Requester.genMSUrl(_msname); return this; }
+
+  /**
+   * Alters the base URL for calls to a request by setting the this._baseurl.
+   *
+   * @param {string} _msname - name of the microservice to send to
+   * @return {Requester} - returns this so you can chain calls
+   */
+  toMS(_msname) { this._baseurl = Requester.genMSUrl(_msname); return this; }
+
+  /**
+   * Uses the WOV_www_api_url unless it is localhost, then it appends the port number of the MS running locally.
+   *
+   * @param {string} _msname - name of the microservice to send to
+   * @return {string} - url ex. http://localhost:4024 or https://api-dev.mydomain.com
+   */
+  static genMSUrl(_msname) {
+    let urlbase = Config.get('WOV_www_api_url');
+    let urlscheme = Config.get('WOV_www_api_urlscheme');
+    let retval = `${urlscheme}://${urlbase}`;
+    if ( urlbase == 'localhost' ) retval += `:${Config.get(`WOV_${_msname}_port`)}`;
+    return retval;
+  }
+
 };
+
