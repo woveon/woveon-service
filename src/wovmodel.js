@@ -760,8 +760,11 @@ class WovModel {
   }
 
   /**
-   * @param {integer} _id
-   * @param {object} _data
+   * Writes back to the DB. Unlike save, this does not require a model.
+   *
+   * @param {integer} _id -
+   * @param {object} _data - data to update on the model
+   * @return {?} -
    */
   static async updateOne(_id, _data) {
     // this.l.throwError(`Need to implement 'updateOne' for ${this.name}.`); }
@@ -1061,6 +1064,8 @@ class WovModel {
 
     return retval;
   }
+
+  // TODO: reload()
 
   /**
    * Build a query to save dirty values.
