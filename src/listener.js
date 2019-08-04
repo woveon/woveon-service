@@ -1120,7 +1120,9 @@ class DocPath {
 class DocMethod {
 
   /**
-   * @param {object} _options} -
+   * Documents a method.
+   *
+   * @param {object} _options -
    */
   constructor(_options) {
     let base = {
@@ -1134,7 +1136,7 @@ class DocMethod {
       docs       : [],      // DocDoc
       params     : [],      // DocParam
       paramspost : [],      // DocParam for after called (only on onProtect)
-      responses  : {},      // DocResp
+      responses  : {},      // DocResp, indexed by useful keys
     };
     Object.assign(this, base, _options);
 
