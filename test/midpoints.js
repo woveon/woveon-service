@@ -17,7 +17,7 @@ let root = `/${name}/${ver}`;
 
 let logger = new Logger(mtag, {debug : true, showName : true, level : 'info', color : 'inverse'}, {titles : false});
 
-describe(`>${mtag} : Midpoint Routes`, async function() {
+describe.skip(`>${mtag} : Midpoint Routes`, async function() {
 
   it('> test express functionality ', async function() {
     let r = new WS.Requester(logger, `http://localhost:${port}`); // /${root}`);
