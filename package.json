@@ -4,7 +4,7 @@
   "description": "Tools to build a microservice.",
   "main": "src/index.js",
   "scripts": {
-    "test": "mocha -b test/3"
+    "test": "make test"
   },
   "repository": {
     "type": "git",
