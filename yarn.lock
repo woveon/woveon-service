@@ -1264,10 +1264,10 @@ wordwrap@~0.0.2:
   resolved "https://registry.yarnpkg.com/wordwrap/-/wordwrap-0.0.3.tgz#a3d5da6cd5c0bc0008d37234bbaf1bed63059107"
   integrity sha1-o9XabNXAvAAI03I0u68b7WMFkQc=
 
-woveon-logger@^0.0.19:
-  version "0.0.19"
-  resolved "https://registry.yarnpkg.com/woveon-logger/-/woveon-logger-0.0.19.tgz#5747c670090da64779989abba863da06223976fb"
-  integrity sha512-JRyCem3IGzxhyZD9DCpkfv31BQzbL9WwaJVMtnUrxqqIGVg2KwJHwpmIEGeJGvV4X8XBYhsErA59T5HS88po8w==
+woveon-logger@^0.0.21:
+  version "0.0.21"
+  resolved "https://registry.yarnpkg.com/woveon-logger/-/woveon-logger-0.0.21.tgz#32b7e8323b3fd4f29cbf2268a328481add194fb3"
+  integrity sha512-xwEm6AkfwUYZPP0gA2+GGlXHX961yIBmxQ+USGZBNwS4GgObGqqddprYyg+J+/hECVdyJ5xQFlkXc4X8y4eT4A==
   dependencies:
     chai "^4.2.0"
     colors "^1.3.x"
