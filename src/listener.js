@@ -2,22 +2,22 @@ const express    = require('express');
 const bodyParser = require('body-parser');
 const path       = require('path');
 const Handlebars = require('handlebars');
-const fs         = require('fs');
 const Logger     = require('woveon-logger');
-
+const fs         = require('fs');
 const cors       = require('cors');
 
-const WovReturn  = require('./wovreturn');
+const WovReturn    = require('./wovreturn');
+const DocTemplates = require('./doctemplates');
 
 
-Handlebars.registerHelper('json', function(context) { return JSON.stringify(context); });
+// NOTE: JSON needs {{{JSON X}}}, since it outputs html
 Handlebars.registerHelper('JSON', function(context) { return `<pre style="font-size: 8px"><code>${JSON.stringify(context, null, 2)}</code></pre>`; });
 Handlebars.registerHelper('upper', function(context) { return context.toUpperCase(); });
 Handlebars.registerHelper('docParam', function(context, _ispost) {
   let retval = null;
   let t = _ispost || 'Param';
 
-  // Logger.g().info('docParam: ', context, _ispost);
+  Logger.g().info('docParam: ', context, _ispost);
   if ( typeof context == 'string' ) {
     retval=
       `<dt>${t}: ${context} <span> (required)</span></dt>`;
@@ -32,6 +32,10 @@ Handlebars.registerHelper('docParam', function(context, _ispost) {
   }
   return retval;
 });
+
+/**
+ * @typedef Promise
+ */
 
 /**
  * Class that manages RESTFUL listening via ExpressJS.
@@ -149,8 +153,11 @@ module.exports = class Listener {
 
 
   /**
-   * Start up the app listening. Between init() and listen(), plugins can extend this Listener.
-   * @return {promise}
+   * Start up the app listening.
+   *
+   * Between init() and listen(), plugins can extend this Listener.
+   *
+   * @return {Promise} -
    */
   async listen() {
 
@@ -556,7 +563,7 @@ module.exports = class Listener {
         route     : _route,
         docs      : [],      // DocDoc
         params    : [],      // DocParam
-        responses : {},      // DocResp
+        responses : [],      // DocResp
       });
       retval.method = _methodOrDocMethod;
     }
@@ -611,7 +618,7 @@ module.exports = class Listener {
         desc      : null,
         docs      : [],      // DocDoc
         params    : [],      // DocParam
-        responses : {},      // DocResp
+        responses : [],      // DocResp
       });
     }
     if ( _docMethod.filename == null ) _docMethod.filename = _mfilename;
@@ -657,7 +664,7 @@ module.exports = class Listener {
         desc      : null,
         docs      : [],      // DocDoc
         params    : [],      // DocParam
-        responses : {},      // DocResp
+        responses : [],      // DocResp
       });
     }
     if ( _docMethod.filename == null ) _docMethod.filename = _mfilename;
@@ -697,7 +704,7 @@ module.exports = class Listener {
         desc      : null,
         docs      : [],      // DocDoc
         params    : [],      // DocParam
-        responses : {},      // DocResp
+        responses : [],      // DocResp
       });
     }
     if ( _docMethod.filename == null ) _docMethod.filename = _mfilename;
@@ -741,18 +748,7 @@ module.exports = class Listener {
     let retval = '';
 
     // this template is for the listing of routes... quick info
-    let endpointTemplate = `
-<div>
-  <div>
-  {{#if hasPage}}<a href='{{docroute}}'>{{/if}}{{route}} - {{#each vlist}}{{/each}}{{#if hasPage}}</a>{{/if}}
-  {{#if summary}}
-  <div style='margin-left: 15px'><i>{{summary}}</i></div>
-  {{/if}}
-  <ul style='list-style-type: none'>
-  {{#each node.methods}}<li><i>{{#if funcname}}{{funcname}}{{else}}(unnamed){{/if}} - {{upper verb}}{{#if summary}} - {{summary}}{{/if}}</i></li>{{/each}}
-  </ul>
-</div>
-`;
+    let endpointTemplate = DocTemplates.page_endpoint;
     let compiledTemplate = Handlebars.compile(endpointTemplate);
 
     // build the end node path with all the verbs
@@ -818,7 +814,7 @@ module.exports = class Listener {
                 verb      : verb,
                 docs      : [],
                 params    : [],
-                responses : {},
+                responses : [],
               });
               // dataOverview.hasPage = true; // has verb path page, then link
             }
@@ -834,7 +830,7 @@ module.exports = class Listener {
       retval += r;
 
       // this.logger.info(`${_curpath} PATH: `, node);
-      this._renderEndpoint(_curpath, node);
+      this._renderEndpoint(_curpath, Object.assign({}, {root : this.root}, node));
     }
 
     // continue searching for endnodes
@@ -869,30 +865,12 @@ module.exports = class Listener {
    * @param {string} _innerhtml - html of all the endpoints previously rendered
    */
   _renderDocOverview(_innerhtml) {
-    let rawTemplateBody= `
-<html>
-<head>
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
-</head>
-<body>
-
-
-<div class='container'>
-  <h1>{{name}} - Documentation</h1>
-  {{{innerhtml}}}
-</div>
-
-  <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
-</body>
-</html>
- `;
+    let rawTemplateBody= DocTemplates.page_wrapper;
 
     // compile handlebars template (and cache it)
     let templateBody   = Handlebars.compile(rawTemplateBody);
 
-    let bodyhtml = templateBody({innerhtml : _innerhtml, name : this.name});
+    let bodyhtml = templateBody({innerhtml : _innerhtml, name : this.name, root: this.root});
     // this.logger.info('innerhtml = ', _innerhtml);
     // this.logger.info('bodyhtml = ', bodyhtml);
     this.app.get(this.root + '/doc', async (req, res) => { res.send(bodyhtml); });
@@ -903,6 +881,7 @@ module.exports = class Listener {
    *
    * @param {string} _route - path to get to endpoint
    * @param {object} _node - node containg data of the endpoing, all methods
+   * @return {null} -
    */
   _renderEndpoint(_route, _node) {
     let rr = this.root + '/doc' + _route;
@@ -911,132 +890,16 @@ module.exports = class Listener {
     this.logger.aspect('listener.route', `DOC   : ${JSON.stringify(rr, null, 2)} - GET`);
 
     // Templates for Handlebars
-    let hPath = `
-<html>
-<head>
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
-</head>
-<body>
-
-<div class='container'>
-  <div><a href='${this.root}/doc' class='btn btn-primary'>back</a></div>
-
-  <h1>{{route}}</h1>
-
-  <blockquote>{{summary}}</blockquote>
-
-  <p><strong>Path Description</strong>: {{{desc}}}</p>
-
-  {{#if docs}}
-  <div class='wov-docs'>
-  {{#each docs}}
-    <dt>Document: <a href="{{link}}" target="_blank">{{title}}</a></dt>
-    <dd>{{description}}</dd>
-  {{/each}}
-  </div> <!-- end wov-docs -->
-  {{/if}}
-
-  {{#if params}}
-  <div class='container-params'>
-  {{#each params}}
-    <dt>Param: {{name}}{{#if in}} - in {{in}}{{/if}}{{#if required}}<strong> (required)</strong><br />{{/if}}</dt>
-    <dd>{{desc}}</dd>
-  {{/each}}
-  </div>
-  {{/if}}
-
-  <hr />
-
-  <div class='container container-methods'>
-    {{#each methods}}
-    <div class='card'>
-
-      <div class='card-body'>
-        <h2><span style='text-transform: uppercase;'>{{@key}}</span> : {{#if funcname}}{{funcname}}{{else}}(unnamed){{/if}}</h2>
-        <p><i>{{summary}}</i></p>
-        {{#if funcname}}<div><strong>Function</strong>: {{funcname}} {{#if filename}}in {{filename}}{{/if}}</div>{{/if}}
-        {{#if desc}}<div><strong>Description</strong>: {{desc}}</div>{{/if}}
-
-        {{#if docs}}
-        <div class='wov-docs'>
-        {{#each docs}}
-          <dt>Document: <a href="{{link}}" target="_blank">{{title}}</a></dt>
-          <dd>{{description}}</dd>
-        {{/each}}
-        </div> <!-- end wov-docs -->
-        {{/if}}
-
-        {{#if params}}
-        <div class='wov-params'>
-        {{#each params}}
-          {{{docParam this 'Param'}}}
-        {{/each}}
-        </div> <!-- ends wov-params -->
-        {{/if}}
-
-        {{#if paramspost.length}}
-        <div class='wov-params'>
-        {{#each paramspost}}
-          {{{docParam this 'PostParam'}}}
-        {{/each}}
-        </div> <!-- ends wov-params -->
-        {{/if}}
-
-        {{#if responses}}
-        <div>
-        {{#each responses}}
-          <div><strong>{{@key}} Response</strong>: {{desc}}</div>
-        {{/each}}
-        </div>
-        {{/if}}
-      </div> <!-- ends card body-->
-
-    </div> <!-- ends method - card -->
-    {{/each}}
-  </div> <!-- ends container-methods -->
-
-  <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
-
-</body>
-</html>
-`;
+    let hPath = DocTemplates.page_landing;
 
     // compile handlebars template (and cache it)
     if ( this.templateNode == null ) this.templateNode   = Handlebars.compile(hPath);
 
     let nodehtml = this.templateNode(_node);
     this.app.get(rr, async (req, res) => { res.send(nodehtml); });
+
+    return null;
   }
-  /*
-    // get data
-    / *
-    let d = null;
-    if (typeof _doc === 'function') {
-      d = await _doc(Object.assign(req.query, req.params, req.wov));
-    } else d = {data : _doc};
-    * /
-    _doc.route = rr;
-
-    // callback for data object
-    this.app.report(rr, (req, res) => {
-      let dd = d;
-      this.logger.info('hit callback: ', rr);
-      this.responseHandler(rr, dd, _mfilename,
-        Object.assign(req.query, req.params, req.wov), res, {addRoute : true});
-    });
-
-
-      this._addDocRoute(rr, null, v);
-
-      // normal response
-      res.status(200);
-      res.send(v);
-      res.end();
-    });
-  }
-  */
 
 
   /**
@@ -1148,7 +1011,7 @@ class DocMethod {
       docs       : [],      // DocDoc
       params     : [],      // DocParam
       paramspost : [],      // DocParam for after called (only on onProtect)
-      responses  : {},      // DocResp, indexed by useful keys
+      responses  : [],      // DocResp, indexed by useful keys
     };
     Object.assign(this, base, _options);
 
@@ -1204,7 +1067,7 @@ class DocParam {
 
 
 /**
- * Documentaiton of a response.
+ * Documentation of a response.
  *
  */
 class DocResp {
@@ -1214,8 +1077,11 @@ class DocResp {
    */
   constructor(_options) {
     let base = {
-      desc   : null,
-      params : [],  // DocParam
+      name       : null,
+      resptype   : null,
+      desc       : null,
+      attributes : [],  // DocParam
+      example    : null,
     };
     // this.options = Object.assign(this, base, _options);
     Object.assign(this, base, _options);

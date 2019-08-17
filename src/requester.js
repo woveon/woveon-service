@@ -226,7 +226,7 @@ module.exports = class Requester {
    * @param {*} headers -
    * @param {*} body -
    * @param {*} _rawresult - should this return the data or the result object
-   * @return {Promise}
+   * @return {Promise} -
    */
   async delete(url, headers, body, _rawresult = false) {
     // let fullurl = (this._baseurl ? this._baseurl+url: url);
