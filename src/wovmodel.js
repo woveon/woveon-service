@@ -899,7 +899,146 @@ class WovModel {
 
 
   /**
+   * Generates the code to access the data.
+   *
+   * @return {string} - javascript code
+   */
+  static getGraphQLModelResolver() {
+    let retval = '';
+
+    this.l.info('_graphQL object ', this._graphQL);
+    if ( this._graphQL == null ) this.initGraphQLSchema();
+
+    // ex. this._graphQL.objs =  [ 'account', 'Account']
+    retval += `const ${this.name} = {\n`;
+    for (let i=0; i<this._graphQL.objs.length; i++) {
+      let o = this._graphQL.objs[i];
+      if ( o[1][0] != '[' ) {
+        retval +=
+          `  ${o[0]} : async function(_parent, __, {args, dataSources}) {\n`+
+          `    let me = new dataSources.model.${this.name}(_parent);\n`+
+          `    await me.readIn('${o[1]}');\n`+
+          `    return me.${o[0]}.get();\n`+
+          `  },\n`;
+      }
+      else {
+        retval +=
+          `  ${o[0]} : async function(_parent, __, {args, dataSources}) {\n`+
+          `    let me = new dataSources.model.${this.name}(_parent);\n`+
+          `    await me.readInMany('${o[1].slice(1, -1)}');\n`+
+          `    return me.${o[0]}.get();\n`+
+          `  },\n`;
+      }
+    }
+    retval += `}`;
+
+    /*
+    retval += `const ${mod.name} = {\n`;
+    do {
+      this.l.info(`getGraphQLModelResolver : ${this.name}`);
+
+      // populate this
+      let mdata = {
+        attribname  : 'attribname',  // accountapplications
+        modelname   : 'ModelName',   // Account
+        modelreadin : 'ModelReadIn', // AccountApplications
+      };
+      mdata.modelname = mod.name;
+
+      // For own schema (pointing to another model)
+      for (let k in this._ownschema) {
+        if ( this._ownschema.hasOwnProperty(k) ) {
+          let v = this._ownschema[k];
+          let qv = null;
+
+          // objects
+          if ( this.isRef(k) ) {
+            this.l.info(`${this.name} : own var is a ref: ${k}`);
+            let kt = k.substring(0, k.length - 4).substring(1);
+            let gqlobject = null;
+            this.l.info(`  kt : ${kt} `, this._transmodel);
+            if ( this._transmodel[kt] !== undefined ) {
+              if ( kt != null ) { gqlobject = this._transmodel[kt]; }
+            }
+            else {
+              let mod = this.cl.getModelByTablename(kt);
+              if ( mod == null ) {
+                this.l.throwError(`Model '${this.name}' references '${kt}', but no known model. Add transmodel entry of '${this.name}::{ $  {kt} : X }'?`);
+              }
+              gqlobject = mod.name;
+            }
+            // this._graphQL.objs.push([kt, gqlobject]);
+
+            this.l.info(`  ${k} : ${qv}`);
+            mdata.modelreadin = `${gqlobject}`;
+            mdata.attribname = `${kt}`;
+
+            // echo it
+            let c = `  ${mdata.attribname} : async function(_parent, __, {args, dataSources}) {\n`+
+              `    let u = new dataSources.model.${mdata.modelname}(_parent);\n`+
+              `    await u.readIn('${mdata.modelreadin}');\n`+
+              `    return u.${mdata.attribname}.get();\n`+
+              `  },\n`;
+            this.l.info(`${c}`);
+            retval += c;
+          }
+        }
+      }
+
+      // for all other models, pointing to this, go through schema
+      let models = Object.values(this.cl.table2model);
+      for (let i in models) {
+        let m = models[i];
+        this.l.info(`${this.name} <== ${m.name} : (tablename '${m.tablename}') : transmodel of : `, m._transmodel);
+
+        // for all in schema
+        for (let k in m._ownschema) {
+          if ( m._ownschema.hasOwnProperty(k) ) {
+            // this.l.info(`  - ${m.name}.${k}`);
+            let addit = false;
+
+            // deref k and see if the transmodel entry points to this model's name
+            let kt = m._transmodel[k.substring(0, k.length - 4).substring(1)]; // see if dereffed k points to a model
+            // this.l.info('ktt : ', k.substring(0, k.length - 4).substring(1));
+            // this.l.info('kt : ', kt);
+            if ( kt == this.name ) addit = true;
+
+            // see if this other model's property points to the tablename of this model
+            if ( k == `_${this.tablename}_ref` ) { addit = true; }
+
+            if ( addit ) {
+              this.l.info(`    * adding ${m.name}.${k}`);
+              mdata.modelreadin = `${m.name}`;
+              mdata.attribname = m._plural || m.name.toLowerCase()+'s';
+
+              // echo it
+              let c = `  ${mdata.attribname} : async function(_parent, __, {args, dataSources}) {\n`+
+                `    let me = new dataSources.model.${mdata.modelname}(_parent);\n`+
+                `    await me.readInMany('${mdata.modelreadin}');\n`+
+                `    return me.${mdata.attribname}.get();\n`+
+                `  },\n`;
+              this.l.info(`${c}`);
+              retval += c;
+            }
+          }
+        }
+
+      }
+
+
+      mod = Object.getPrototypeOf(mod);
+    } while ( mod != WovModel );
+    */
+
+    // retval += `}`;
+
+    return retval;
+  };
+
+
+  /**
    * Inits each model, proceeding back through hierarchy, then builds params, going through hierarchy.
+   *
    * @return {string} - GraphQL type definition for this Model
    */
   static getGraphQLSchema() {

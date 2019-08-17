@@ -17,7 +17,7 @@ Handlebars.registerHelper('docParam', function(context, _ispost) {
   let retval = null;
   let t = _ispost || 'Param';
 
-  Logger.g().info('docParam: ', context, _ispost);
+  // Logger.g().info('docParam: ', context, _ispost);
   if ( typeof context == 'string' ) {
     retval=
       `<dt>${t}: ${context} <span> (required)</span></dt>`;

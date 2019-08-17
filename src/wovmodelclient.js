@@ -74,6 +74,30 @@ module.exports = class WovModelClient {
   }
 
   /**
+   * Returns the object that returns the db queries that generate the object.
+   * @return {string} - the model code
+   */
+  getGraphQLModelResolvers() {
+    let models = Object.values(this.table2model);
+    let retval = {
+      modeljs   : '',
+      exportsjs : 'module.exports = {',
+    };
+    for (let k in models ) {
+      if ( models.hasOwnProperty(k) ) {
+        let m = models[k];
+        let s = m.getGraphQLModelResolver();
+        retval.modeljs += '\n'+s;
+        retval.exportsjs += `${m.name}, `;
+      }
+    }
+
+    retval.exportsjs += '};\n';
+
+    return retval;
+  }
+
+  /**
    * NOTE: when switching to pools, have to set a client, cleared on endTransaction()
    * NOTE2: never tested this so commenting out for now
    * @return {bool|Error} - true on success, Error on failure
