@@ -1,4 +1,8 @@
 
+/**
+ * @typedef Promise
+ */
+
 const WovReturn = require('./wovreturn');
 
 module.exports = class WovModelClient {
@@ -34,13 +38,20 @@ module.exports = class WovModelClient {
     }.bind(this));
   }
 
+  async initModelDB(_doDrop, _doTable, _doView) {
+    this.l.logDeprecated('Call init, not initModelDB');
+    return this.init(_doDrop, _doTable, _doView);
+  }
+
   /**
    * A helper function to run WovModel.doInitDB on the Wovclient WovModels.
+   *
    * @param {bool} _doDrop  - if true, drop the table
    * @param {bool} _doTable - if true, create the table
    * @param {bool} _doView  - if true, create the view
+   * @return {Promise<undefined>} -
    */
-  async initModelDB(_doDrop, _doTable, _doView) {
+  async init(_doDrop, _doTable, _doView) {
     let models = Object.values(this.table2model);
     for (let k in models ) {
       if ( models.hasOwnProperty(k) ) {
@@ -55,6 +66,7 @@ module.exports = class WovModelClient {
       }
     }
   }
+
 
   /**
    * Helper function to get all GraphQL schemas in the model.
@@ -72,6 +84,7 @@ module.exports = class WovModelClient {
     }
     return retval;
   }
+
 
   /**
    * Returns the object that returns the db queries that generate the object.

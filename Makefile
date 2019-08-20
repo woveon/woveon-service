@@ -41,7 +41,7 @@ mongo-stop:
 pg-start : pg-docker-start pg-docker-start-delay pg-create-db
 
 pg-docker-start :
-	@docker run --rm --name postgres-local -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} -d -p 5432:5432 postgres
+	@docker run --rm --name postgres-local -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} -d -p 5432:5432 postgres:9.6
 
 pg-docker-start-delay :
 	@sleep 5
@@ -56,7 +56,7 @@ pg :
 	PGPASSWORD=${POSTGRES_PASSWORD} psql -h localhost -U postgres -d "${WOV_DB}" || printf '\nERROR: run "make pg-start" to start postgres (and make pg-db to populate it)\n\n'
 
 test : .FORCE
-	@${ENVS} mocha -b $$TEST --timeout ${DEFAULTTESTTIMEOUT}
+	${ENVS} mocha -b $$TEST --timeout ${DEFAULTTESTTIMEOUT}
 
 test-html : .FORCE
 	${ENVS} WOV_TEST=$$TEST mocha -b $$TEST --timeout ${DEFAULTTESTTIMEOUT} --reporter mochawesome --reporter-options reportDir=.mochawesome-report ; open -g ./.mochawesome-report/mochawesome.html

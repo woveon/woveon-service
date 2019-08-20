@@ -4,16 +4,21 @@
 const autoBind       = require('auto-bind-inheritance');
 const CryptoJS       = require('crypto-js'); // library with convenient syntax
 const crypto         = require('crypto');    // part of nodejs
-const uuidv4         = require('uuid/v4');
-const Listener       = require('./listener');
-const Requester      = require('./requester');
-const WovReturn      = require('./wovreturn');
-const Config         = require('./config');
-
 const Logger         = require('woveon-logger');
-const ModelLoader    = require('./modelloader');
-const WovModelClient = require('./wovmodelclient');
-const WovModel       = require('./wovmodel');
+const uuidv4         = require('uuid/v4');
+
+const Listener         = require('./listener');
+const Requester        = require('./requester');
+const WovReturn        = require('./wovreturn');
+const Config           = require('./config');
+// const ModelLoader      = require('./modelloader');
+const WovUtil          = require('./wovutil');
+const WovModelClient   = require('./wovmodelclient');
+const WovModel         = require('./wovmodel');
+const WovStateLayer    = require('./wovstatelayer');
+
+const WovRemoteServiceClient = require('./wovrservclient');
+const WovRemoteService       = require('./wovrserv');
 
 const {WovDBPostgres, WovDBMongo} = require('./wovdb');
 const {DocMethod}                 = Listener;
@@ -110,29 +115,22 @@ module.exports = class Service {
    *     : protects    - function that adds routes to the listener (bound to this service when called in onInit)
    *     : routes      - function that adds routes to the listener (bound to this service when called in onInit)
    *
-   * NOTE: recently changed arguments to use nodejs defaults... bound to screw this up
    */
   constructor(_options) {
     autoBind(this);
 
-    /*
-    if ( typeof _options != 'object' ) {
-      throw Error(`Woveon-Service service is not being initialized with an object, but a "${typeof _options}", with value: "${_options}".`);
-    }
-    */
-
     this._options = Object.assign({}, {
       port       : 80,
       ver        : 'v1',
-      staticdir  : null,
       baseroute  : null,
+      staticdir  : null,
       protects   : null,
       routes     : null,
       controller : null,
+      statelayer : null,
     }, _options);
 
-    this.name     = _options.name || 'unnamed';
-    this.model    = _options.model;
+    this.name       = _options.name || 'unnamed';
     this.internal_address = null;
     this.external_address = null;
 
@@ -155,48 +153,16 @@ module.exports = class Service {
       this.name,
     );
 
-    if ( this._options.controller ) this.bindControllers(this._options.controller);
+    if ( this._options.controller ) WovUtil.bindObjectFunctionsToObject(this._options.controller, this);
 
     this.logger.verbose(`...created service ${this.name}`);
   };
 
 
   /**
-   * Call this to define the controller methods for a REST API.
-   *
-   * This takes all the functions defined in this file and binds them to this object.
-   * NOTE: if 'controller' object passed to options of this service in constructor, this will be called for you.
-   *
-   * @param {object} _funcs - an object of DocMethods or functions, where the keys are the controller names.
-   * @return {null} - no return
-   */
-  bindControllers(_funcs) {
-
-    for (let k in _funcs) {
-      if ( _funcs.hasOwnProperty(k) ) {
-        // this.logger.info(`bindController ${k}`);
-        let f = _funcs[k];
-        if ( typeof f == 'object' ) {
-          if ( f.handler != undefined ) {
-            this[k] = f;
-            this[k].handler = f.handler.bind(this);
-            Object.defineProperty(this[k].handler, 'name', {value : k}); // retain name of function after binding
-          }
-          else throw Error(`Controller has entry '${k}' that is not a function or a DocMethod with a handler function.`);
-        }
-        else if ( typeof f == 'function' ) {
-          this[k] = f.bind(this);
-        }
-        else { throw Error(`Controller file has entry '${k}' that is not a function or a DocMethod with a handler function.`); }
-      }
-    }
-
-    return null;
-  };
-
-
-  /**
    * Initialize the service. Start adding your listener routes after this.
+   *
+   * @return {undefined}
    */
   async init() {
     this.logger.aspect('service-levels', '  ... start init service');
@@ -211,8 +177,9 @@ module.exports = class Service {
 
 
   /**
-   * @param {bool} _requestip -
    * Starts the listener listening.
+   *
+   * @param {bool} _requestip -
    */
   async startup() {
     try {
@@ -243,7 +210,10 @@ module.exports = class Service {
   /**
    * @return {string} -
     */
-  static generateToken() { return uuidv4(); }
+  static generateToken() {
+    Logger.g().logDeprecated('generateToken should be called on WovUtil');
+    return uuidv4();
+  }
 
 
   /**
@@ -252,6 +222,7 @@ module.exports = class Service {
    * @return {string} - random length string
    */
   static generateRandomString(length = 20) {
+    Logger.g().logDeprecated('generateRandomString should be called on WovUtil');
     return crypto.randomBytes(length).toString('hex');
   };
 
@@ -261,6 +232,7 @@ module.exports = class Service {
    * @return {string} -
    */
   static generateOrderedString(length = 20) {
+    Logger.g().logDeprecated('generateOrderedString should be called on WovUtil');
     if ( Service.GOS_last === undefined ) Service.GOS_last = -1;
     const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
@@ -276,7 +248,10 @@ module.exports = class Service {
 
   /**
    */
-  static orderedStringReset() { Service.GOS_last = -1; }
+  static orderedStringReset() {
+    Logger.g().logDeprecated('orderedStringReset should be called on WovUtil');
+    Service.GOS_last = -1;
+  }
 
 
   /**
@@ -286,6 +261,7 @@ module.exports = class Service {
    * @return {string} - _secret decrypted to UTF8 string
    */
   static decrypt(_saltedkey, _secret) {
+    Logger.g().logDeprecated('decrypt should be called on WovUtil');
     let decryptedBytes = CryptoJS.AES.decrypt(_secret, _saltedkey);
     let plaintext = decryptedBytes.toString(CryptoJS.enc.Utf8);
     return JSON.parse(plaintext);
@@ -299,6 +275,7 @@ module.exports = class Service {
    * @return {object} - call toString() on the object to get the string
    */
   static encrypt(_saltedkey, _secret) {
+    Logger.g().logDeprecated('encrypt should be called on WovUtil');
     let retval = null;
     try {
       let result = CryptoJS.AES.encrypt(JSON.stringify(_secret), _saltedkey);
@@ -310,13 +287,21 @@ module.exports = class Service {
 
 };
 
-module.exports.Listener       = Listener;
-module.exports.WovReturn      = WovReturn;
-module.exports.Requester      = Requester;
-module.exports.Logger         = Logger;
-module.exports.ModelLoader    = ModelLoader;
-module.exports.WovModelClient = WovModelClient;
-module.exports.WovModel       = WovModel;
-module.exports.WovDBPostgres  = WovDBPostgres;
+// Utility
+module.exports.Config           = Config;
+module.exports.WovReturn        = WovReturn;
+module.exports.Logger           = Logger;
+module.exports.Util             = WovUtil;
+
+// Interface Layer
+module.exports.Listener         = Listener;
+module.exports.Requester        = Requester;
+
+// State Layer
+module.exports.WovStateLayer    = WovStateLayer;
+module.exports.WovModelClient   = WovModelClient;
+module.exports.WovModel         = WovModel;
+module.exports.WovRemoteServiceClient = WovRemoteServiceClient;
+module.exports.WovRemoteService       = WovRemoteService;
+module.exports.WovDBPostgres    = WovDBPostgres;
 module.exports.WovDBMongo     = WovDBMongo;
-module.exports.Config         = Config;

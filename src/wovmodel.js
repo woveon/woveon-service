@@ -906,7 +906,7 @@ class WovModel {
   static getGraphQLModelResolver() {
     let retval = '';
 
-    this.l.info('_graphQL object ', this._graphQL);
+    // this.l.info('_graphQL object ', this._graphQL);
     if ( this._graphQL == null ) this.initGraphQLSchema();
 
     // ex. this._graphQL.objs =  [ 'account', 'Account']
