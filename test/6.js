@@ -6,7 +6,6 @@ const Service   = require('../src/index');
 
 const express   = require('express');
 
-const C         = require('woveon-service').Config;
 
 let mtag ='routetest';
 
@@ -21,11 +20,24 @@ let logger = new Logger(mtag, {
 
 describe(`>${mtag}: `, async function() {
 
-  let testdb = null;
+  let clogger = new Logger('config', {debug : true, showName : true, dbCharLen : 40, color : 'bgBlue white'}, {});
+  let C = null;
 
   // setup the service
   before(async function() {
     this.timeout(3000);
+    Service.Config.staticconfig=1; // avoid config error for calling in other test cases
+    new Service.Config(clogger, [
+      'WOV_testdb_type',         // postgres, mongo, etc.
+      'WOV_testdb_username',     // ex. 'postgres'
+      'WOV_testdb_endpoint',     // 'localhost' for ssh tunneling, AWS db for pod
+      'WOV_testdb_database',     // 'woveon' is default
+      'WOV_testdb_port',         // ssh tunneling port, or postgres default port 5432
+    ],
+      ['WOV_testdb_password'], {blankenvvars : false});
+    let testdb = null;
+    C = Service.Config;
+
     testdb = new Service.WovDBPostgres('testdb', logger);
     await testdb.connect();
     C.setData('db', testdb);

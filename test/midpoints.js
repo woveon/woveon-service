@@ -78,7 +78,7 @@ describe.skip(`>${mtag} : Midpoint Routes`, async function() {
     await l.close();
   });
 
-  it.only('> basic', async function() {
+  it('> basic', async function() {
     let r = new WS.Requester(logger, `http://localhost:${port}${root}`);
     let l = new WS.Listener(port, logger, null, root, name);
     let fu2 = function(_args, _res) { logger.info('u2 hit : ', _res.req.originalUrl, _args); return WR.retSuccess({aa : _args.a}); };

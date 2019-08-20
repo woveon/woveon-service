@@ -3,7 +3,6 @@ const expect    = require('chai').expect;
 const Logger    = require('woveon-logger');
 const WovReturn = require('../src/wovreturn');
 const Service   = require('../src/index');
-const C         = require('woveon-service').Config;
 
 const WovModelMany    = require('../src/wovmodelmany');
 const {WovDBPostgres} = require('../src/wovdb');
@@ -30,6 +29,16 @@ describe(`> ${mtag}: `, async function() {
 
   let cl     = null;
   let testdb = null;
+  let clogger = new Logger('config', {debug : true, showName : true, dbCharLen : 40, color : 'bgBlue white'}, {});
+  Service.Config.staticconfig=1;
+  new Service.Config(clogger, [
+    'WOV_testdb_type',         // postgres, mongo, etc.
+    'WOV_testdb_username',     // ex. 'postgres'
+    'WOV_testdb_endpoint',     // 'localhost' for ssh tunneling, AWS db for pod
+    'WOV_testdb_database',     // 'woveon' is default
+    'WOV_testdb_port',         // ssh tunneling port, or postgres default port 5432
+  ],
+    ['WOV_testdb_password'], {blankenvvars : false});
 
   let data   = {id : 1, name : 'name'};
   let data2  = {id : 1, title : 'title2.1', _testtable_ref : data.id};

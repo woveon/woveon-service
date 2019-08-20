@@ -75,7 +75,10 @@ module.exports = class Config {
         if ( v == null || v == '' ) { _wmsg.push(`${_extra}env variable ${vn} is '${v}'`); }
         _l.aspect('config', vn + ': '+ v);
         _dest[vn] = v;
-        if ( _blankenvvars ) process.env[vn] = undefined;
+        if ( _blankenvvars ) {
+          process.env[vn] = undefined;
+          // console.log(`**** blank env var ${vn}.`);
+        }
       }
     }
   }
@@ -106,7 +109,7 @@ module.exports = class Config {
   constructor(_logger, _conf, _sconf, _options = null) {
 
     let options = Object.assign({}, {blankenvvars : true, wovtools : true}, _options);
-//    _logger.info('options : ', options, _options);
+    // _logger.info('options : ', options, _options);
     // _logger.info('***Config constructor called');
     // _logger.printStack();
 
@@ -367,7 +370,6 @@ module.exports = class Config {
 
 };
 
-// module.exports = function() { return new Promise(function(res, rej) { res(true); }); };
 
 module.exports.staticconfig  = 1;
 module.exports.staticpromise = 1;

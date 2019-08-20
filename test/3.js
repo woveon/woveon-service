@@ -58,7 +58,7 @@ describe(`${mtag}: WovReturn tests`, async function() {
       logger.h2('titles').aspect('titles', this.test.title);
       let r = WovReturn.retFail(d);
       expect(r.success).to.equal(false);
-      expect(r.code).to.equal(400);
+      expect(r.code).to.equal(500);
       expect(r.data).to.deep.equal(d);
       expect(r.msg).to.equal('Failure');
     });
@@ -90,7 +90,7 @@ describe(`${mtag}: WovReturn tests`, async function() {
   });
 
 
-  describe.only(`> checkProperties`, async function() {
+  describe(`> checkProperties`, async function() {
 
     it('> single attr', function() {
       logger.h2('titles').aspect('titles', this.test.title);
