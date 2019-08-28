@@ -116,6 +116,9 @@ module.exports = class Service {
    *     : protects    - function that adds routes to the listener (bound to this service when called in onInit)
    *     : routes      - function that adds routes to the listener (bound to this service when called in onInit)
    *
+   *     : applayer    - functionality to apply to this service
+   *     : statelayer  - access to stateful data
+   *
    */
   constructor(_options) {
     autoBind(this);
@@ -137,7 +140,7 @@ module.exports = class Service {
     WovUtil.bindObjectFunctionsToObject(_options.applayer, this, this.al);
 
     // State Layer
-    this.sl = this._options.statelayer || {};
+    this.sl = this._options.statelayer || new WovStateLayer(this.l, []);
 
     this.name       = _options.name || 'unnamed';
     this.internal_address = null;

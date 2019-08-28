@@ -62,7 +62,7 @@ describe(`> ${mtag}: `, async function() {
     await testdb.connect();
     cl = new Service.WovModelClient(logger, testdb,
       [TestModel, TestModel2, TestModel3, MP, TMS.Car, TMS.Tire, TMS.Wheel]); // , ['testtable', 'testtable2', 'testmodel3', 'mp']);
-    await cl.initModelDB(true, true, true);
+    await cl.init(null, true, true, true);
   });
 
 

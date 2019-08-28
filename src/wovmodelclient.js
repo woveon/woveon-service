@@ -70,8 +70,10 @@ module.exports = class WovModelClient extends entity.WovEntityClient {
             this.l.info('result: ', result);
             this.l.rethrowError(result.data, `Error creating table for model '${m.name}'.`);
           }
+
+          // place on statelayer if it exists
           // this.sl[`model_${m.name}`] = m;
-          this.sl[`${m.name}`] = m;
+          if ( this.sl != null ) this.sl[`${m.name}`] = m;
         }
       }
     }
