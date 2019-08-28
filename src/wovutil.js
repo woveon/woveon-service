@@ -16,13 +16,34 @@ module.exports = {
    * Call to bind methods from one file to the object.
    *
    * This takes all the functions defined in this file and binds them to this object. If the functions are a DocMethod, then
-   * the handler is bound.
+   * the handler is bound. If _placedonobj is defined, the bound functions are placed on this object but it defaults to the
+   * _bindobj.
+   *
+   * The utilty of this is to allow development in multiple files and then reorganize them at runtime under your own conventions.
+   * So, for example, microservice M has an Application Layer (M.al) and a State Layer (M.sl). I attach all application functinos
+   * to the Application Layer, but bind them to the microservice so they have access to all default functions there and the
+   * state layer.  ex. bindObjectFunctionsToObject( myapplicationfunctions, M, M.al);
+   *
+   * ex. A = {a : 1}, B = {a : 2}, C = function() { return this.a; }
+   *
+   * bindObjectFunctionsToObject(C, A);
+   * - console.log(A.C()); // 1
+   *
+   * bindObjectFunctionsToObject(C, A, A);
+   * - console.log(A.C()); // 1
+   *
+   * bindObjectFunctionsToObject(C, A, B);
+   * - console.log(A.C()); // error, function is not on A
+   * - console.log(B.C()); // 2
    *
    * @param {object} _funcs - an object of DocMethods or functions, where the keys are the controller names.
-   * @param {object} _obj - the target object where the functions become bound.
+   * @param {object} _bindobj - the target object where the functions become bound.
+   * @param {object} _placedonobj - the target object where the functions are placed. defaults to _bindobj.
    * @return {null} - no return
    */
-  bindObjectFunctionsToObject(_funcs, _obj) {
+  bindObjectFunctionsToObject(_funcs, _bindobj, _placedonobj = null) {
+
+    if ( _placedonobj == null ) _placedonobj = _bindobj;
 
     for (let k in _funcs) {
       if ( _funcs.hasOwnProperty(k) ) {
@@ -31,14 +52,14 @@ module.exports = {
         let f = _funcs[k];
         if ( typeof f == 'object' ) {
           if ( f.handler != undefined ) {
-            _obj[k] = f;
-            _obj[k].handler = f.handler.bind(_obj);
-            Object.defineProperty(_obj[k].handler, 'name', {value : k}); // retain name of function after binding
+            _placedonobj[k] = f;
+            _bindobj[k].handler = f.handler.bind(_bindobj);
+            Object.defineProperty(_placedonobj[k].handler, 'name', {value : k}); // retain name of function after binding
           }
           else throw Error(`Binding object has entry '${k}' that is not a function or a DocMethod with a handler function.`);
         }
         else if ( typeof f == 'function' ) {
-          _obj[k] = f.bind(_obj);
+          _placedonobj[k] = f.bind(_bindobj);
         }
         else { throw Error(`Binding object has entry '${k}' that is not a function or a DocMethod with a handler function.`); }
       }

@@ -1,11 +1,15 @@
 
 /**
  * @typedef Promise
+ * @typedef WovStateLayer
+ * @typedef WoveonLogger
  */
 
+const Logger    = require('woveon-logger');
 const WovReturn = require('./wovreturn');
+const entity    = require('./entity');
 
-module.exports = class WovModelClient {
+module.exports = class WovModelClient extends entity.WovEntityClient {
 
   /**
    * @param {WoveonLogger} _l -
@@ -15,7 +19,8 @@ module.exports = class WovModelClient {
    * @param {Object} _modelInitOptions -
    */
   constructor(_l, _wmdb, _models, _safeTables, _modelInitOptions) {
-    this.l = _l; this.wmdb = _wmdb;
+    super(_l);
+    this.wmdb = _wmdb;
 
     // only Postgres for now (maybe additional sql servers as well, but untested)
     if ( _wmdb.constructor.name != 'WovDBPostgres' ) {
@@ -35,24 +40,27 @@ module.exports = class WovModelClient {
       m.init(this.l, this); this[m.name] = m; this[`model_${m.name.toLowerCase()}`] = m; this.table2model[m.tablename] = m;
       this._safeTables[m.tablename] = true;          // auto-add each model's table
       this._safeTables[`wsv_${m.tablename}`] = true; // auto-add each model's view
+
     }.bind(this));
   }
 
   async initModelDB(_doDrop, _doTable, _doView) {
     this.l.logDeprecated('Call init, not initModelDB');
-    return this.init(_doDrop, _doTable, _doView);
+    return this.init(null, _doDrop, _doTable, _doView);
   }
 
   /**
    * A helper function to run WovModel.doInitDB on the Wovclient WovModels.
    *
-   * @param {bool} _doDrop  - if true, drop the table
-   * @param {bool} _doTable - if true, create the table
-   * @param {bool} _doView  - if true, create the view
+   * @param {WovStateLayer} _sl -
+   * @param {boolean} _doDrop  - if true, drop the table
+   * @param {boolean} _doTable - if true, create the table
+   * @param {boolean} _doView  - if true, create the view
    * @return {Promise<undefined>} -
    */
-  async init(_doDrop, _doTable, _doView) {
+  async init(_sl, _doDrop, _doTable, _doView) {
     let models = Object.values(this.table2model);
+    this.sl = _sl;
     for (let k in models ) {
       if ( models.hasOwnProperty(k) ) {
         let m = models[k];
@@ -62,6 +70,8 @@ module.exports = class WovModelClient {
             this.l.info('result: ', result);
             this.l.rethrowError(result.data, `Error creating table for model '${m.name}'.`);
           }
+          // this.sl[`model_${m.name}`] = m;
+          this.sl[`${m.name}`] = m;
         }
       }
     }
@@ -70,6 +80,7 @@ module.exports = class WovModelClient {
 
   /**
    * Helper function to get all GraphQL schemas in the model.
+   *
    * @return {string} - all schemas
    */
   getGraphQLSchemas() {
@@ -88,13 +99,15 @@ module.exports = class WovModelClient {
 
   /**
    * Returns the object that returns the db queries that generate the object.
-   * @return {string} - the model code
+   *
+   * @return {object} - {modeljs:,exportsjs:}
    */
   getGraphQLModelResolvers() {
     let models = Object.values(this.table2model);
     let retval = {
       modeljs   : '',
-      exportsjs : 'module.exports = {',
+      exportsjs : '',
+      // exportsjs : 'module.exports = {',
     };
     for (let k in models ) {
       if ( models.hasOwnProperty(k) ) {
@@ -105,7 +118,7 @@ module.exports = class WovModelClient {
       }
     }
 
-    retval.exportsjs += '};\n';
+    // retval.exportsjs += '};\n';
 
     return retval;
   }

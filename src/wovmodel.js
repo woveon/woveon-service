@@ -4,6 +4,10 @@ const WovReturn = require('./wovreturn');
 const WovModelMany = require('./wovmodelmany');
 
 /**
+ * @typedef integer
+ */
+
+/**
  * This is a base class of every "thing" which has a model in our system.
  * It connects to the database through a wovmodelclient.
  */
@@ -31,10 +35,37 @@ class WovModel {
 
   /**
    * Gets the data of the key, or if null, returns all data.
-   * @param {string} _key
-   * @return {*}
+   *
+   * @param {string} _key -
+   * @param {object} _options - additional options
+   * @return {*} -
    */
-  get(_key = null) { if ( _key == null) return this._data; else return this._data[_key]; }
+  get(_key = null, _options = null) {
+    let options = Object.assign({}, {
+      stringify : false, // if true, then all objects are JSON.stringified
+    }, _options);
+    let retval = null;
+
+    if ( _key == null) {
+      let result = this._data;
+      if ( options.stringify ) {
+        retval = {};
+        let keys = Object.keys(result);
+        for (let i=0; i<keys.length; i++) {
+          let k = keys[i];
+          if ( result[k] != null && (typeof result[k]) == 'object' ) { retval[k] = JSON.stringify(result[k]); }
+          else retval[k] = result[k];
+        }
+      }
+      else { retval = result; }
+    }
+    else {
+      retval = this._data[_key];
+      if ( options.stringify && retval != null && ((typeof retval) == 'object' ) ) { retval = JSON.stringify(retval); }
+    }
+
+    return retval;
+  }
 
 
   /**
@@ -309,7 +340,7 @@ class WovModel {
       if ( this[modelname] === undefined ) {
 
         if ( (modref.mod.prototype  instanceof WovModel) ) {
-          let result = await modref.mod.readByID(modref.cid);
+          let result = await modref.mod.getByID(modref.cid);
           // this.constructor.l.info(`result mod(${mod.name}) cid(${cid}):`, result);
           if ( result != null ) {
             this[modelname] = result;
@@ -645,13 +676,22 @@ class WovModel {
 
 
   /**
+   * DEPRECATED
+   */
+  static async readByID(_id) {
+    Logger.g().logDeprecated('readByID -> getByID');
+    return this.getByID(_id);
+  }
+
+  /**
    * Reads in the data by the id. For polymorphic models, requires a 2nd read since the first read returns _model_t.
+   *
    * @param {integer} _id -
    * @return {WovModel|Error} -
    */
-  static async readByID(_id) {
+  static async getByID(_id) {
     let retval = null;
-    // console.log('readByID : this: ', this, this.tablename);
+    // console.log('getByID : this: ', this, this.tablename);
     let data = await this.cl._selectByID(_id, `wsv_${this.tablename}`);
     // console.log('data is ', data);
     if ( data != null && !(data instanceof Error) ) {
@@ -660,27 +700,36 @@ class WovModel {
       if ( data._model_t == this.name ) { retval = new this(data); }
       else { // polymorphic
         let Mod = this.cl[data._model_t];
-        if ( Mod == null ) { this.cl.l.throwError(`ms.WovModel_readByID for '${this.name}' returned _model_t of '${data._model_t}' which does not exist on client.`); }
-        retval = await Mod.readByID(_id);
+        if ( Mod == null ) { this.cl.l.throwError(`ms.WovModel_getByID for '${this.name}' returned _model_t of '${data._model_t}' which does not exist on client.`); }
+        retval = await Mod.getByID(_id);
       }
       */
     }
     return retval;
   }
 
+  /**
+   * DEPRECATED
+   */
   static async readByIDs(_ids) {
+    Logger.g().logDeprecated('readByIDs -> getByIDs');
+    return this.getByIDs(_ids); }
+
+  /**
+   */
+  static async getByIDs(_ids) {
     let retval = null;
 
     let x = 1;
     let qqs = [];
     for (let id in _ids ) { qqs.push(`id=$${x++}::integer`); }
     let q = `SELECT * FROM "wsv_${this.tablename}" WHERE ${qqs.join(' AND ')}`;
-    return this.cl._runQuery(q, _ids, 'ws.src.WovModel_readByIDs');
+    return this.cl._runQuery(q, _ids, 'ws.src.WovModel_getByIDs');
   }
 
   /**
    * Internal function that is passed the data from a read of a model's table. If the _model_t does not match the model, reread correct table.
-   * @param {Object} _data - data read in from some other read. (readByID, readByXID, readIn, readInMany, etc)
+   * @param {Object} _data - data read in from some other read. (getByID, getByXID, readIn, readInMany, etc)
    * @param {WovModel} _model - this model that the _data matches to; could be this, or another model 
    *      if reading in from another; creates an instance of this normally, if the _model_t matches. 
    *      Otherwise, gets the model of _model_t and creates.
@@ -695,27 +744,31 @@ class WovModel {
     else if ( _data._model_t == Mod.name ) { retval = new Mod(_data); }
     else { // polymorphic
       Mod = this.cl[_data._model_t]; // get the model
-      if ( Mod == null ) { this.cl.l.throwError(`ms.WovModel_readByID for '${this.name}' returned _model_t of '${_data._model_t}' which does not exist on client.`); }
-      retval = await Mod.readByID(_data.id);
+      if ( Mod == null ) { this.cl.l.throwError(`ms.WovModel_getByID for '${this.name}' returned _model_t of '${_data._model_t}' which does not exist on client.`); }
+      retval = await Mod.getByID(_data.id);
     }
     return retval;
   }
 
+  static async readByXID(_xid) {
+    Logger.g().logDeprecated('readByXID -> getByXID');
+    return this.getByXID(_xid);
+  }
 
   /**
    * @param {integer} _xid -
    * @return {WovModel} -
    */
-  static async readByXID(_xid) {
+  static async getByXID(_xid) {
     let retval = null;
 
-    if ( this._schema.xid == null ) { retval = WovReturn.retError(this.name, `Called 'readByXID' on model without 'xid'.`); }
+    if ( this._schema.xid == null ) { retval = WovReturn.retError(this.name, `Called 'getByXID' on model without 'xid'.`); }
 
     if ( retval == null ) {
-      // console.log('readByXID : ', this.name, this.tablename, _xid);
+      // console.log('getByXID : ', this.name, this.tablename, _xid);
       let q = `SELECT * FROM wsv_${this.tablename} WHERE xid=$1::uuid`;
       let d = [_xid];
-      let result = await this.cl._runSingularQuery(q, d, `${this.name}.readByXID`);
+      let result = await this.cl._runSingularQuery(q, d, `${this.name}.getByXID`);
       // console.log('result is ', result);
       if ( result != null && !(result instanceof Error) ) { retval = new this(result); }
     }
@@ -916,7 +969,7 @@ class WovModel {
       if ( o[1][0] != '[' ) {
         retval +=
           `  ${o[0]} : async function(_parent, __, {args, dataSources}) {\n`+
-          `    let me = new dataSources.model.${this.name}(_parent);\n`+
+          `    let me = new dataSources.sl.${this.name}(_parent);\n`+
           `    await me.readIn('${o[1]}');\n`+
           `    return me.${o[0]}.get();\n`+
           `  },\n`;
@@ -924,7 +977,7 @@ class WovModel {
       else {
         retval +=
           `  ${o[0]} : async function(_parent, __, {args, dataSources}) {\n`+
-          `    let me = new dataSources.model.${this.name}(_parent);\n`+
+          `    let me = new dataSources.sl.${this.name}(_parent);\n`+
           `    await me.readInMany('${o[1].slice(1, -1)}');\n`+
           `    return me.${o[0]}.get();\n`+
           `  },\n`;

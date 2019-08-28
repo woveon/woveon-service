@@ -4,6 +4,8 @@
  * @typedef WovRemoteServiceClient
  */
 
+const entity = require('./entity');
+
 /**
  * A remote service is a connection to another service for data and functionality.
  *
@@ -15,7 +17,7 @@
  * - test types and parameters of the remote calls
  * - trace connections between microservices
  */
-module.exports = class WovRemoteService {
+module.exports = class WovRemoteModel extends entity.WovEntityModel {
 
   static cl = null; // WovRemoteServiceClient
 
@@ -25,9 +27,9 @@ module.exports = class WovRemoteService {
    * @param {object} _options -
    */
   constructor(_options) {
+    super();
     if ( this.constructor.isInited() == false ) { throw Error(`Creating object of non-inited class ${this.constructor.name}.`); }
     this._options = _options;
-    // this.l = _options.logger;
   }
 
 

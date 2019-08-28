@@ -17,8 +17,8 @@ const WovModelClient   = require('./wovmodelclient');
 const WovModel         = require('./wovmodel');
 const WovStateLayer    = require('./wovstatelayer');
 
-const WovRemoteServiceClient = require('./wovrservclient');
-const WovRemoteService       = require('./wovrserv');
+const WovRemoteModelClient = require('./wovremotemodelclient');
+const WovRemoteModel       = require('./wovremotemodel');
 
 const {WovDBPostgres, WovDBMongo} = require('./wovdb');
 const {DocMethod}                 = Listener;
@@ -40,7 +40,8 @@ module.exports = class Service {
    * @return {null} -
    */
   async onInit() {
-    this.logger.info('onInit woveon-service');
+    if ( this.sl != null ) { await this.sl.init(); }
+
     this.listener.onGet('/priv/shutdown', new DocMethod({
       summary : 'A route to shut down the server',
       handler : this.doShutdown,
@@ -127,8 +128,16 @@ module.exports = class Service {
       protects   : null,
       routes     : null,
       controller : null,
+      applayer   : null,
       statelayer : null,
     }, _options);
+
+    // bind Application Layer functions to this and place on this.al
+    this.al = {};
+    WovUtil.bindObjectFunctionsToObject(_options.applayer, this, this.al);
+
+    // State Layer
+    this.sl = this._options.statelayer || {};
 
     this.name       = _options.name || 'unnamed';
     this.internal_address = null;
@@ -298,10 +307,10 @@ module.exports.Listener         = Listener;
 module.exports.Requester        = Requester;
 
 // State Layer
-module.exports.WovStateLayer    = WovStateLayer;
-module.exports.WovModelClient   = WovModelClient;
-module.exports.WovModel         = WovModel;
-module.exports.WovRemoteServiceClient = WovRemoteServiceClient;
-module.exports.WovRemoteService       = WovRemoteService;
-module.exports.WovDBPostgres    = WovDBPostgres;
-module.exports.WovDBMongo     = WovDBMongo;
+module.exports.WovStateLayer        = WovStateLayer;
+module.exports.WovModelClient       = WovModelClient;
+module.exports.WovModel             = WovModel;
+module.exports.WovRemoteModelClient = WovRemoteModelClient;
+module.exports.WovRemoteModel       = WovRemoteModel;
+module.exports.WovDBPostgres        = WovDBPostgres;
+module.exports.WovDBMongo           = WovDBMongo;

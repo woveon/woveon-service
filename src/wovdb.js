@@ -9,6 +9,9 @@ Mongoose.Promise = Promise;
 Mongoose.set('useFindAndModify', false); // see https://mongoosejs.com/docs/deprecations.html
 require('mongoose-long')(Mongoose);
 
+/**
+ * @typedef Promise
+ */
 
 /**
  * Abstracts databases in WoveonService and is a handy
@@ -192,6 +195,16 @@ class WovDBPostgres extends WovDB {
       .catch( (e) => {
         Logger.g().throwError('  ... connection error, is bastion tunneled into?', e.stack);
       });
+  }
+
+  /**
+   * Disconnects.
+   *
+   * @return {Promise} -
+   */
+  async disconnect() {
+    return this.client.end()
+      .catch( (err) => Logger.g().error('error during disconnection', err.stack));
   }
 
   /**

@@ -248,7 +248,7 @@ module.exports = class Requester {
    * @param {string} _msname - name of the microservice to send to
    * @return {Requester} - returns this so you can chain calls
    */
-  toMS(_msname) { this._baseurl = Requester.genMSUrl(_msname); return this; }
+  toMS(_msname) { let cur = this._baseurl; this._baseurl = Requester.genMSUrl(_msname) + cur; return this; }
 
   /**
    * Uses the WOV_www_api_url unless it is localhost, then it appends the port number of the MS running locally.

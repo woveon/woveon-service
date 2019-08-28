@@ -21,8 +21,6 @@ let logger = new Logger(mtag, {
 
 describe(`> ${mtag}: `, async function() {
 
-  let modelcl = null;
-  let rservcl = null;
   let testdb = null;
   let clogger = new Logger('config', {debug : true, showName : true, dbCharLen : 40, color : 'bgBlue white'}, {});
   Service.Config.staticconfig=1;
@@ -42,25 +40,28 @@ describe(`> ${mtag}: `, async function() {
     this.timeout(3000);
     testdb = new Service.WovDBPostgres('testdb', logger);
     await testdb.connect();
-    modelcl = new Service.WovModelClient(logger, testdb, [TMS.Car, TMS.Tire, TMS.Wheel]);
-    rservcl = new Service.WovRemoteServiceClient(logger, [TRS.Store]);
   });
 
 
   it('> Create a basic Service Layer', async function() {
-    let sl = new Service.WovStateLayer(logger, modelcl, rservcl);
+    let modelcl = new Service.WovModelClient(logger, testdb, [TMS.Car, TMS.Tire, TMS.Wheel]);
+    let rservcl = new Service.WovRemoteModelClient(logger, [TRS.Store]);
+    let sl      = new Service.WovStateLayer(logger, [ modelcl, rservcl ]);
     await sl.init();
 
     // Make sure models are on the model client
-    expect(sl.modelcl.Car).to.not.be.undefined;
-    expect(sl.modelcl.Tire).to.not.be.undefined;
-    expect(sl.modelcl.Wheel).to.not.be.undefined;
-    expect(sl.modelcl.Car.isInited()).to.be.true;
-    expect(sl.modelcl.Tire.isInited()).to.be.true;
-    expect(sl.modelcl.Wheel.isInited()).to.be.true;
+    expect(sl.Car).to.not.be.undefined;
+    expect(sl.clients[0].Car).to.not.be.undefined;
+    expect(sl.Tire).to.not.be.undefined;
+    expect(sl.Wheel).to.not.be.undefined;
+    expect(sl.Car.isInited()).to.be.true;
+    expect(sl.Tire.isInited()).to.be.true;
+    expect(sl.Wheel.isInited()).to.be.true;
 
     // Make sure remote services are on the rserv client
-    expect(sl.rservcl.Store.isInited()).to.be.true;
+    expect(sl.Store).to.not.be.undefined;
+    expect(sl.clients[1].Store).to.not.be.undefined;
+    expect(sl.Store.isInited()).to.be.true;
 
   });
 

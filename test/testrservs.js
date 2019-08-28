@@ -7,7 +7,7 @@ const Service = require.main.require('src/index');
 
 module.exports = function() {
 
-  const Store = class Store extends Service.WovRemoteService {
+  const Store = class Store extends Service.WovRemoteModel {
   };
 
   return {Store};
