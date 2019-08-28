@@ -261,6 +261,7 @@ module.exports = class Requester {
     let urlscheme = Config.get('WOV_www_api_urlscheme');
     let retval = `${urlscheme}://${urlbase}`;
     if ( urlbase == 'localhost' ) retval += `:${Config.get(`WOV_${_msname}_port`)}`;
+    retval += `/${_msname}/${Config.get(`WOV_${_msname}_ver`)}`;
     return retval;
   }
 
