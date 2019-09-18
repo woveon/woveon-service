@@ -40,7 +40,7 @@ module.exports = class Service {
    * @return {null} -
    */
   async onInit() {
-    if ( this.sl != null ) { await this.sl.init(); }
+    if ( this.statelayer != null ) { await this.statelayer.init(); }
 
     this.listener.onGet('/priv/shutdown', new DocMethod({
       summary : 'A route to shut down the server',
@@ -140,7 +140,7 @@ module.exports = class Service {
     WovUtil.bindObjectFunctionsToObject(_options.applayer, this, this.al);
 
     // State Layer
-    this.sl = this._options.statelayer || new WovStateLayer(this.l, []);
+    this.statelayer = this._options.statelayer || new WovStateLayer(this.l, []);
 
     this.name       = _options.name || 'unnamed';
     this.internal_address = null;

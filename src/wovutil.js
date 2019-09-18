@@ -20,7 +20,7 @@ module.exports = {
    * _bindobj.
    *
    * The utilty of this is to allow development in multiple files and then reorganize them at runtime under your own conventions.
-   * So, for example, microservice M has an Application Layer (M.al) and a State Layer (M.sl). I attach all application functinos
+   * So, for example, microservice M has an Application Layer (M.al) and a State Layer (M.statelayer). I attach all application functinos
    * to the Application Layer, but bind them to the microservice so they have access to all default functions there and the
    * state layer.  ex. bindObjectFunctionsToObject( myapplicationfunctions, M, M.al);
    *

@@ -16,7 +16,9 @@ all:
 	@echo ""
 	@echo "See the makefile for more."
 	@echo "  : make pg-start    -> launches local db as Docker container"
+	@echo "    : make pg-create-db  -> creates the db needed for testing in a running postgres db"
 	@echo "  : make pg-stop     -> stops local db Docker container"
+	@echo "  : make pg-psql     -> psql command line in db"
 	@echo "  : make mongo-start -> launches local db as Docker container"
 	@echo "  : make mongo-stop  -> stops local db Docker container"
 	@echo "  : make test        -> run tests"
@@ -48,6 +50,9 @@ pg-docker-start-delay :
 
 pg-create-db :
 	@PGPASSWORD=${POSTGRES_PASSWORD} psql -h localhost -U postgres -c "create database ${WOV_DB}"
+
+pg-psql :
+	@PGPASSWORD=${POSTGRES_PASSWORD} psql -h localhost -U postgres -d ${WOV_DB}
 
 pg-stop :
 	@docker stop postgres-local

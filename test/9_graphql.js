@@ -18,6 +18,7 @@ let logger = new Logger(mtag, {
 });
 
 describe(`> ${mtag}: `, async function() {
+  let sl = null;
   let cl = null;
   let testdb = null;
   Service.Config.staticconfig=1;
@@ -46,7 +47,8 @@ describe(`> ${mtag}: `, async function() {
       .catch( (e) => { logger.throwError('  ... db connection error', e.stack); });
       */
     cl = new Service.WovModelClient(logger, C.data('db'), [M.ParentModel, M.ChildModel, M.ChildChildModel, M.AssModelP, M.AssModelC, M.MP]);
-    await cl.initModelDB(true, true, true);
+    sl = new Service.WovStateLayer(logger, [cl]);
+    await cl.init(sl, true, true, true);
   });
 
   describe('> GraphQL tests', async function() {

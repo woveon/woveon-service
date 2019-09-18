@@ -22,6 +22,7 @@ describe(`>${mtag}: `, async function() {
 
   let clogger = new Logger('config', {debug : true, showName : true, dbCharLen : 40, color : 'bgBlue white'}, {});
   let C = null;
+  let ser = null;
 
   // setup the service
   before(async function() {
@@ -41,16 +42,11 @@ describe(`>${mtag}: `, async function() {
     testdb = new Service.WovDBPostgres('testdb', logger);
     await testdb.connect();
     C.setData('db', testdb);
-    /*
-    await C.data('db').connect()
-      .then(() => { logger.info('  ... db connected'); })
-      .catch( (e) => { logger.throwError('  ... db connection error', e.stack); });
-      */
   });
 
   it('listener test', async function() {
 
-    let ser = new Service({
+    ser = new Service({
       name   : 'testser',
       port   : 9001, // C.get('WOV_apitest_port'),
       logger : logger,
@@ -60,67 +56,69 @@ describe(`>${mtag}: `, async function() {
 
     await ser.init();
 
-    /*
-    ser.onRouteAa = (async function(_args, _res) {
-      logger.h3().info('ser onRoute /A/:a hit', _args);
-      return WovReturn.retSuccess({aa : _args.a});
-    });
-    ser.listener.onProtect('/A/:a/B', ser.onRouteAa, __filename);
-    */
-    let rt = express.Router();
+    let rt = express.Router(); // eslint-disable-line  new-cap
     rt.all('/A/:a', async function(_req, res, next) {
-      logger.h3().info('****************rt all hit');
+      // logger.h3().info('****************rt all hit');
       return next();
     });
     ser.listener.app.use('/testser/v1', rt);
 
 
     ser.onGetTest = (async function(_args, _res) {
-      logger.info('onGetTest: ', _args);
-      return WovReturn.retSuccess({});
+      // logger.info('onGetTest: ', _args);
+      return WovReturn.retSuccess('Test');
     });
     ser.listener.onGet('/A/:a', ser.onGetTest, __filename);
 
     ser.onGetB = (async function(_args, _res) {
-      logger.info('onGetB hit: ', _args);
-      return WovReturn.retSuccess({});
+      // logger.info('onGetB hit: ', _args);
+      return WovReturn.retSuccess({a : _args.a, b : _args.b});
     });
     ser.listener.onGet('/A/:a/B/:b', ser.onGetB, __filename);
 
-
-    /*
-    ser.listener.app.use('/', function(_req, _res, _next) {
-      console.log('asdfasdfas');
-      logger.info('------------------------------');
-      return next();
+    ser.onGetC = new Service.Listener.DocMethod({
+      params  : ['a', 'b', 'c'],
+      handler : (async function(_args, _res) {
+        return WovReturn.retSuccess({a : _args.a, b : _args.b, c : _args.c});
+      }),
     });
-      */
+    ser.listener.onGet('/A/:a/B/:b/C/:c', ser.onGetC, __filename);
 
-    /*
-    console.log('app: ', ser.listener.app._router.stack);
-    console.log('rt : ', rt.stack);
-    console.log('rt in app: ', ser.listener.app._router.stack[ser.listener.app._router.stack.length-1]);
-    */
 
     await ser.startup();
 
     let r = new Service.Requester(logger, `http://localhost:${ser._options.port}/${ser._options.name}/${ser._options.ver}`);
+    // logger.info('ser options: ', ser._options);
 
-    let result1 = await r.get(`/health`);
-    logger.info('health: ', result1.success, result1.data);
+    let result1 = await r.get(`/pub/health`);
+    // logger.info('health: ', result1.success, result1.data);
+    expect(result1.success).to.be.true;
+    expect(result1.data).to.be.true;
+
     let result2 = await r.get(`/A/a/B/b`);
-    logger.info('result 2: ', result2);
+    // logger.info('result 2: ', result2);
+    expect(result2.success).to.be.true;
+    expect(result2.data).to.deep.equal({a : 'a', b : 'b'});
 
     let result3 = await r.get(`/A/a`);
-    logger.info('result 3: ', result3);
-    // let baseroute = '/';
-    // let l = new Service.Listener(9001, this.logger, null, baseroute, 'listenertest');
+    // logger.info('result 3: ', result3);
+    expect(result3.success).to.be.true;
+    expect(result3.data).to.equal('Test');
 
-    // await ser.onShutdown();
-    // await r.get('/shutdown');
+    // params specificed and will fail
+    let result4 = await r.get(`/A/a/B/b/C`);
+    // logger.info('result 4: ', result4);
+    expect(result4.success).to.be.false;
+    result4 = await r.get(`/A/a/B/b/C/c`);
+    // logger.info('result 4 again: ', result4);
+    expect(result4.success).to.be.true;
+    expect(result4.data).to.deep.equal({a : 'a', b : 'b', c : 'c'});
+
+
   });
 
   after(async function() {
+    await ser.onShutdown();
   });
 
 });

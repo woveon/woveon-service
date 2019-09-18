@@ -36,7 +36,7 @@ describe(`> ${mtag}: `, async function() {
     this.timeout(3000);
 
 
-    logger.info('waiting for config: ', C);
+    // logger.info('waiting for config: ', C);
     // await C.blockForInit();
     // logger.info('Showing config', C);
     // logger.info('Showing config', await C.staticpromise);
@@ -54,7 +54,7 @@ describe(`> ${mtag}: `, async function() {
 
       let created = null;
       await user.save()
-        .then(function(d) { logger.info('then: ', d); created=d; })
+        .then(function(d) { /* logger.info('then: ', d); */ created=d; })
         .catch(function(e) { logger.throwError(e); } );
       addContext(this, {title : 'Created result', value : created});
 

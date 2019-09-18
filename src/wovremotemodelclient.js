@@ -19,7 +19,7 @@ module.exports = class WovRemoteClient extends entity.WovEntityClient {
    * @param {Logger} _l -
    * @param {Array<WovRemoteModel>} _rservs - array of the WovRemoteModels created in the microservice.
    */
-  constructor(_l, _rservs) {
+  constructor(_l, _rservs, _msrequesters) {
     super(_l);
     this.l = _l;
     this._rservs = _rservs;
@@ -28,23 +28,23 @@ module.exports = class WovRemoteClient extends entity.WovEntityClient {
   /**
    * Eventually will do async calls to test initial config and connections.
    *
-   * Connects to State Layer : WoveonService.sl.rserv_X.
+   * Connects to State Layer : WoveonService.statelayer.rserv_X.
    *
    * @param {WovStateLayer} _sl -
    * @return {undefined} -
    */
   async init(_sl) {
-    this.sl = _sl;
+    this.statelayer = _sl;
     this._rservs.forEach( function(rs) {
       rs.init(this.l, this);
 
       // attach X RemoteService to WovServiceClient
-      // WoveonService.sl.rserv.X
-      // WoveonService.sl.rserv.rserv_X
+      // WoveonService.statelayer.rserv.X
+      // WoveonService.statelayer.rserv.rserv_X
       this[rs.name] = rs;
       this[`rserv_${rs.name.toLowerCase()}`] = rs;
-      // this.sl[`rserv_${rs.name}`] = rs;
-      this.sl[`${rs.name}`] = rs;
+      // this.statelayer[`rserv_${rs.name}`] = rs;
+      this.statelayer[`${rs.name}`] = rs;
     }.bind(this));
   };
 

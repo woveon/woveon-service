@@ -28,7 +28,7 @@ module.exports = class ModelLoader {
     this.relpath   = _relpath;
     this.loaddata   = {};
 
-    this.logger.verbose('...manager loading full path', this.basepath + '/' + this.relpath);
+    // this.logger.verbose('...manager loading full path', this.basepath + '/' + this.relpath);
     let basesize = this.basepath.split('/').length;
     let that = this;
 
@@ -68,7 +68,7 @@ module.exports = class ModelLoader {
    * @param {object} _loaded   - output of require call
    */
   onLoad(_loaddata, _loaded) {
-    this.logger.info(`  ... onload : '${this.loaddata.filename}' : '${this.loaddata.dirs}' `, _loaded);
+    // this.logger.info(`  ... onload : '${this.loaddata.filename}' : '${this.loaddata.dirs}' `, _loaded);
   }
 
 };

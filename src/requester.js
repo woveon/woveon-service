@@ -179,12 +179,12 @@ module.exports = class Requester {
 
 
   /**
-   * RESTFUL Get
+   * RESTFUL Get.
    *
    * @param {*} url -
    * @param {*} headers -
    * @param {*} _rawresult - should this retunull, null, rn the data or the result object
-   * @return {promise}
+   * @return {Promise} -
    */
   async get(url, headers, _rawresult = false) {
     // let fullurl = (this._baseurl ? this._baseurl+url: url);
@@ -193,12 +193,13 @@ module.exports = class Requester {
 
 
   /**
-   * RESTFUL Post
+   * RESTFUL Post.
+   *
    * @param {*} url -
    * @param {*} headers -
-   * @param {*} body
+   * @param {*} body -
    * @param {*} _rawresult - should this return the data or the result object
-   * @return {promise}
+   * @return {Promise} -
    */
   async post(url, headers, body, _rawresult = false) {
     // let fullurl = (this._baseurl ? this._baseurl+url: url);
@@ -207,12 +208,13 @@ module.exports = class Requester {
 
 
   /**
-   * RESTFUL Put
+   * RESTFUL Put.
+   *
    * @param {*} url -
    * @param {*} headers -
    * @param {*} body -
    * @param {*} _rawresult - should this return the data or the result object
-   * @return {promise}
+   * @return {Promise} -
    */
   async put(url, headers, body, _rawresult = false) {
     // let fullurl = (this._baseurl ? this._baseurl+url: url);
@@ -221,7 +223,8 @@ module.exports = class Requester {
 
 
   /**
-   * RESTFUL Delete
+   * RESTFUL Delete.
+   *
    * @param {*} url -
    * @param {*} headers -
    * @param {*} body -

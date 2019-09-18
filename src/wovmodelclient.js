@@ -2,17 +2,17 @@
 /**
  * @typedef Promise
  * @typedef WovStateLayer
- * @typedef WoveonLogger
  */
 
 const Logger    = require('woveon-logger');
 const WovReturn = require('./wovreturn');
 const entity    = require('./entity');
+// const WovModel  = require('./wovmodel');
 
 module.exports = class WovModelClient extends entity.WovEntityClient {
 
   /**
-   * @param {WoveonLogger} _l -
+   * @param {Logger} _l -
    * @param {WovDBPostgres} _wmdb - WovDBPostgres (does not have to be connected yet)
    * @param {Array<models>} _models - the models this loads onto this
    * @param {Array<string>} _safeTables - database tables user can directly call selects on
@@ -52,7 +52,7 @@ module.exports = class WovModelClient extends entity.WovEntityClient {
   /**
    * A helper function to run WovModel.doInitDB on the Wovclient WovModels.
    *
-   * @param {WovStateLayer} _sl -
+   * @param {WovStateLayer} _sl - the state layer of the microservice being passed in
    * @param {boolean} _doDrop  - if true, drop the table
    * @param {boolean} _doTable - if true, create the table
    * @param {boolean} _doView  - if true, create the view
@@ -60,7 +60,7 @@ module.exports = class WovModelClient extends entity.WovEntityClient {
    */
   async init(_sl, _doDrop, _doTable, _doView) {
     let models = Object.values(this.table2model);
-    this.sl = _sl;
+    this.statelayer = _sl;
     for (let k in models ) {
       if ( models.hasOwnProperty(k) ) {
         let m = models[k];
@@ -72,8 +72,8 @@ module.exports = class WovModelClient extends entity.WovEntityClient {
           }
 
           // place on statelayer if it exists
-          // this.sl[`model_${m.name}`] = m;
-          if ( this.sl != null ) this.sl[`${m.name}`] = m;
+          // this.statelayer[`model_${m.name}`] = m;
+          // if ( this.statelayer != null ) this.statelayer[`${m.name}`] = m;
         }
       }
     }

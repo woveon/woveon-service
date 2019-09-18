@@ -2,6 +2,10 @@
 const Logger = require('woveon-logger');
 
 /**
+ * @typedef Promise
+ */
+
+/**
  * Created a class so I can do 'instanceof WovReturn'
  */
 module.exports = class WovReturn {
@@ -24,8 +28,22 @@ module.exports = class WovReturn {
 
 
   /**
+   * Some returns continue to operate in an asynchronous manner after the functionality is called. This
+   * returns the promise that continues. It is NOT passed via listeners.
+   *
+   * @param {Promise} _promise - the promise that is the async functionality
+   * @return {undefined} -
+   */
+  markAsync(_promise) {
+    this.meta = this.meta || {};
+    this.meta.prom = _promise;
+  }
+
+
+  /**
    * Utility function to push to string.
    * (i.e. data usually not shown with typical toString function).
+   *
    * @return {string} - json stringified view of this
    */
   ts() { return JSON.stringify(this, null, '  '); }
@@ -44,6 +62,7 @@ module.exports = class WovReturn {
     if ( _obj.data === undefined || _obj.success === undefined ) return false;
     return true;
   }
+
 
 
   /**

@@ -37,7 +37,7 @@ describe(`> ${mtag}: `, async function() {
 
     let err = 'A';
     let e = WR.retCodedError(err, d, m);
-    logger.info('e : ', e);
+    // logger.info('e : ', e);
     expect(e).to.not.be.null;
     expect(e.success).to.be.false;
     expect(e.code).to.equal(200);

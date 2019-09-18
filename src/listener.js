@@ -9,6 +9,10 @@ const cors       = require('cors');
 const WovReturn    = require('./wovreturn');
 const DocTemplates = require('./doctemplates');
 
+/**
+ * @typedef Response - an http.response object
+ */
+
 
 // NOTE: JSON needs {{{JSON X}}}, since it outputs html
 Handlebars.registerHelper('JSON', function(context) { return `<pre style="font-size: 8px"><code>${JSON.stringify(context, null, 2)}</code></pre>`; });
@@ -303,9 +307,14 @@ module.exports = class Listener {
     let fn = this.logger.trimpath(_mfilename, this.logger.options.trimTo); // _mfilename.split(this.logger.options.trimTo+'/')[1] || _mfilename;
     this.logger.aspect('listener.incomingfull', `Handling : '${_route}' with: '${fn}::${_method.name}' :`, _args);
     this.logger.aspect('listener.incoming', `Handling : '${_route}' with: '${fn}::${_method.name}'`);
+    this.logger.aspect('listener.incoming', `Handling : '${_route}' with expected properties: `, _paramDefs);
     this.logger.aspect('thread', `>>>arriving at ${fn}::${_method.name} in ${_mfilename}`);
 
-    let retval = WovReturn.checkProperties(_args, _paramDefs);
+    // check params if we have them
+    let retval = null;
+    if ( _paramDefs != null )  {
+      retval = WovReturn.checkProperties(_args, _paramDefs);
+    }
 
     if ( retval == null ) { if ( (typeof _method) != 'function' ) { retval = this.retSuccess(_method); } }
 
@@ -366,9 +375,11 @@ module.exports = class Listener {
 
   /**
    * Common function called by onProtect and responseHandler to return data to the client.
+   *
    * @param {Response} _res -
    * @param {WovReturn} _wr - object to be sent to client
    * @param {string} _methodname - name of the handling method
+   * @return {undefined} -
    */
   async sendWovReturnResponse(_res, _wr, _methodname) {
 
@@ -379,6 +390,9 @@ module.exports = class Listener {
 
     this.logger.aspect('listener.result', `  ... returning(${_wr.code}): `, _wr);
     this.logger.aspect('thread', `<<<leaving from ${_methodname}`, _wr);
+
+    // strip meta.prom
+    if ( _wr.meta && _wr.meta.prom ) delete(_wr.meta.prom);
 
     // send with code
     if (! _res.headersSent) { await _res.status(_wr.code).json(_wr); }
@@ -534,8 +548,15 @@ module.exports = class Listener {
     return retval;
   }
 
+
   /**
    * Call for all onX https verbs. Common functionality across them.
+   *
+   * @param {string} _verb - http verb name
+   * @param {string} _route - the route to listen on
+   * @param {Function|DocMethod} _methodOrDocMethod - the handler on this route
+   * @param {string} _mfilename - __filename passed in so we can spew useful logging messages
+   * @return {object} - The object computed from all this which is passed to the handler.
    */
   onXCommon(_verb, _route, _methodOrDocMethod, _mfilename) {
     let retval = {
@@ -543,6 +564,7 @@ module.exports = class Listener {
       docmethod : null,
       method    : null,
     };
+    // this.logger.info('onXCommon: ', typeof _methodOrDocMethod);
 
     // Check state of system and called params
     if ( _mfilename == null ) { this.logger.throwError('Need to append "__filename" to listener function.'); }
@@ -562,10 +584,11 @@ module.exports = class Listener {
         verb      : _verb,
         route     : _route,
         docs      : [],      // DocDoc
-        params    : [],      // DocParam
-        responses : [],      // DocResp
+        params    : null,      // DocParam
+        responses : null,      // DocResp
       });
       retval.method = _methodOrDocMethod;
+      // this.logger.info('onXCommon 1a: ', retval);
     }
     else { throw Error(`Unknown "_methodOrDocMethod" passed to "on${_verb.charAt(0).toUpperCase()+_verb.slice(1)}" route "${_route}"`); }
 
@@ -576,7 +599,7 @@ module.exports = class Listener {
     if ( retval.docmethod.route    == null ) retval.docmethod.route    = _route;
     this.onDoc(retval.fullroute, retval.docmethod, _verb);
 
-    // this.logger.info('onXCommon : ', retval.docmethod);
+    // this.logger.info('onXCommon 2: ', retval);
 
     this.logger.aspect('listener.route listener.protect', `${_verb.toUpperCase().padEnd(7)} : `+
                                          `${this._getFunctionRawName(retval.method).padEnd(20, ' ')} : ${retval.fullroute}`);
@@ -592,6 +615,7 @@ module.exports = class Listener {
    */
   async onGet(_route, _methodOrDocMethod, _mfilename) {
     let result = this.onXCommon('get', _route, _methodOrDocMethod, _mfilename);
+    // this.logger.info('result onGet: ', result);
 
     this.app.get(result.fullroute, (req, res) => {
       this.responseHandler(result.fullroute, result.method, result.docmethod.params, _mfilename,
@@ -1009,14 +1033,14 @@ class DocMethod {
       verb       : null,    // one of this.verbs
       route      : null,    // the route without the domain but including root
       docs       : [],      // DocDoc
-      params     : [],      // DocParam
-      paramspost : [],      // DocParam for after called (only on onProtect)
-      responses  : [],      // DocResp, indexed by useful keys
+      params     : null,    // DocParam
+      paramspost : null,    // DocParam for after called (only on onProtect)
+      responses  : null,    // DocResp, indexed by useful keys
     };
     Object.assign(this, base, _options);
 
     // expand params object to an array of DocParams
-    if ( typeof this.params == 'object' && Array.isArray(this.params) == false) {
+    if ( this.params !== null && typeof this.params == 'object' && Array.isArray(this.params) == false) {
       let p = [];
       for (let k in this.params ) { p.push(new DocParam({name : k, required : this.params[k]})); }
       this.params = p;

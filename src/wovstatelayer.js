@@ -1,13 +1,15 @@
 
 /**
  * @typedef WovModelClient
+ * @typedef WovModel
  * @typedef WovRemoteServiceClient
  * @typedef WovEntityClient
  * @typedef WovEntityModel
  * @typedef WovStateLayer
+ * @typedef Logger
  */
 
-const Logger               = require('woveon-logger');
+// const Logger               = require('woveon-logger');
 const WovModelClient       = require('./wovmodelclient');
 const WovRemoteModelClient = require('./wovremotemodelclient');
 
@@ -17,8 +19,10 @@ const WovRemoteModelClient = require('./wovremotemodelclient');
  */
 module.exports = class WovStateLayer {
 
-  // the WovEntity Clients this layer has
-  clients;
+  l        = null; // the loggr object
+  _clients = null; // the array of WovEntity Clients this layer has
+  _models  = null; // the hash (by lowercase model name) of WovModels this state layer serves (added from clients)
+
 
   /**
    * Constructor.
@@ -28,7 +32,24 @@ module.exports = class WovStateLayer {
    */
   constructor(_l, _woventityclients) {
     this.l = _l;
-    this.clients = _woventityclients;
+    this._clients = _woventityclients;
+    this._models  = {};
+
+    // build models into this
+    for (let i=0; i<this._clients.length; i++ ) {
+      let c = this._clients[i];
+
+      // add to the state layer and check for a few errors
+      for (let k in c.table2model) {
+        let m = c.table2model[k];
+        if ( m == null ) throw Error(`Model of index 'k' is null?`);
+        if ( this._models[m.name.toLowerCase()] != undefined ) {
+          throw Error(`Model named '${m.name}' of index '${k}' already exists in state layer.`);
+        }
+        this._models[m.name.toLowerCase()] = m;
+        this[m.name] = m;
+      }
+    }
   };
 
 
@@ -45,12 +66,13 @@ module.exports = class WovStateLayer {
    * @return {WovStateLayer} - returns itself ex. new WovStateLayer(...).init()
    */
   async init() {
+
     // this.l.info('WovStateLayer init called');
-    for (let i=0; i<this.clients.length; i++ ) {
-      let c = this.clients[i];
+    for (let i=0; i<this._clients.length; i++ ) {
+      let c = this._clients[i];
       // this.l.info('init client ', c);
       if ( c instanceof WovModelClient ) {
-        await c.init(this, false, false, true);
+        await c.init(this, false, true, true);
       }
       else if ( c instanceof WovRemoteModelClient ) {
         await c.init(this);
@@ -58,10 +80,24 @@ module.exports = class WovStateLayer {
       else {
         this.l.error('Unknown client to init in state layer : ', c);
       }
+
     }
     this._inited = true;
     return this;
   }
+
+
+  /**
+   * Returns the model of the given name.
+   *
+   * @param {string} _n - model name
+   * @return {WovModel} -
+   */
+  getModel(_n) {
+    let retval = this._models[_n.toLowerCase()];
+    return retval;
+  }
+
 
   /**
    * Call on each client.

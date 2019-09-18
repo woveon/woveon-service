@@ -51,7 +51,8 @@ describe(`> ${mtag}: `, async function() {
 
     // Make sure models are on the model client
     expect(sl.Car).to.not.be.undefined;
-    expect(sl.clients[0].Car).to.not.be.undefined;
+    expect(sl._models.car).to.not.be.undefined;
+    expect(sl._clients[0].Car).to.not.be.undefined;
     expect(sl.Tire).to.not.be.undefined;
     expect(sl.Wheel).to.not.be.undefined;
     expect(sl.Car.isInited()).to.be.true;
@@ -60,7 +61,7 @@ describe(`> ${mtag}: `, async function() {
 
     // Make sure remote services are on the rserv client
     expect(sl.Store).to.not.be.undefined;
-    expect(sl.clients[1].Store).to.not.be.undefined;
+    expect(sl._clients[1].Store).to.not.be.undefined;
     expect(sl.Store.isInited()).to.be.true;
 
   });

@@ -40,11 +40,11 @@ describe(`> ${mtag}: `, async function() {
   ],
     ['WOV_testdb_password'], {blankenvvars : false});
 
-  let data   = {id : 1, name : 'name'};
-  let data2  = {id : 1, title : 'title2.1', _testtable_ref : data.id};
-  let data3  = {id : 101, title : 'title3.1', _testtable_ref : data.id};
-  let data3a = {id : 102, title : 'title3.2', _testtable_ref : data.id};
-  let data3b = {id : 103, title : 'title3.3', _testtable_ref : data.id};
+  let data   = {id : 1,   name : 'name'};
+  let data2  = {id : 1,   title : 'title2.1', _testmodel_ref : data.id};
+  let data3  = {id : 101, title : 'title3.1', _testmodel_ref : data.id};
+  let data3a = {id : 102, title : 'title3.2', _testmodel_ref : data.id};
+  let data3b = {id : 103, title : 'title3.3', _testmodel_ref : data.id};
   let fdata  = {name : data.name};
   let fdata2 = {title : data2.title};
 //  let fdata3 = {title : data3.title};
@@ -140,7 +140,7 @@ describe(`> ${mtag}: `, async function() {
       wmm[1] = new TestModel({id : 1, name : 'A'});
       wmm[2] = new TestModel({id : 2, name : 'B'});
       wmm[3] = new TestModel({id : 3, name : 'C'});
-      logger.info('wmm: ', wmm);
+      // logger.info('wmm: ', wmm);
     });
 
     it('> pos', async function() {
@@ -172,7 +172,7 @@ describe(`> ${mtag}: `, async function() {
     });
 
     it(`> read null : ${__fileloc}`, async function() {
-      let val = await TestModel.readByID(data.id);
+      let val = await TestModel.getByID(data.id);
       expect(val).to.be.null;
     });
 
@@ -183,7 +183,7 @@ describe(`> ${mtag}: `, async function() {
     });
 
     it(`> read 1 : ${__fileloc}`, async function() {
-      let val = await TestModel.readByID(data.id);
+      let val = await TestModel.getByID(data.id);
       // logger.info('val: ', val);
       expect(val).to.not.be.null;
       expect(val.get()).to.deep.equal(data);
@@ -194,7 +194,7 @@ describe(`> ${mtag}: `, async function() {
       let val = await TestModel.updateOne(data.id, data2);
       // logger.info('val: ', val);
       expect(val).to.include(data2);
-      let val2 = await TestModel.readByID(data.id);
+      let val2 = await TestModel.getByID(data.id);
       expect(val2.get()).to.include(data2);
     });
 
@@ -202,7 +202,7 @@ describe(`> ${mtag}: `, async function() {
       let val = await TestModel.deleteByID(data.id);
       // logger.info('val: ', val);
       expect(val.id).to.equal(data.id);
-      let val2 = await TestModel.readByID(data.id);
+      let val2 = await TestModel.getByID(data.id);
       expect(val2).to.be.null;
     });
 
@@ -215,15 +215,15 @@ describe(`> ${mtag}: `, async function() {
       expect(tm1.isRef('name')).to.be.false;
       expect(tm2.isRef('id')).to.be.false;
       expect(tm2.isRef('title')).to.be.false;
-      expect(tm2.isRef('_testtable_ref')).to.be.true;
+      expect(tm2.isRef('_testmodel_ref')).to.be.true;
       expect(TestModel.isRef('name')).to.be.false;
       expect(TestModel2.isRef('title')).to.be.false;
-      expect(TestModel2.isRef('_testtable_ref')).to.be.true;
+      expect(TestModel2.isRef('_testmodel_ref')).to.be.true;
     });
 
     it(`> flatten : ${__fileloc}`, async function() {
-      let tm1 = await TestModel.readByID(data.id);
-      let tm2 = await TestModel2.readByID(data2.id);
+      let tm1 = await TestModel.getByID(data.id);
+      let tm2 = await TestModel2.getByID(data2.id);
       // logger.info('tm1 flatten: ', tm1.flatten());
       // logger.info('tm2 flatten: ', tm2.flatten());
       expect(tm1.flatten()).to.deep.equal(fdata);
@@ -231,71 +231,83 @@ describe(`> ${mtag}: `, async function() {
     });
 
     it(`> readIn (with table testtable and model testmodel) : ${__fileloc}`, async function() {
-      let tm2 = await TestModel2.readByID(data2.id);
+      let tm2 = await TestModel2.getByID(data2.id);
+      // logger.info('tm2: ', tm2);
       await tm2.readIn('testmodel');
       expect(tm2.testmodel).to.exist;
       expect(tm2.testmodel instanceof TestModel).to.be.true;
     });
 
-    it(`> readIn from cross-model : ${__fileloc}`, async function() {
+    it(`> readIn, from cross-model by id : ${__fileloc}`, async function() {
       let tm3 = await TestModel3.createOne(data3);
-      logger.info('tm3 data: ', tm3.get());
+      // logger.info('tm3 data: ', tm3.get());
 
-      let tm = await TestModel.readByID(data.id);
-      await tm.readIn('testmodel3');
+      let tm = await TestModel.getByID(data.id);
+      await tm.readIn('TestModel3');
+      /*
       logger.info('tm data: ', tm.get());
       logger.info('tm: ', tm);
-      logger.info('testmodel3 data: ', tm.testmodel3.get());
-      expect(tm.testmodel3).to.exist;
-      expect(tm.testmodel3.get('_testtable_ref')).to.equal(tm.get('id'));
+      logger.info('testmodel data: ', tm.testmodels3.get());
+      */
+      expect(tm.testmodels3).to.exist;
+      // logger.info('tm.testmodels3 : ', tm.testmodels3);
+      expect(tm.testmodels3.length).to.equal(1);
+      expect(tm.testmodels3.get('_testmodel_ref')[0]).to.equal(tm.get('id'));
     });
 
 
+    /*
     it(`> readInMany (with plural and trans) : ${__fileloc}`, async function() {
-      let tm1 = await TestModel.readByID(data.id);
+      let tm1 = await TestModel.getByID(data.id);
       await tm1.readInMany('TestModel3');
-      // logger.info('tm1: ', tm1);
+      logger.info('tm1: ', tm1);
       expect(tm1.testmodels3).to.exist;
+      exit(1);
 
     });
+    */
 
-    it(`> readInMany partially : ${__fileloc}`, async function() {
+    it(`> readIn many with limiters : ${__fileloc}`, async function() {
       await TestModel3.createOne(data3a);
       await TestModel3.createOne(data3b);
-      let tm1 = await TestModel.readByID(data.id);
-      await tm1.readInMany('TestModel3', {title : data3a.title});
+      let tm1 = await TestModel.getByID(data.id);
+      await tm1.readIn('TestModel3', {title : data3a.title});
       expect(Object.keys(tm1.testmodels3).length).to.equal(1);
-      await tm1.readInMany('TestModel3', {title : data3b.title});
+      await tm1.readIn('TestModel3', {title : data3b.title});
       expect(Object.keys(tm1.testmodels3).length).to.equal(2);
 
       delete tm1.testmodels3;
-      await tm1.readInMany('TestModel3', {'or' : [{title : data3a.title}, {title : data3b.title}] });
+      await tm1.readIn('TestModel3', {'or' : [{title : data3a.title}, {title : data3b.title}] });
       expect(Object.keys(tm1.testmodels3).length).to.equal(2);
 
       delete tm1.testmodels3;
-      await tm1.readInMany('TestModel3', {'and' : [{title : data3a.title}, {title : data3b.title}] });
+      await tm1.readIn('TestModel3', {'and' : [{title : data3a.title}, {title : data3b.title}] });
       expect(Object.keys(tm1.testmodels3).length).to.equal(0);
-      await tm1.readInMany('TestModel3', {'and' : [{title : data3a.title}] });
+      await tm1.readIn('TestModel3', {'and' : [{title : data3a.title}] });
       expect(Object.keys(tm1.testmodels3).length).to.equal(1);
 
       delete tm1.testmodels3;
-      await tm1.readInMany('TestModel3', {'and' : {title : data3a.title} });
+      await tm1.readIn('TestModel3', {'and' : {title : data3a.title}});
       expect(Object.keys(tm1.testmodels3).length).to.equal(1);
 
     });
 
 
     it(`> flatten component : ${__fileloc}`, async function() {
-      let tm2 = await TestModel2.readByID(data2.id);
+      let tm2 = await TestModel2.getByID(data2.id);
       await tm2.readIn('testmodel');
       // now test flatten
-      // logger.info('tm2 flatten: ', tm2.flatten());
+      /*
+      logger.info('tm2 : ', tm2);
+      logger.info('tm2 flatten : ', tm2.flatten());
+      logger.info('testmodel data.name: ', data.name);
+      */
       expect(tm2.flatten()).to.deep.equal({title : data2.title, testmodel : {name : data.name}});
 
     });
 
     it(`> save : ${__fileloc}`, async function() {
-      let tm1 = await TestModel.readByID(data.id);
+      let tm1 = await TestModel.getByID(data.id);
 
       // not dirty so does not run
       let r1 = await tm1.save();
@@ -307,7 +319,7 @@ describe(`> ${mtag}: `, async function() {
       expect(r2).to.equal(true);
 
       // read it back in and check the change was applied
-      let tm1b = await TestModel.readByID(data.id);
+      let tm1b = await TestModel.getByID(data.id);
       // logger.info('tm1a: ', tm1a);
       expect(tm1b.get('name')).to.equal('newname');
     });
@@ -318,9 +330,11 @@ describe(`> ${mtag}: `, async function() {
 
     it(`> schema private : ${__fileloc}`, async function() {
       let mp = await MP.createOne({title : 'mp', pp : 'secret'});
+      /*
       logger.info('mp         : ', mp);
       logger.info('mp get     : ', mp.get());
       logger.info('mp flatten : ', mp.flatten());
+      */
 
       expect(mp.get()).to.deep.equal({id : 1, title : 'mp', pp : 'secret'});
       expect(mp.flatten()).to.deep.equal({title : 'mp'});
@@ -350,6 +364,7 @@ describe(`> ${mtag}: `, async function() {
         await TMS.Wheel.createOne({style : 'chrome', _tire_ref : tires[3].get('id')}),
       ];
 
+      /*
       logger.info('car   : ', car.get());
       logger.info('tire  : ', tires[0].get());
       logger.info('tire  : ', tires[1].get());
@@ -359,17 +374,20 @@ describe(`> ${mtag}: `, async function() {
       logger.info('wheel : ', wheels[1].get());
       logger.info('wheel : ', wheels[2].get());
       logger.info('wheel : ', wheels[3].get());
+      */
 
-      await car.readInMany('Tire');
-      logger.info('Car Tires : ', car.tires.get());
+      await car.readIn('Tire');
+      // logger.info('Car Tires : ', car);
+      // logger.info('Car Tires : ', car.tires.get());
       car.tires.get().forEach( function(t, i) { expect(t).to.deep.equal(tires[i].get()); });
 
-      logger.info('Car Tires : ', car.tires);
+      // logger.info('Car Tires : ', car.tires);
       await car.tires.readIn('Wheel');
-      logger.info('Car Tires (post): ', car.tires);
-      logger.info('Car Tires Wheels: ', car.tires.select('wheel'));
-      await car.tires.select('wheel').readIn('Tire');
-      logger.info('Car Tires Wheels Tire: ', car.tires.select('wheel').select('tire'));
+      // logger.h1().info('Car Tires (post): ', car.tires);
+      // logger.info('Car Tires Wheels: ', await car.tires.select('wheels'));
+      await car.tires.select('wheels').readIn('tire');
+      // logger.info('Car Tires Wheels Tire: ', car.tires.select('wheels'));
+      // logger.info('Car Tires Wheels Tire: ', car.tires.select('wheels').select('tire'));
 
     });
 
