@@ -226,8 +226,8 @@ describe(`> ${mtag}: `, async function() {
       let tm2 = await TestModel2.getByID(data2.id);
       // logger.info('tm1 flatten: ', tm1.flatten());
       // logger.info('tm2 flatten: ', tm2.flatten());
-      expect(tm1.flatten()).to.deep.equal(fdata);
-      expect(tm2.flatten()).to.deep.equal(fdata2);
+      expect(tm1.flatten({keepinstance : false})).to.deep.equal(fdata);
+      expect(tm2.flatten({keepinstance : false})).to.deep.equal(fdata2);
     });
 
     it(`> readIn (with table testtable and model testmodel) : ${__fileloc}`, async function() {
@@ -302,7 +302,7 @@ describe(`> ${mtag}: `, async function() {
       logger.info('tm2 flatten : ', tm2.flatten());
       logger.info('testmodel data.name: ', data.name);
       */
-      expect(tm2.flatten()).to.deep.equal({title : data2.title, testmodel : {name : data.name}});
+      expect(tm2.flatten({keepinstance : false})).to.deep.equal({title : data2.title, testmodel : {name : data.name}});
 
     });
 
@@ -337,7 +337,7 @@ describe(`> ${mtag}: `, async function() {
       */
 
       expect(mp.get()).to.deep.equal({id : 1, title : 'mp', pp : 'secret'});
-      expect(mp.flatten()).to.deep.equal({title : 'mp'});
+      expect(mp.flatten({keepinstance : false})).to.deep.equal({title : 'mp'});
     });
 
     it(`> schema ignore additional attributes : ${__fileloc}`);
@@ -391,6 +391,57 @@ describe(`> ${mtag}: `, async function() {
 
     });
 
+
+    it(`> car.tires.wheel flatten test : ${__fileloc}`, async function() {
+
+      let car = await TMS.Car.createOne({nameplate : 'Pilot', make : 'Honda', license : 'AGH432', state : 'GA', combo : '1234'});
+      let tires = [
+        await TMS.Tire.createOne({brand : 'Michelin', model : '1', position : 'FL', wear : '.76', _car_ref : car.get('id')}),
+        await TMS.Tire.createOne({brand : 'Michelin', model : '1', position : 'FR', wear : '.78', _car_ref : car.get('id')}),
+        await TMS.Tire.createOne({brand : 'Michelin', model : '1', position : 'RL', wear : '.86', _car_ref : car.get('id')}),
+        await TMS.Tire.createOne({brand : 'Michelin', model : '1', position : 'RR', wear : '.91', _car_ref : car.get('id')}),
+      ];
+      let wheels = [
+        await TMS.Wheel.createOne({style : 'chrome', _tire_ref : tires[0].get('id')}),
+        await TMS.Wheel.createOne({style : 'chrome', _tire_ref : tires[1].get('id')}),
+        await TMS.Wheel.createOne({style : 'chrome', _tire_ref : tires[2].get('id')}),
+        await TMS.Wheel.createOne({style : 'chrome', _tire_ref : tires[3].get('id')}),
+      ];
+
+      await car.readIn('Tire');
+
+      // expect flatten's wov_model_instance to be the car
+      let cf = car.flatten();
+      // Logger.g().info(`car flattened: `, cf);
+      expect(cf.wov_model_instance).to.deep.equal(car);
+
+      // flatten won't recurse to tires
+      let cfa = car.flatten({recurse : false});
+      // Logger.g().info(`car flattened no recurse: `, cfa);
+      expect(cfa.tires).to.be.undefined;
+
+      // no delete ids
+      let cfb = car.flatten({recurse : false, deleteid : false});
+      expect(cfb.id).to.equal(car.get('id'));
+
+      // no delete sensitive
+      let cfc = car.flatten({recurse : false, deletesensitive : false});
+      expect(cfc.combo).to.equal(car.get('combo'));
+
+      // flatten tire 0 wov_model_instance is tire 0
+      let t0 = car.tires.pos(0).flatten();
+      // Logger.g().info(`car tire 0 flattened: `, t0);
+      expect(t0.wov_model_instance).to.deep.equal(car.tires.pos(0));
+
+      // do not keep instance
+      let t0a = car.tires.pos(0).flatten({keepinstance : false});
+      expect(t0a.wov_model_instance).to.be.undefined;
+
+      // do not delete refs
+      let t0b = car.tires.pos(0).flatten({keepinstance : false, deleterefs : false});
+      expect(t0b._car_ref).to.equal(car.get('id'));
+
+    });
   });
 
   after(async function() {

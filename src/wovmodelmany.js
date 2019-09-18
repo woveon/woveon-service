@@ -160,9 +160,9 @@ class _WovModelMany {
    * @param {boolean} _recurse - whether to continue flattening the objects in this.
    * @return {Array} - array of flattened model instances
    */
-  flatten(_recurse = true ) {
+  flatten(_options = {}) {
     let retval = [];
-    for (let k in this) { if ( this.hasOwnProperty(k) ) { retval.push(this[k].flatten(_recurse)); } }
+    for (let k in this) { if ( this.hasOwnProperty(k) ) { retval.push(this[k].flatten(_options)); } }
     return retval;
   }
 

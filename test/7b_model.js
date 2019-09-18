@@ -91,7 +91,7 @@ describe(`> ${mtag}: `, async function() {
       // logger.info('result2: ', result2);
 
       // logger.info('result3: ', ap[0].flatten());
-      expect(ap[0].flatten()).to.deep.equal(p.assmodelps[1].flatten());
+      expect(ap[0].flatten({keepinstance : false})).to.deep.equal(p.assmodelps[1].flatten({keepinstance : false}));
     });
 
     it.skip(`> readIn on model with singular 'from' direction`);

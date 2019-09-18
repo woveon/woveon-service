@@ -132,6 +132,7 @@ class WovModel extends entity.WovEntityModel {
    * @param {boolean} _deleterefs -
    * @return {object} -
    */
+  /*
   static flattenObj(_objOrArray, _recurse = true, _deleteid = true, _deleterefs = true) {
     let retval = null;
 
@@ -184,78 +185,81 @@ class WovModel extends entity.WovEntityModel {
     // Logger.g().info(`  retval: `, retval);
     return retval;
   }
+  */
 
 
   /**
-   * Flattens a class.
+   * Flattens a model instance.
    * Returns the data of this object, without ids and refs. Any components are flattened by default.
+   * OLD: flatten(_recurse = true, _deleteid = true, _deleterefs = true, _deletesensitive = true).
    *
-   * @param {boolean} _recurse - if true, flattens components that have been dereferenced
-   * @param {boolean} _deleteid -
-   * @param {boolean} _deleterefs -
-   * @param {boolean} _deletesensitive -
-   * @return {object} -
+   * @param {object} _options - named options passed to the flatten
+   * - recurse         - if true, flattens components that have been dereferenced
+   * - deleteid        - default true
+   * - deleterefs      - default true
+   * - deletesensitive - default true
+   * - keepinstance    - default true
+   * @return {object} - clean data object
    */
-  flatten(_recurse = true, _deleteid = true, _deleterefs = true, _deletesensitive = true) {
+  flatten(_options = {}) {
+    let options = Object.assign({
+      recurse         : true,
+      deleteid        : true,
+      deleterefs      : true,
+      deletesensitive : true,
+      keepinstance    : true,
+    }, _options);
     let retval = JSON.parse(JSON.stringify(this._data)); // duplicate data
 
     // delete id
-    if ( _deleteid ) {
-      delete retval.id;
-    }
+    if ( options.deleteid ) { delete retval.id; }
 
     // delete all refs
-    if ( _deleterefs ) {
+    if ( options.deleterefs ) {
       for ( let k in retval ) {
         if ( retval.hasOwnProperty(k) ) { if ( this.isRef(k) ) { delete retval[k]; } }
       }
     }
 
     // delete all 'sensitive' members
-    // this.constructor.l.info(`delete all 'sensitive' members`, this.constructor._sensitive);
-    if ( _deletesensitive ) {
-      for ( let i in this.constructor._sensitive) {
-        let k = this.constructor._sensitive[i];
-        // this.constructor.l.info('delete sensitive member : ', k);
-        delete retval[k];
-      }
+    if ( options.deletesensitive ) {
+      for ( let i in this.constructor._sensitive) { let k = this.constructor._sensitive[i]; delete retval[k]; }
     }
-    // console.log('flatten2: ', retval);
 
     // flatten component WovModels recursively
-    if ( _recurse ) {
+    if ( options.recurse ) {
       for ( let k in this ) {
         if ( this.hasOwnProperty(k) ) {
           let v = this[k];
-          if ( v instanceof WovModel ) {
-            retval[k] = v.flatten(_recurse, _deleteid, _deleterefs, _deletesensitive);
-          }
+          if ( v instanceof WovModel ) { retval[k] = v.flatten(options); }
         }
       }
     }
 
-    // console.log('  - flattened : ', retval);
+    // retain link to model instance
+    if ( options.keepinstance) { retval.wov_model_instance = this; }
 
+    // console.log('  - flattened : ', retval);
     return retval;
   }
 
 
   /**
-   * Helper function that calls model (or if array each model's) flatten function.
+   * Helper function that calls flatten on model(s).
    *
    * @param {Array<WovModel>|WovModel|object} _model_array_hash - model(s) to flatten, in different 'containers'
-   * @param {boolean} _recurse - if true, flattens components that have been dereferenced
+   * @param {object} _options -
    * @return {Array<object>} -
    */
-  static flatten(_model_array_hash, _recurse = true) {
-    let models = null;
+  static flatten(_model_array_hash, _options = {}) {
+    let models = null; // to be an Array<WovModel>
     let retval = [];
 
     if ( Array.isArray(_model_array_hash) )           { models = _model_array_hash; }    // array
     else if ( _model_array_hash instanceof WovModel ) { models = [_model_array_hash]; }  // model
-    else { models = Object.values(_model_array_hash); }                                // hash
+    else { models = Object.values(_model_array_hash); }                                  // hash, so grab values
 
-    models.forEach(function(_m) { retval.push(_m.flatten()); });
+    models.forEach(function(_m) { retval.push(_m.flatten(_options)); });
 
     return retval;
   }

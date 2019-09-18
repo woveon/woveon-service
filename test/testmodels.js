@@ -74,7 +74,7 @@ module.exports = function() {
   // ---------------------------------------------------------------------
   // Car / Tire / Wheel
   const Car = class Car extends Service.WovModel { static tablename = 'car'; };
-  Car.setSchema({schema : {nameplate : 'text', make : 'text', license : 'text', state : 'text'}});
+  Car.setSchema({schema : {nameplate : 'text', make : 'text', license : 'text', state : 'text', combo : 'text'}, sensitive : ['combo'] });
 
   const Tire = class Tire extends Service.WovModel { static tablename = 'tire'; };
   Tire.setSchema({
