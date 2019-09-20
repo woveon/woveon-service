@@ -1,4 +1,6 @@
 
+const performance = require('perf_hooks').performance;
+
 const expect    = require('chai').expect;
 const Logger    = require('woveon-logger');
 const WovReturn = require('../src/wovreturn');
@@ -28,6 +30,7 @@ let logger = new Logger(mtag, {
 describe(`> ${mtag}: `, async function() {
 
   let cl     = null;
+  let statelayer = null;
   let testdb = null;
   let clogger = new Logger('config', {debug : true, showName : true, dbCharLen : 40, color : 'bgBlue white'}, {});
   Service.Config.staticconfig=1;
@@ -61,8 +64,9 @@ describe(`> ${mtag}: `, async function() {
     testdb = new WovDBPostgres('testdb', logger);
     await testdb.connect();
     cl = new Service.WovModelClient(logger, testdb,
-      [TestModel, TestModel2, TestModel3, MP, TMS.Car, TMS.Tire, TMS.Wheel]); // , ['testtable', 'testtable2', 'testmodel3', 'mp']);
-    await cl.init(null, true, true, true);
+      [TestModel, TestModel2, TestModel3, MP, TMS.Car, TMS.Tire, TMS.Wheel, TMS.ParentModel, TMS.ChildModel, TMS.ChildChildModel, TMS.AssModelP, TMS.AssModelC, TMS.ReadInA, TMS.ReadInB, TMS.ReadInC, TMS.ReadInCChild, TMS.AA, TMS.BB, TMS.CC]); // , ['testtable', 'testtable2', 'testmodel3', 'mp']);
+    sl = new Service.WovStateLayer(logger, [cl]);
+    await cl.init(sl, true, true, true);
   });
 
 
@@ -230,26 +234,202 @@ describe(`> ${mtag}: `, async function() {
       expect(tm2.flatten({keepinstance : false})).to.deep.equal(fdata2);
     });
 
+
+    it(`> deRef Full tests : ${__fileloc}`, async function() {
+      logger.h2('titles').aspect('titles', this.test.title);
+      let result = null;
+
+      /*
+      logger.info('AA: ', TMS.AA);
+      logger.info('BB: ', TMS.BB);
+      logger.info('CC: ', TMS.CC);
+      */
+
+      // none
+      try {
+        result = TMS.AA.deRef(null, 'a');
+        expect(true).to.be.false;
+      }
+      catch (e) { expect(result).to.be.null; }
+
+      // to, transmodel
+      result = [TMS.AA.deRef('_tob_ref'), TMS.AA.deRef(null, 'tob')];
+      for (let i in result) {
+        let r = result[i];
+        expect(r).to.deep.equal({
+          model : TMS.BB,
+          dir   : 'to',
+          sel   : 'tob',
+          ref   : '_tob_ref',
+          erel  : Service.WovModel.ER_ONE,
+        });
+      }
+
+      // to, tablename
+      /*
+      result = TMS.AA.deRef(null, 'BBb');
+      // logger.info('tables: ', cl.table2model);
+      expect(result).to.deep.equal({
+        model : TMS.BB,
+        dir   : 'to',
+        sel   : 'b',
+        ref   : '_b_ref',
+        erel  : Service.WovModel.ER_ONE,
+      });
+      */
+
+      // to, modelname
+      result = [TMS.AA.deRef(null, 'BB'), TMS.AA.deRef('_bb_ref', null)];
+      for (let i in result) {
+        let r = result[i];
+        expect(r).to.deep.equal({
+          model : TMS.BB,
+          dir   : 'to',
+          sel   : 'bb',
+          ref   : '_bb_ref',
+          erel  : Service.WovModel.ER_ONE,
+        });
+      }
+
+      // from, modelname (NOTE: using CC since BB would go to _bb_ref in AA)
+      result = [TMS.AA.deRef(null, 'CC'), TMS.AA.deRef('_cc_ref', null)];
+      for (let i in result) {
+        let r = result[i];
+        // logger.info('r: ', r);
+        expect(r).to.deep.equal({
+          model     : TMS.CC,
+          dir       : 'from',
+          sel       : 'CC',
+          ref       : '_aa_ref',
+          erel      : Service.WovModel.ER_MANY, // ambiguous warning given
+          ambiguous : true,
+        });
+      }
+
+      result = [TMS.AA.deRef(null, 'CC:toa1')];
+      for (let i in result) {
+        let r = result[i];
+        // logger.info('r: ', r);
+        expect(r).to.deep.equal({
+          model  : TMS.CC,
+          dir    : 'from',
+          sel    : 'CC:toa1',
+          selbak : 'cc',
+          ref    : '_toa1_ref',
+          erel   : Service.WovModel.ER_ONE,
+        });
+      }
+
+      result = [TMS.AA.deRef(null, 'CC:toam')];
+      for (let i in result) {
+        let r = result[i];
+        // logger.info('r: ', r);
+        expect(r).to.deep.equal({
+          model  : TMS.CC,
+          dir    : 'from',
+          sel    : 'CC:toam',
+          selbak : 'cc',
+          ref    : '_toam_ref',
+          erel   : Service.WovModel.ER_MANY,
+        });
+      }
+
+    });
+
+
+    it.skip(`> deRef speed test : ${__fileloc}`, async function() {
+
+      let n = 100;
+      let m = 100;
+      /*
+      logger.info('f static1:', TMS.AA.prototype);
+      logger.info('f static1a:', TMS.AA.prototype.prototype);
+
+      // equivalent
+      logger.info('f static1b:', TMS.AA.__proto__);
+      logger.info('f static2:', Object.getPrototypeOf(TMS.AA)); // call twice to get parent class
+
+      // logger.info('f static2b:', Object.getPrototypeOf(Object.getPrototypeOf(TMS.AA)));
+      logger.info('f static3:', Object.getOwnPropertyNames(TMS.AA.__proto__));
+
+      func = logger.constructor._pf_f(Service.WovModel.deRef);
+      logger.info('f1:', func);
+      logger.info('f1a:', func.this);
+      Service.WovModel.__proto__.deRef = func.bind(Service.WovModel.__proto__);
+      */
+      // logger.info('f2:', Service.WovModel.__proto__.deRef);
+      // logger.info('f2a:', Service.WovModel.__proto__.deRef.__proto__);
+      // logger.info('deRef :', TMS.AA.__proto);
+      // func = func.bind(TMS.AA);
+
+      logger.info(`start run of ${n} with breaks every ${m}.`);
+      for (let i in [0, 1]) {
+        let usecache = (i?false:true);
+        logger.info(' use cache : ', usecache);
+        let ac = [];
+        for (let i=0; i<n; i++) {
+          as = performance.now();
+          result = TMS.AA.deRef(null, 'CC:toa1', usecache);
+          ac.push(performance.now()-as);
+        }
+        logger.info(' - first ', ac[1]-ac[0]);
+        for (let i=0; i< ac.length; i++) { logger.info(` - ${i} : ${ac[i]}`); }
+        // logger.info(' - ', b-a, (b-a) / n);
+      }
+
+    });
+
+    it(`> deRef test : ${__fileloc}`, async function() {
+      logger.h2('titles').aspect('titles', this.test.title);
+
+
+      try { TMS.ParentModel.deRef('_a_ref'); expect(true).to.be.false; }
+      catch (e) {}
+
+      let dr = TMS.ParentModel.deRef('_assmodelp_ref');
+
+      expect( dr.model ).to.equal(TMS.AssModelP);
+      expect( dr.dir   ).to.equal('from');
+      expect( dr.erel  ).to.equal(Service.WovModel.ER_MANY);
+
+      try { TMS.ChildModel.deRef('_parent_ref'); expect(true).to.be.false; }
+      catch (e) {}
+
+      expect( TMS.Car.deRef('_tire_ref').model ).to.equal(TMS.Tire);
+      expect( TMS.Tire.deRef('_car_ref').model ).to.equal(TMS.Car);
+      expect( TMS.Tire.deRef('_wheel_ref').model ).to.equal(TMS.Wheel);
+      expect( TMS.Wheel.deRef('_tire_ref').model ).to.equal(TMS.Tire);
+
+      expect( TMS.ReadInA.deRef('_named_ref').model ).to.equal(TMS.ReadInB);
+      expect( TMS.ReadInA.deRef('_readinb_ref').model ).to.equal(TMS.ReadInB);
+
+      expect( TMS.AssModelP.deRef('_parentmodel_ref').model ).to.equal(TMS.ParentModel);
+
+    });
+
+
     it(`> readIn (with table testtable and model testmodel) : ${__fileloc}`, async function() {
+      logger.h2('titles').aspect('titles', this.test.title);
       let tm2 = await TestModel2.getByID(data2.id);
       // logger.info('tm2: ', tm2);
       await tm2.readIn('testmodel');
+      // logger.info('tm2: ', tm2);
       expect(tm2.testmodel).to.exist;
       expect(tm2.testmodel instanceof TestModel).to.be.true;
     });
 
+
     it(`> readIn, from cross-model by id : ${__fileloc}`, async function() {
+      logger.h2('titles').aspect('titles', this.test.title);
       let tm3 = await TestModel3.createOne(data3);
       // logger.info('tm3 data: ', tm3.get());
 
       let tm = await TestModel.getByID(data.id);
       await tm.readIn('TestModel3');
-      /*
-      logger.info('tm data: ', tm.get());
-      logger.info('tm: ', tm);
-      logger.info('testmodel data: ', tm.testmodels3.get());
-      */
-      expect(tm.testmodels3).to.exist;
+      // logger.info('tm data: ', tm.get());
+      // logger.info('tm: ', tm);
+      // logger.info('testmodel data: ', tm.testmodels3.get());
+      expect(tm.testmodels3.get('id')[0]).to.equal(tm3.get('id'));
       // logger.info('tm.testmodels3 : ', tm.testmodels3);
       expect(tm.testmodels3.length).to.equal(1);
       expect(tm.testmodels3.get('_testmodel_ref')[0]).to.equal(tm.get('id'));
@@ -268,6 +448,7 @@ describe(`> ${mtag}: `, async function() {
     */
 
     it(`> readIn many with limiters : ${__fileloc}`, async function() {
+
       await TestModel3.createOne(data3a);
       await TestModel3.createOne(data3b);
       let tm1 = await TestModel.getByID(data.id);
@@ -384,8 +565,8 @@ describe(`> ${mtag}: `, async function() {
       // logger.info('Car Tires : ', car.tires);
       await car.tires.readIn('Wheel');
       // logger.h1().info('Car Tires (post): ', car.tires);
-      // logger.info('Car Tires Wheels: ', await car.tires.select('wheels'));
-      await car.tires.select('wheels').readIn('tire');
+      // logger.info('Car Tires Wheels: ', await car.tires.select('wheel'));
+      await car.tires.select('wheel').readIn('tire');
       // logger.info('Car Tires Wheels Tire: ', car.tires.select('wheels'));
       // logger.info('Car Tires Wheels Tire: ', car.tires.select('wheels').select('tire'));
 

@@ -23,6 +23,7 @@ let logger = new Logger(mtag, {
 
 describe(`> ${mtag}: `, async function() {
   let cl = null;
+  let sl = null;
   let testdb = null;
   Service.Config.staticconfig=1;
   let clogger = new Logger('config', {debug : true, showName : true, dbCharLen : 40, color : 'bgBlue white'}, {});
@@ -42,7 +43,8 @@ describe(`> ${mtag}: `, async function() {
     testdb = new WovDBPostgres('testdb', logger);
     await testdb.connect();
     cl = new Service.WovModelClient(logger, testdb, [M.SingularTestA, M.SingularTestB, M.SingularTestC]);
-    await cl.init(null, true, true, true);
+    sl = new Service.WovStateLayer(logger, [cl]);
+    await cl.init(sl, true, true, true);
   });
 
   describe('> WovModel Singular from Test', async function() {
@@ -83,10 +85,10 @@ describe(`> ${mtag}: `, async function() {
       expect(b.toa1.get('id')).to.equal(a.get('id'));
       expect(b.toam.get('id')).to.equal(a1.get('id'));
 
-      await a.readIn('SingularTestB.toa1');
+      await a.readIn('SingularTestB:toa1');
       // logger.info('a :', a);
-      expect(a.toa1).to.exist;
-      expect(a.toa1 instanceof M.SingularTestB).to.be.true;
+      expect(a.singulartestb).to.exist;
+      expect(a.singulartestb instanceof M.SingularTestB).to.be.true;
 
     });
 

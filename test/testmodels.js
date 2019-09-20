@@ -19,7 +19,7 @@ module.exports = function() {
    * A model with a _transmodel entry
    */
   const TestModel2 = class TestModel2 extends Service.WovModel { static tablename = 'testtable2'; };
-  TestModel2.setSchema({schema : {title : 'text', _testmodel_ref : 'integer'}, trans : {testmodel : 'testmodel'}});
+  TestModel2.setSchema({schema : {title : 'text', _testmodel_ref : 'integer'}, trans : {testmodel : 'TestModel'}});
 
 
   /**
@@ -74,7 +74,18 @@ module.exports = function() {
   // ---------------------------------------------------------------------
   // Car / Tire / Wheel
   const Car = class Car extends Service.WovModel { static tablename = 'car'; };
-  Car.setSchema({schema : {nameplate : 'text', make : 'text', license : 'text', state : 'text', combo : 'text'}, sensitive : ['combo'] });
+  Car.setSchema({
+    schema : {
+      nameplate : 'text',
+      make      : 'text',
+      license   : 'text',
+      state     : 'text',
+      combo     : 'text',
+    },
+    trans     : {},
+    erels     : {},
+    sensitive : ['combo'],
+  });
 
   const Tire = class Tire extends Service.WovModel { static tablename = 'tire'; };
   Tire.setSchema({
@@ -85,7 +96,7 @@ module.exports = function() {
   const Wheel = class Wheel extends Service.WovModel { static tablename = 'wheel'; };
   Wheel.setSchema({
     schema : {style : 'text', _tire_ref : 'integer'},
-    erels  : {tire : 'many'},
+    erels  : {tire : 'one'},
   });
 
 
@@ -128,6 +139,25 @@ module.exports = function() {
   });
 
 
+  // ---------------------------------------------------------------------
+  // AA and BB are for exhaustive testing of deRef
+  const AA = class AA extends Service.WovModel { static tablename = 'AAa'; };
+  AA.setSchema({schema : {name : 'text', _bb_ref : 'integer', _tobb_ref : 'integer'}, trans : {tob : 'BB'}});
+  const BB = class BB extends Service.WovModel { static tablename = 'BBb'; };
+  BB.setSchema({schema : {name : 'text', _aa_ref : 'integer', _toaa_ref : 'integer'}, trans : {toa : 'AA'}});
+  const CC = class CC extends Service.WovModel { static tablename = 'CCc'; };
+  CC.setSchema({
+    schema : {
+      name      : 'text',
+      _aa_ref   : 'integer',
+      _toa1_ref : 'integer',
+      _toam_ref : 'integer',
+    },
+    trans : {toa1 : 'AA',  toam : 'AA'},
+    erels : {toa1 : 'one', toam : 'many'},
+  });
+
+
   // NOTE: all new models need to be added to the client that they are used in!
   let models = {
     TestModel, TestModel2, TestModel3,
@@ -137,6 +167,7 @@ module.exports = function() {
     Car, Tire, Wheel,
     ReadInA, ReadInB, ReadInC, ReadInCChild,
     SingularTestA, SingularTestB, SingularTestC,
+    AA, BB, CC,
   };
 
   // return Object.assign({}, models, {onBefore});

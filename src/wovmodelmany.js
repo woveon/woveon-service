@@ -119,7 +119,10 @@ class _WovModelMany {
     for (let k in this) {
       if ( this.hasOwnProperty(k) ) {
         // Logger.g().info(`WovModelMany(${_selector}) '${k}' :`);
-        proms.push( this[k].readIn(_selector).then( function(_m) { retval.push(_m); })); // does this maintain the order?
+        proms.push( this[k].readIn(_selector).then( function(_m) {
+          // Logger.g().info('readIn model ', _m);
+          retval.push(_m);
+        })); // does this maintain the order?
       }
     }
     await Promise.all(proms);
@@ -137,6 +140,7 @@ class _WovModelMany {
    */
   select(_k) {
     let retval = new WovModelMany();
+    // Logger.g().info('many has : ', Object.keys(this));
     for (let k in this) {
       if ( this.hasOwnProperty(k) ) {
         // Logger.g().info(`WovModelMany select (${_k}) '${k}' :`);

@@ -15,6 +15,7 @@ const Config           = require('./config');
 const WovUtil          = require('./wovutil');
 const WovModelClient   = require('./wovmodelclient');
 const WovModel         = require('./wovmodel');
+const WovModelMany     = require('./wovmodelmany');
 const WovStateLayer    = require('./wovstatelayer');
 
 const WovRemoteModelClient = require('./wovremotemodelclient');
@@ -313,6 +314,7 @@ module.exports.Requester        = Requester;
 module.exports.WovStateLayer        = WovStateLayer;
 module.exports.WovModelClient       = WovModelClient;
 module.exports.WovModel             = WovModel;
+module.exports.WovModelMany         = WovModelMany;
 module.exports.WovRemoteModelClient = WovRemoteModelClient;
 module.exports.WovRemoteModel       = WovRemoteModel;
 module.exports.WovDBPostgres        = WovDBPostgres;

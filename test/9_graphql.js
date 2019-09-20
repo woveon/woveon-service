@@ -46,20 +46,74 @@ describe(`> ${mtag}: `, async function() {
       .then(() => { logger.verbose('  ... db connected'); })
       .catch( (e) => { logger.throwError('  ... db connection error', e.stack); });
       */
-    cl = new Service.WovModelClient(logger, C.data('db'), [M.ParentModel, M.ChildModel, M.ChildChildModel, M.AssModelP, M.AssModelC, M.MP]);
+    cl = new Service.WovModelClient(logger, C.data('db'),
+      [M.ParentModel, M.ChildModel, M.ChildChildModel, M.AssModelP, M.AssModelC, M.MP, M.Car, M.Tire, M.Wheel, M.ReadInA, M.ReadInB, M.ReadInC, M.ReadInCChild]);
     sl = new Service.WovStateLayer(logger, [cl]);
     await cl.init(sl, true, true, true);
   });
 
   describe('> GraphQL tests', async function() {
 
+    /*
+    it(`> deRef test : ${__fileloc}`, async function() {
+      expect( M.ParentModel.deRef('_a_ref') ).to.be.undefined;
+      expect( M.ParentModel.deRef('_assmodelp_ref') ).to.equal(M.AssModelP);
+      expect( M.ChildModel.deRef('_parent_ref') ).to.be.undefined;
+
+      expect( M.Car.deRef('_tire_ref') ).to.equal(M.Tire);
+      expect( M.Tire.deRef('_car_ref') ).to.equal(M.Car);
+      expect( M.Tire.deRef('_wheel_ref') ).to.equal(M.Wheel);
+      expect( M.Wheel.deRef('_tire_ref') ).to.equal(M.Tire);
+
+      expect( M.ReadInA.deRef('_named_ref') ).to.equal(M.ReadInB);
+      expect( M.ReadInA.deRef('_readinb_ref') ).to.equal(M.ReadInB);
+
+      expect( M.AssModelP.deRef('_parentmodel_ref') ).to.equal(M.ParentModel);
+
+    });
+    */
+
     it(`> ParentModel : ${__fileloc}`, async function() {
-      logger.info(`Parent schema     : \n`, M.ParentModel.getGraphQLSchema());
-      logger.info(`Child schema      : \n`, M.ChildModel.getGraphQLSchema());
-      logger.info(`ChildChild schema : \n`, M.ChildChildModel.getGraphQLSchema());
-      logger.info(`AssModelP schema  : \n`, M.AssModelP.getGraphQLSchema());
-      logger.info(`AssModelC schema  : \n`, M.AssModelC.getGraphQLSchema());
-      logger.info(`MP schema : \n`, M.MP.getGraphQLSchema());
+      // M.ChildModel.debugme = true;
+      // logger.info('Child: ', M.ChildModel);
+
+
+      // computes them
+      /*
+      M.ParentModel.debugme     = true;
+      M.AssModelP.debugme       = true;
+      M.ChildModel.debugme      = true;
+      M.ChildChildModel.debugme = true;
+      M.AssModelC.debugme       = true;
+      M.MP.debugme              = true;
+      M.Car.debugme             = true;
+      M.Tire.debugme            = true;
+      M.Wheel.debugme           = true;
+      */
+      /*
+      M.ReadInA.debugme = true;
+      M.ReadInB.debugme = true;
+      M.ReadInC.debugme = true;
+      M.ReadInCChild.debugme = true;
+      logger.h1().info('ReadInA: ', M.ReadInA.getGraphQLSchema());
+      */
+      /*
+      logger.h1().info('ReadInB: ', M.ReadInB.getGraphQLSchema());
+      logger.h1().info('ReadInC: ', M.ReadInC.getGraphQLSchema());
+      logger.h1().info('ReadInCChild: ', M.ReadInCChild.getGraphQLSchema());
+      */
+      cl.getGraphQLSchemas();
+
+      for (let k in cl.table2model ) {
+        let m = cl.table2model[k];
+        logger.h3().info(`Model '${m.name}' :`);
+        logger.info('  - ', m._schema);
+        logger.info('  - ', m.getGraphQLSchema());
+        logger.info('  - ', m._graphQL);
+      }
+
+      expect(M.ParentModel._graphQL.vars.length).to.equal(1);
+      expect(M.ParentModel._graphQL.objs.length).to.equal(1);
     });
   });
 });

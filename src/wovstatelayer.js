@@ -12,6 +12,8 @@
 // const Logger               = require('woveon-logger');
 const WovModelClient       = require('./wovmodelclient');
 const WovRemoteModelClient = require('./wovremotemodelclient');
+const Logger               = require('woveon-logger');
+
 
 /**
  * The State Layer manages models (which manage Entity CRUD) and connects to remote services
@@ -34,6 +36,7 @@ module.exports = class WovStateLayer {
     this.l = _l;
     this._clients = _woventityclients;
     this._models  = {};
+    this._inited = false;
 
     // build models into this
     for (let i=0; i<this._clients.length; i++ ) {
@@ -95,6 +98,7 @@ module.exports = class WovStateLayer {
    */
   getModel(_n) {
     let retval = this._models[_n.toLowerCase()];
+    // Logger.g().info(`getModel ${_n} of models: `, Object.keys(this._models));
     return retval;
   }
 
@@ -107,8 +111,8 @@ module.exports = class WovStateLayer {
   getGraphQLModelResolvers() {
     let retval = {modeljs : '', exportsjs : ''};
 
-    for (let i=0; i<this.clients.length; i++) {
-      let cl = this.clients[i];
+    for (let i=0; i<this._clients.length; i++) {
+      let cl = this._clients[i];
       let result = cl.getGraphQLModelResolvers();
       retval.modeljs += result.modeljs;
       retval.exportsjs += result.exportsjs;
@@ -126,8 +130,8 @@ module.exports = class WovStateLayer {
   getGraphQLSchemas() {
     let retval = '';
 
-    for (let i=0; i<this.clients.length; i++) {
-      let cl = this.clients[i];
+    for (let i=0; i<this._clients.length; i++) {
+      let cl = this._clients[i];
       let result = cl.getGraphQLSchemas();
       retval += result;
     }

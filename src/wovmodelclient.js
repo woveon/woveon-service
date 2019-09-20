@@ -65,6 +65,7 @@ module.exports = class WovModelClient extends entity.WovEntityClient {
       if ( models.hasOwnProperty(k) ) {
         let m = models[k];
         if ( m.isInited() ) {
+          // this.l.info('doInitDB for model : ', m.name);
           let result = await models[k].doInitDB(_doDrop, _doTable, _doView);
           if ( result instanceof WovReturn ) {
             this.l.info('result: ', result);

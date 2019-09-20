@@ -23,6 +23,7 @@ let logger = new Logger(mtag, {
 
 describe(`> ${mtag}: `, async function() {
   let cl = null;
+  let sl = null;
   let testdb = null;
   Service.Config.staticconfig=1;
   let clogger = new Logger('config', {debug : true, showName : true, dbCharLen : 40, color : 'bgBlue white'}, {});
@@ -47,7 +48,8 @@ describe(`> ${mtag}: `, async function() {
       .catch( (e) => { logger.throwError('  ... db connection error', e.stack); });
       */
     cl = new Service.WovModelClient(logger, testdb, [M.ParentModel, M.ChildModel, M.ChildChildModel, M.AssModelP, M.AssModelC, M.ReadInA, M.ReadInB, M.ReadInC, M.ReadInCChild]);
-    await cl.init(null, true, true, true);
+    sl = new Service.WovStateLayer(logger, [cl]);
+    await cl.init(sl, true, true, true);
   });
 
   describe('> WovModel Associations and Polymorphic tests', async function() {
@@ -122,7 +124,7 @@ describe(`> ${mtag}: `, async function() {
     */
 
 
-    it(`WovService> readInResolveModel and readIn/readInMany : ${__fileloc}`, async function() {
+    it(`WovService> readIn: ${__fileloc}`, async function() {
 
       let a  = await M.ReadInA.createOne({_named_ref : -1, _readinb_ref : -1});
       let a1 = await M.ReadInA.createOne({_named_ref : -1, _readinb_ref : -1});
@@ -146,116 +148,105 @@ describe(`> ${mtag}: `, async function() {
 
       // nothing named 'b'
       try {
-        result = await a._readInResolveModel('b');
+        // logger.info('a: ', a);
+        result = await a.constructor.deRef(null, 'b');
         expect('Should never reach this since exception thrown').to.be.false;
       }
       catch (e) { }
 
       addContext(this, {title : 'A -> B: find it', value : {a, b}});
-      result = await a._readInResolveModel('readinb');
+      result = await a.constructor.deRef(null, 'readinb');
       expect(result).to.not.be.null;
-      expect(result.direction).to.equal('to');
+      expect(result.dir).to.equal('to');
       expect(result.ref).to.equal('_readinb_ref');
       expect(result.model.name).to.equal('ReadInB');
-      expect(result.cid).to.equal(b.get('id'));
 
       addContext(this, {title : 'A -(named)-> B find it using a named', value : {a : a.get(), b : b.get()}});
-      result = await a._readInResolveModel('named');
+      result = await a.constructor.deRef(null, 'named');
       expect(result).to.not.be.null;
-      expect(result.direction).to.equal('to');
+      expect(result.dir).to.equal('to');
       expect(result.ref).to.equal('_named_ref');
       expect(result.model.name).to.equal('ReadInB');
-      expect(result.cid).to.equal(b.get('id'));
 
       addContext(this, {title : 'B -> A find it', value : {a : a.get(), b : b.get()}});
-      result = await b._readInResolveModel('readina');
+      result = await b.constructor.deRef(null, 'readina');
       expect(result).to.not.be.null;
-      expect(result.direction).to.equal('to');
+      expect(result.dir).to.equal('to');
       expect(result.ref).to.equal('_readina_ref');
       expect(result.model.name).to.equal('ReadInA');
-      expect(result.cid).to.equal(a.get('id'));
 
       addContext(this, {title : 'B -(named)-> A find it using a named', value : {a : a.get(), b : b.get()}});
-      result = await b._readInResolveModel('named');
+      result = await b.constructor.deRef(null, 'named');
       expect(result).to.not.be.null;
-      expect(result.direction).to.equal('to');
+      expect(result.dir).to.equal('to');
       expect(result.ref).to.equal('_named_ref');
       expect(result.model.name).to.equal('ReadInA');
-      expect(result.cid).to.equal(a1.get('id'));
 
       addContext(this, {title : 'A <- C find it using default', value : {a : a.get(), c : c.get()}});
-      result = await a._readInResolveModel('readinc');
+      result = await a.constructor.deRef(null, 'readinc');
       expect(result).to.not.be.null;
-      expect(result.direction).to.equal('from');
+      expect(result.dir).to.equal('from');
       expect(result.ref).to.equal('_readina_ref');
       expect(result.model.name).to.equal('ReadInC');
-      expect(result.cid).to.be.null;
 
       addContext(this, {title : 'A <(named)- C find it using C\'s nameda', value : {a : a.get(), c : c.get()}});
-      result = await a._readInResolveModel('readinc', 'nameda');
+      result = await a.constructor.deRef(null, 'ReadinC:nameda');
       expect(result).to.not.be.null;
-      expect(result.direction).to.equal('from');
+      expect(result.dir).to.equal('from');
       expect(result.ref).to.equal('_nameda_ref');
       expect(result.model.name).to.equal('ReadInC');
-      expect(result.cid).to.be.null;
 
 
       // inheritance of parent's refs
 
       addContext(this, {title : 'A <- CC find it using default', value : {a : a.get(), c : c.get()}});
-      result = await a._readInResolveModel('readinc');
+      result = await a.constructor.deRef(null, 'readinc');
       expect(result).to.not.be.null;
-      expect(result.direction).to.equal('from');
+      expect(result.dir).to.equal('from');
       expect(result.ref).to.equal('_readina_ref');
       expect(result.model.name).to.equal('ReadInC');
-      expect(result.cid).to.be.null;
 
       addContext(this, {title : 'A <(named)- CC find it using C\'s nameda', value : {a : a.get(), c : c.get()}});
-      result = await a._readInResolveModel('readinc', 'nameda');
+      result = await a.constructor.deRef(null, 'ReadinC:nameda');
       expect(result).to.not.be.null;
-      expect(result.direction).to.equal('from');
+      expect(result.dir).to.equal('from');
       expect(result.ref).to.equal('_nameda_ref');
       expect(result.model.name).to.equal('ReadInC');
-      expect(result.cid).to.be.null;
 
       addContext(this, {title : 'CC -> a find it using default : inheritance of parent _readina_ref ', value : {a : a.get(), cc : cc.get()}});
-      result = await cc._readInResolveModel('readina');
+      result = await cc.constructor.deRef(null, 'readina');
       expect(result).to.not.be.null;
       expect(result).to.include({
-        direction : 'to',
-        ref       : '_readina_ref',
-        cid       : a.get('id'),
+        dir : 'to',
+        ref : '_readina_ref',
       });
       expect(result.model.name).to.equal('ReadInA');
 
       addContext(this, {title : 'CC -> a find it using nameda  : inheritance of parent _nameda_ref', value : {a : a.get(), cc : cc.get()}});
-      result = await cc._readInResolveModel('nameda');
+      result = await cc.constructor.deRef(null, 'nameda');
       // logger.info('result: ', result);
       expect(result).to.not.be.null;
       expect(result).to.include({
-        direction : 'to',
-        ref       : '_nameda_ref',
-        cid       : a1.get('id'),
+        dir : 'to',
+        ref : '_nameda_ref',
       });
       expect(result.model.name).to.equal('ReadInA');
 
       addContext(this, {title : 'CC -> b find it using readinb : new ref of child', value : {a : a.get(), cc : cc.get()}});
-      result = await cc._readInResolveModel('readinb');
+      result = await cc.constructor.deRef(null, 'readinb');
       expect(result).to.not.be.null;
       expect(result).to.include({
-        direction : 'to',
-        ref       : '_readinb_ref',
-        cid       : b.get('id'),
+        dir : 'to',
+        ref : '_readinb_ref',
       });
       expect(result.model.name).to.equal('ReadInB');
 
       addContext(this, {title : 'CC -> b find it using namedb  : new trans ref of child', value : {a : a.get(), cc : cc.get()}});
-      result = await cc._readInResolveModel('namedb');
+      result = await cc.constructor.deRef(null, 'namedb');
       expect(result).to.not.be.null;
       expect(result).to.include({
-        direction : 'to',
+        dir : 'to',
         ref       : '_namedb_ref',
-        cid       : b.get('id'),
       });
       expect(result.model.name).to.equal('ReadInB');
 
