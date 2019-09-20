@@ -1,8 +1,8 @@
 
 
-const Logger  = require('woveon-logger');
+// const Logger  = require('woveon-logger');
 const Service = require.main.require('src/index');
-const WR      = Service.WovReturn;
+// const WR      = Service.WovReturn;
 
 
 module.exports = function() {

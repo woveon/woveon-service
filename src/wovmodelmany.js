@@ -1,4 +1,3 @@
-
 /**
  * @typedef integer
  * @typedef WovModel
@@ -84,29 +83,6 @@ class _WovModelMany {
 
 
   /**
-   * Calls readInMany on each item.
-   *
-   * @param {string} _t - model to read in
-   * @param {object} _limiters -
-   * @return {Array<WovModel>} - models read in
-   */
-  /*
-  async readInMany(_t, _limiters = {}) {
-    let retval = [];
-    let proms = [];
-    for (let k in this) {
-      if ( this.hasOwnProperty(k) ) {
-        // Logger.g().info(`${this[k].constructor.name}(id ${k}).readInMany ${_t}`);
-        proms.push( this[k].readInMany(_t, _limiters).then( function(_m) { retval.push(_m); })); // does this maintain the order?
-      }
-    }
-    await Promise.all(proms);
-    return retval;
-  }
-  */
-
-
-  /**
    * Read In called on each.
    *
    * @param {string} _selector - Selector passed to each model instance in this.
@@ -161,7 +137,7 @@ class _WovModelMany {
   /**
    * Calls flatten on all objects in this.
    *
-   * @param {boolean} _recurse - whether to continue flattening the objects in this.
+   * @param {object} _options - whether to continue flattening the objects in this.
    * @return {Array} - array of flattened model instances
    */
   flatten(_options = {}) {

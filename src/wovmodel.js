@@ -1,4 +1,3 @@
-
 const Logger = require('woveon-logger');
 const WovReturn = require('./wovreturn');
 const WovModelMany = require('./wovmodelmany');
@@ -124,71 +123,6 @@ class WovModel extends entity.WovEntityModel {
   }
 
   /**
-   * Goes through an Object (not class) and deletes it's ids.
-   *
-   * @param {object} _objOrArray -
-   * @param {boolean} _recurse - if true, go down all paths
-   * @param {boolean} _deleteid -
-   * @param {boolean} _deleterefs -
-   * @return {object} -
-   */
-  /*
-  static flattenObj(_objOrArray, _recurse = true, _deleteid = true, _deleterefs = true) {
-    let retval = null;
-
-    // Logger.g().info(`flattenObj recurse(${_recurse}) deleteid(${_deleteid}) deleterefs(${_deleterefs}): `, _objOrArray);
-
-
-    // Array
-    if ( Array.isArray(_objOrArray) ) {
-      // Logger.g().info(`  array:`);
-      let arr = _objOrArray;
-      for (let k=0; k<arr.length; k++) {
-        arr[k] = WovModel.flattenObj(arr[k], _recurse);
-      }
-      retval = arr;
-    }
-
-    // Object
-    else {
-      let obj = _objOrArray;
-      // Logger.g().info(`  object:`);
-
-      if ( _deleteid ) delete obj.id;
-
-
-      // delete all refs
-      if ( _deleterefs ) {
-        for (let k in obj) {
-          if ( WovModel.isRef(k) ) {
-            // Logger.g().info(`  object: ${k}: delete ref`);
-            delete obj[k];
-          }
-        }
-      }
-
-      // delete recursively
-      if ( _recurse ) {
-        for (let k in obj) {
-          // Logger.g().info(`  object rec: ${k}`);
-          // Logger.g().info(`  object rec:`, JSON.stringify(obj[k]));
-          let v = obj[k];
-
-          // if it's an object (or array) it recurses
-          if ( v != null && typeof v == 'object' ) obj[k] = WovModel.flattenObj(v, _recurse);
-        }
-      }
-
-      retval = obj;
-    }
-
-    // Logger.g().info(`  retval: `, retval);
-    return retval;
-  }
-  */
-
-
-  /**
    * Flattens a model instance.
    * Returns the data of this object, without ids and refs. Any components are flattened by default.
    * OLD: flatten(_recurse = true, _deleteid = true, _deleterefs = true, _deletesensitive = true).
@@ -276,280 +210,17 @@ class WovModel extends entity.WovEntityModel {
 
 
   /**
-   * Reads the component of this and sets on itself. The component should have a data ref (ex. this._data._X_ref for component X).
-   * ex. - readComp('account'), looks for this._data._account_ref, then reads from table 'account'.
-   * .    _ readComp('user'), looks for this._data._user_ref, then finds model this.cl['model_user'], which reads from model.tablename, which is 'users'.
-   * .    _ readComp('persona') on Person, find no this.get('persona') so looks in _transmodel, getting default_persona, so gets model Persona,.
-   * .      with Person.get('_default_persona').
+   * Reads in models by their relationship. (see deRef).
    *
-   * @param {string} _modelnameU - property to check in data, to read in from, using _[_modelname]_ref. Or, use transref if not found.
-   * @return {object} - the component object if found
-   */
-  async __readIn(_modelnameU) {
-
-    let retval   = null;
-    /*
-    let mod      = null;
-    let propname = null; // data-level name of the property, not model-level
-    */
-
-    let modelname = _modelnameU.toLowerCase();
-    let modref   = null;
-
-    this.constructor.l.aspect('ws.src.WovModel_readIn', `readIn : ${_modelnameU} of this model ${this.constructor.name}`);
-    this.constructor.l.aspect('ws.src.WovModel__readIn', 'check : ', this.get(`_${modelname}_ref`));
-    this.constructor.l.aspect('ws.src.WovModel__readIn', 'check transmodel : ', this.constructor._transmodel[modelname]);
-
-
-    { // already loaded
-      let result = this[modelname];
-      if ( result !== undefined ) { retval = result; }
-    }
-
-    if ( retval == null ) {
-
-      let result = await this._getModelRelation(_modelnameU);
-      if ( result instanceof WovReturn ) { retval = result; }
-      else modref = result;
-
-      /*
-        // check modelname/propname
-      if ( this.get(`_${modelname}_ref`) !== undefined ) {
-        this.constructor.l.aspect('ws.src.WovModel_readIn', ' - 1 - ');
-        propname = modelname;
-        mod = this.constructor.cl[`model_${modelname}`];
-      }
-
-    // if not found yet, lookup in transmodel
-      else if ( this.constructor._transmodel[_modelnameU] !== undefined ) {
-        this.constructor.l.aspect('ws.src.WovModel__readIn', ' - 2 - ');
-        propname = this.constructor._transmodel[_modelnameU];
-        mod = this.constructor.cl[`model_${modelname}`];
-      }
-
-    // if still not found, is it on the other Object, pointing to this?
-      else {
-        let t = `model_${modelname}`;
-        this.constructor.l.aspect('ws.src.WovModel__readIn', ' - 3.1 - ', t);
-        let othermodel = this.constructor.cl[t];
-        if ( othermodel != null ) {
-          mod = othermodel;
-
-          this.constructor.l.aspect('ws.src.WovModel__readIn', ` - 3.2 - ${this.constructor._transmodel[_modelnameU]} : ${this.constructor.name} : `, this.constructor._schema);
-//
-// find property (data level) : 1st use transmodel, then tablename if null. Then if schema, check it. use modelname if scema fails.
-          propname = this.constructor._transmodel[_modelnameU];
-          if ( propname == null ) { propname = this.constructor.tablename; } // if no transmodel entry, assume tablename (data layer) is correct
-          this.constructor.l.aspect('ws.src.WovModel__readIn', ` - 3.2a - propname : ${propname}`);
-
-// this.constructor.l.info(`mod's ${mod.name} schema: `, mod._schema);
-
-// if not tablename, then can correct with schema
-          if ( mod._schema && mod._schema[`_${propname}_ref`] == undefined ) { propname = this.constructor.name.toLowerCase(); }
-          this.constructor.l.aspect('ws.src.WovModel__readIn', ` - 3.2b - propname : ${propname}`);
-          if ( mod._schema && mod._schema[`_${propname}_ref`] == undefined ) {
-            retval = new Error(`no ref to this model ${this.constructor.name} from ${mod.name}`);
-          }
-          this.constructor.l.aspect('ws.src.WovModel__readIn', ' - 3.3 - propname : ', propname);
-
-// query remote reference id into this
-          let q = `SELECT id, _model_t FROM wsv_${mod.tablename} WHERE _${propname}_ref=$1::integer`;
-          let d = [this.get('id')];
-          let result = await this.constructor.cl._runSingularQuery(q, d, 'ws.src.WovModel_readIn').catch(function(e) { return e; });
-          this.constructor.l.aspect('ws.src.WovModel__readIn', 'result : ', result);
-          if ( result == null ) { retval = WovReturn.retError(result, `Nothing in '${mod.tablename}._${propname}_ref' references ${this.name}.id = ${this.get('id')} `);  } // nothing
-          else if ( result instanceof Error ) { retval = result; }
-          else {
-            cid = result.id;
-
-            // also, check _model_t, that omod is the correct model
-            // this.constructor.l.info(`model ${result._model_t} vs  model ${mod.name}`);
-            if ( result._model_t != mod.name ) {
-              // this.constructor.l.aspect('ws.src.WovModel_readIn', `using polymorphic model ${result._model_t}, which is child of ${mod.name}`);
-              this.constructor.l.warn(`*** using polymorphic model ${result._model_t}, which is child of ${mod.name}`);
-              mod = this.constructor.cl[result._model_t];
-            }
-          }
-        }
-      }
-      */
-    }
-    // this.constructor.l.info(`readIn : modelname(${_modelname}) propname(${propname}) : mod : `, mod, ` cid(${cid})`);
-
-    // this.constructor.l.info(`retval 1: `, retval);
-    if ( retval == null ) {
-
-      if ( modref.propname == null) this.constructor.l.throwError(`Unknown readIn modelname : '${_modelnameU}' of '${this.constructor.name}' and not in _transmodel : '${JSON.stringify(this.constructor._transmodel)}'.`);
-      if ( modref.mod == null ) this.constructor.l.throwError(`Unknown readIn model for modelname : '${_modelnameU}' of '${this.constructor.name}'.`);
-    }
-
-    // this.constructor.l.info(`retval 2: `, retval);
-    if ( retval == null ) {
-      // this.constructor.l.info(`setting value ${_modelname} of this`);
-
-      // don't reload again... also prevents overwritting properties of the object
-      if ( this[modelname] === undefined ) {
-
-        if ( (modref.mod.prototype  instanceof WovModel) ) {
-          let result = await modref.mod.getByID(modref.cid);
-          // this.constructor.l.info(`result mod(${mod.name}) cid(${cid}):`, result);
-          if ( result != null ) {
-            this[modelname] = result;
-            retval = result;
-          }
-        }
-        else { this.constructor.l.throwError(`Can't find a model for : '${_modelnameU}'.`); }
-      }
-      else {
-        this.constructor.l.warn(`Attempted to overwrite property '${modelname}' of object of `+
-          `class '${this.constructor.name}' when reading in model '${_modelnameU}'.`);
-        this.constructor.l.printStack();
-      }
-    }
-
-    return retval;
-  }
-
-
-  /**
-   * For this model, find the property, model and cid that it references.
-   * ex. Tire._getModelRelation('wheel') -> {_wheel_ref, Wheel, #}.
-   *
-   * @param {string} _modelnameU - property to check in data, to read in from, using _[_modelname]_ref. Or, use transref if not found.
-   * @return {object} - {propname:, mod:, cid:,} or WovReturn<Error>
-   */
-  async _getModelRelation(_modelnameU) {
-    let retval = null;
-    this.constructor.l.logDeferred('This is old');
-    this.constructor.l.info(`_getModelRelation ${_modelnameU} : transmodel `, this.constructor._transmodel);
-
-    this.constructor.l.logDeprecated('NO LONGER USED. Whatever called this should not be called either.');
-
-    let modelname = _modelnameU.toLowerCase();
-
-    // check modelname/propname
-    if ( this.get(`_${modelname}_ref`) !== undefined ) {
-      this.constructor.l.aspect('ws.src.WovModel_readIn', ' - 1 - ');
-      this.constructor.l.info(' - 1 - ');
-      retval = {
-        propname : modelname,
-        mod      : this.constructor.cl[`model_${modelname}`],
-        cid      : null,
-      };
-
-      // if mod (model) not found, look up in transmodel
-      /*
-      if (retval.mod == null ) {
-        console.log('mod is null');
-        let mm = this.constructor._transmodel[_modelnameU];
-        console.log('mm: ', mm);
-        if ( mm != null ) retval.mod = this.constructor.cl[`model_${mm.toLowerCase()}`];
-      }
-      */
-      retval.cid = this.get(`_${retval.propname}_ref`);
-      this.constructor.l.info(`_getModelRelation retval of '${_modelnameU}' is :`, retval);
-    }
-
-    // if not found yet, lookup in transmodel
-    else if ( this.constructor._transmodel[_modelnameU] !== undefined ) {
-      this.constructor.l.aspect('ws.src.WovModel__readIn', ' - 2 - ');
-      this.constructor.l.info(' - 2 - ');
-      retval = {
-        propname : this.constructor._transmodel[_modelnameU],
-        mod      : this.constructor.cl[`model_${modelname}`],
-        cid      : null,
-      };
-      retval.cid = this.get(`_${retval.propname}_ref`);
-      this.constructor.l.info(`_getModelRelation retval of '${_modelnameU}' is :`, retval);
-    }
-
-    // else, if still not found, is it on the other Object, pointing to this?
-    // (i.e. could potentially be a 1-Many relationship but user believes it is a 1-1)
-    else {
-      let t = `model_${modelname}`;
-      this.constructor.l.aspect('ws.src.WovModel__readIn', ' - 3.1 - ', t);
-      this.constructor.l.info(' - 3 - ');
-      let othermodel = this.constructor.cl[t];
-      if ( othermodel != null ) {
-        let mod = othermodel;
-        let cid = null;
-        let propname = null;
-
-        this.constructor.l.aspect('ws.src.WovModel__readIn', ` - 3.2 - ${this.constructor._transmodel[_modelnameU]} : ${this.constructor.name} : `, this.constructor._schema);
-        //
-        // find property (data level) : 1st use transmodel, then tablename if null. Then if schema, check it. use modelname if scema fails.
-        propname = this.constructor._transmodel[_modelnameU];
-        if ( propname == null ) { propname = this.constructor.tablename; } // if no transmodel entry, assume tablename (data layer) is correct
-        this.constructor.l.aspect('ws.src.WovModel__readIn', ` - 3.2a - propname : ${propname}`);
-
-        // this.constructor.l.info(`mod's ${mod.name} schema: `, mod._schema);
-
-        // if not tablename, then can correct with schema
-        if ( mod._schema && mod._schema[`_${propname}_ref`] == undefined ) { propname = this.constructor.name.toLowerCase(); }
-        this.constructor.l.aspect('ws.src.WovModel__readIn', ` - 3.2b - propname : ${propname}`);
-        if ( mod._schema && mod._schema[`_${propname}_ref`] == undefined ) {
-          retval = new Error(`no ref to this model ${this.constructor.name} from ${mod.name}`);
-        }
-        this.constructor.l.aspect('ws.src.WovModel__readIn', ' - 3.3 - propname : ', propname);
-
-        // query remote reference id into this
-        let q = `SELECT id, _model_t FROM wsv_${mod.tablename} WHERE _${propname}_ref=$1::integer`;
-        let d = [this.get('id')];
-        let result = await this.constructor.cl._runSingularQuery(q, d, 'ws.src.WovModel_readIn').catch(function(e) { return e; });
-        this.constructor.l.aspect('ws.src.WovModel__readIn', 'result : ', result);
-        if ( result == null ) { retval = WovReturn.retError(result, `Nothing in '${mod.tablename}._${propname}_ref' references ${this.name}.id = ${this.get('id')} `);  } // nothing
-        else if ( result instanceof Error ) { retval = result; }
-        else {
-          cid = result.id;
-
-          // also, check _model_t, that omod is the correct model
-          // this.constructor.l.info(`model ${result._model_t} vs  model ${mod.name}`);
-          if ( result._model_t != mod.name ) {
-            // this.constructor.l.aspect('ws.src.WovModel_readIn', `using polymorphic model ${result._model_t}, which is child of ${mod.name}`);
-            this.constructor.l.warn(`*** using polymorphic model ${result._model_t}, which is child of ${mod.name}`);
-            mod = this.constructor.cl[result._model_t];
-          }
-
-          retval = {
-            propname : propname,
-            mod      : mod,
-            cid      : cid,
-          };
-        }
-      }
-    }
-
-    // at this point, if retval is null, you have a problem
-    if ( retval == null ) {
-      retval = WovReturn.retError(_modelnameU, `'${_modelnameU}' of this model ${this.constructor.name} could not find a Model ref.`);
-    }
-
-    return retval;
-  };
-
-
-  /**
-   * Reads in models by their relationship.
-   *
-   * @param {string} _selector - the selection of the relationship. Form of selector[.backselector].
+   * @param {string} _selector - the selection of the relationship. Form of '_(selector)_ref' or Model[.backselector].
    * @param {object} _limiters - additional params sent to the SQL SELECT statement... see _genLimiterQueries
    * @return {WovReturn<WovModel|WovModelMany>} -
    */
   async readIn(_selector, _limiters = {}) {
     let retval       = null;
-    // let selector     = _selector;
-    // let backselector = null;
 
-    // split the selector to get backselector
-    // let thesplit = _selector.split('.');
-    // if ( thesplit.length > 1 ) { selector = thesplit[0]; backselector = thesplit[1]; }
-
-    // resolve all this to find the model and all that.
-    // let resolved = this.constructor._readInResolveModel(selector, backselector);
-    // this.constructor.l.aspect('readInResolvedModel', `_readInResolvedModel (${selector}, ${backselector}): `, resolved);
     let resolved = this.constructor.deRef(null, _selector);
     this.constructor.l.aspect('deRef', `deRef (${_selector}): `, resolved);
-
 
     if ( resolved == null ) {
       retval = WovReturn.retError(_selector, `'${_selector}' of '${this.constructor.name}' could not resolve.`);
@@ -571,7 +242,6 @@ class WovModel extends entity.WovEntityModel {
 
         this.constructor.l.aspect('ws.src.WovModel_readIn', `handle from`);
 
-
         let q = `SELECT * FROM wsv_${resolved.model.tablename} WHERE ${resolved.ref}=$1::integer`;
         let d = [this.get('id')];
 
@@ -580,8 +250,6 @@ class WovModel extends entity.WovEntityModel {
         if ( ql.q != '' ) {
           q += ` AND ${ql.q}`;
           d = d.concat(ql.d);
-          // this.constructor.l.info('q now: ', q);
-          // this.constructor.l.info('d now: ', d);
         }
 
         let result = await resolved.model.cl._runQuery(q, d, `ws.src.${this.constructor.name}_readIn`)
@@ -628,256 +296,11 @@ class WovModel extends entity.WovEntityModel {
             else {
               throw new Error(`Unknown ER type of '${resolved.erel}' using '${_selector}' for : `, resolved);
             }
-
-            // check if singular
-            /*
-            this.constructor.l.info('singular check model        : ', resolved.model);
-            this.constructor.l.info('singular check backselector : ', backselector);
-            this.constructor.l.info('singular check              : ', resolved.model._erels[_backselector]);
-            */
-
-            // choose backselector, otherwise selector
-            /*
-            let bs = backselector;
-            if ( bs == null ) bs = this._model_t.toLowerCase();
-            // Logger.g().info(`selector(${selector})  backselector(${backselector})  bs(${bs}), resolved: `, resolved);
-            //
-            if ( resolved.model._erels[bs] === null ) {
-              throw Error(`in model '${resolved.model.name}', have _erels of '${bs}' set to null, not ER_ONE or ER_MANY.`);
-            }
-            */
-
-            // check for Entity Relationship
-            /*
-            if ( resolved.model._erels[bs] == this.constructor.ER_ONE ) {
-              if ( models.length > 1 ) {
-                this.constructor.l.error(`There is more than one model on a one-way reference. `+
-                                         `Using 1st and continuing.`, resolved, models);
-              }
-              retval = models[0]; // use 1st
-              // Logger.g().info(`setting ${this.name}.${selector} to reval`);
-              this[selector.toLowerCase()] = retval;
-            }
-            else if ( resolved.model._erels[bs] == null ||
-                      resolved.model._erels[bs] == this.constructor.ER_MANY ) {
-              if ( resolved.model._erels[bs] == null ) {
-                // this.constructor.l.info(`resolved.model : `, resolved.model, ' bs: ', bs);
-                this.constructor.l.warn(`Called ${this._model_t}.readIn('${_selector}') but no Entity Relationship of one/many set. Set ${selector}'s erels['${bs}'] to WovModel.ER_ONE or WovModel.ER_MANY. For now, assuming ER_MANY and continuing.`);
-              }
-
-              let plural = resolved.model._plural || `${resolved.model.name.toLowerCase()}s`;
-              if ( this[plural] == null ) {
-                // Logger.g().info('setting this plural: ', this[plural]);
-                this[plural] = new WovModelMany();
-              }
-              // else { Logger.g().info(`this plural '${plural}' alrady set: `, this[plural]); }
-
-              for (let k in models ) { this[plural][models[k].get('id')] = models[k]; }
-              // this.constructor.l.info(`PLural '${plural}': `, this[plural]);
-              retval = models;
-            }
-            else {
-              throw new Error(`Unknown ER type of '${resolved.model[bs]}' `+
-                          `using '${_selector}' for : `, resolved);
-            }
-            */
           }
         }
       }
       else {
         throw Error(`'${_selector}' of '${this.constructor.name}' bad direction (to/from only): `, resolved );
-        // retval = WovReturn.retError(_selector, `'${_selector}' of '${this.constructor.name}' bad direction (to/from only): `, resolved );
-      }
-    }
-
-    return retval;
-  }
-
-
-  /**
-   * Takes the selector and backselector and finds the information needed for readIn.
-   *
-   * @param {string} _selector - the model or selector to use
-   * @param {string} _backselector - if needed, the model key pointing back
-   * @return {object} - direction, ref, model and cid
-   */
-  static _readInResolveModel(_selector, _backselector = null) {
-    let retval = null;
-    this.constructor.l.logDeferred('Replaced with deRef.');
-    /* {
-      direction : null,  // to or from
-      ref       : null,  // ref to use ex. _X_ref
-      model     : null,  // model
-    };*/
-    let backselector = (_backselector?_backselector:this.name).toLowerCase();
-    this.l.info(`${this.name}._readInResolveModel : selector(${_selector})  backselector(${backselector})`);
-
-    retval = this.deRefTo(null, _selector, {model : true, ref : true, direction : true});
-
-
-    /*
-    // 1st case : to via transmodel
-    if ( this._transmodel[_selector] !== undefined ) {
-      this.l.aspect('ws.src.WovModel__readIn', ' - 1 - ');
-      retval = {
-        direction : 'to',
-        ref       : `_${_selector}_ref`,
-        model     : null,
-      };
-      // this.l.info('cl keys : ', Object.keys(this.cl), 'selector : ', _selector, this._transmodel);
-      retval.model = this.cl[`model_${this._transmodel[_selector].toLowerCase()}`];
-    }
-
-    // 2nd case : to via selector
-    else if ( this._schema[`_${_selector}_ref`] !== undefined ) {
-      this.l.aspect('ws.src.WovModel__readIn', ` - 2 - ${_selector}`);
-      retval = {
-        direction : 'to',
-        ref       : `_${_selector}_ref`,
-        model     : this.cl[`model_${_selector}`],
-      };
-    }
-    */
-
-    // This is deRefFrom...  looking at 'from' cases now (which could be 1-to-many)
-    if ( retval == null ) {
-      this.l.aspect('ws.src.WovModel__readIn', ' - from: ', `model_${_selector.toLowerCase()}`);
-      let frommodel = this.cl[`model_${_selector.toLowerCase()}`];
-
-      // 5th case - no model from selector
-      if ( frommodel == null ) { throw Error(`5th case : no model of selector '${_selector}'.`); }
-
-      // 3rd case : from via transmodel
-      else if ( frommodel._transmodel[backselector] !== undefined ) {
-        this.l.aspect('ws.src.WovModel__readIn', ' - 3 - ');
-        retval = {
-          direction : 'from',
-          ref       : `_${backselector}_ref`,
-          model     : frommodel,
-        };
-      }
-
-      // 4th case : from via selector
-      else if ( frommodel._schema[`_${backselector}_ref`] !== undefined ) {
-        this.l.aspect('ws.src.WovModel__readIn', ` - 4 -  this is ${this.name}`);
-        retval = {
-          direction : 'from',
-          ref       : `_${backselector}_ref`,
-          model     : frommodel,
-        };
-
-        this.l.aspect('ws.src.WovModel__readIn', ` - 4 - retval ${JSON.stringify(retval, null, 2)}`);
-        this.l.aspect('ws.src.WovModel__readIn', ` - 4 - frommodel ${JSON.stringify(frommodel, null, 2)}`);
-      }
-
-      // 6th case - bad back selector
-      else { throw Error(`6th case - bad back selector '${backselector}'.`); }
-    }
-
-    this.l.aspect('readInResolveModel', `readInResolveModel retval of '${_selector}' '${backselector}' is :`, retval);
-    return retval;
-  }
-
-
-  /**
-   * For this, sets this[`${modelname}s`] = [models], where model's table has an _${this.name}_ref variable, that this reads.
-   * ex. car.readInMany('tire'), sets car.tires to be an array of tires.
-   *
-   * NOTE: for models where the plural form is not MODEL+'s', set _plural on the class definition.
-   * ex. with Goose._plural = 'geese', cage.readInMany('goose') would set cage.geese.
-   *
-   * @param {string} _modelnameU - the name of the model that has a many to one relationship to this.
-   * @param {object} _limiters - limits query results ex {xid : [a, b, c]}
-   * @return {Array<WovModel>|WovReturn<Error>} - array of the models loaded
-   */
-  async __readInMany(_modelnameU, _limiters = {}) {
-    let retval = null;
-
-    let omod     = null; // other model, reading from it
-    let table    = null;
-    let propname = null; // this.constructor.name;
-    let modelname = _modelnameU.toLowerCase();
-
-    this.constructor.l.aspect('ws.src.WovModel_readInMany', `readInMany : from model '${modelname}' to this model '${this.constructor.name}'`);
-
-    { // already loaded
-      let result = this[modelname];
-      if ( result !== undefined ) { retval = result; }
-    }
-
-    // get the model
-    if ( retval == null ) {
-      let t = `model_${modelname}`;
-      this.constructor.l.aspect('ws.src.WovModel__readInMany', ' - 3.1 - ', t, Object.keys(this.constructor.cl));
-      omod = this.constructor.cl[t];
-      if ( omod == null ) {
-        this.constructor.l.throwError(`'${this.constructor.name}::readInMany' called with unknown _modelname : ${_modelnameU}`);
-        // retval = WovReturn.retError(this.constructor.name, `Could not find model.`);
-      }
-    }
-
-//    this.constructor.l.info(`omod: ${omod}`); this.constructor.l.info(`retval: ${retval}`);
-
-    // get table and propname
-    if ( retval == null ) {
-      table = omod.tablename;
-      propname = omod._transmodel[modelname];
-      this.constructor.l.aspect('ws.src.WovModel__readInMany', `propname 1: ${propname}: ${modelname}: `, omod._transmodel);
-      if ( propname === undefined ) { propname = this.constructor.name.toLowerCase(); }
-      this.constructor.l.aspect('ws.src.WovModel__readInMany', `propname 2: ${propname}`);
-      if ( propname == null ) retval = WovReturn.retError(this.constructor.name, `No column of '_${modelname}_ref' on table '${table}'.`);
-      this.constructor.l.aspect('ws.src.WovModel__readInMany', `propname 3: ${propname}`);
-
-      this.constructor.l.aspect('ws.src.WovModel__readInMany',
-        `table '${table}', column '_${propname}_ref' that point to '${this.constructor.name}'.`);
-    }
-
-    // this.constructor.l.info(`table: ${table}`);
-
-    // read in values
-    if ( retval == null ) {
-
-      // transform limiters
-
-      let q = `SELECT * FROM wsv_${table} WHERE _${propname}_ref=$1::integer`;
-      let d = [this.get('id')];
-
-      let ql = this._genLimiterQueries(_limiters, omod, d.length);
-      if ( ql.q != '' ) {
-        q += ` AND ${ql.q}`;
-        d = d.concat(ql.d);
-        this.constructor.l.info('q now: ', q);
-        this.constructor.l.info('d now: ', d);
-      }
-
-      let result = await omod.cl._runQuery(q, d, `ws.src.${this.constructor.name}_readInMany`)
-        .catch( function(e) {
-          return WovReturn.retError(e, `Failed reading table '${table}', column '_${propname}_ref' that point to '${this.constructor.name}'.`);
-        }.bind(this));
-
-      this.constructor.l.aspect('ws.src.WovModel_readInMany', `Q result:`, result);
-
-      if ( result != null ) {
-        if (result instanceof Error) { retval = result; }
-        else {
-          let models = null;
-          let proms  = [];
-          for (let i in result ) {
-            if ( result.hasOwnProperty(i) ) {
-              let row = result[i];
-              let m = this.constructor._polyReadCheck(row, omod);
-              // let m = new omod(_row); // eslint-disable-line new-cap
-              proms.push(m);
-            }
-          }
-          await Promise.all(proms).then(function(_models) { models = _models; });
-          // this.constructor.l.info('Models: ', models);
-          let plural = omod._plural || `${modelname}s`;
-          if ( this[plural] == null ) this[plural] = new WovModelMany();
-          for (let k in models ) { this[plural][models[k].get('id')] = models[k]; }
-          // this.constructor.l.info('PLural : ', this[plural]);
-          retval = models;
-        }
       }
     }
 
@@ -1028,27 +451,6 @@ class WovModel extends entity.WovEntityModel {
       };
     }
 
-    // REMOVING ALL TABLE REFERENCES FOR NOW. ALL MODEL REFS AND SELS ARE TO MODELS AND MODELS TRANSLATE TO TABLES.
-    /*
-    // selector is a Model's tablename (tablename caps preserved)
-    else if (selmod == null && this.cl.table2model[_sel] != undefined) {
-      this.l.aspect('deRef', `  - selector is a Model's tablename`);
-      // see if selector is a table name in the database, then see if this model has a ref to that tablename
-      let tmpm = this.cl.table2model[_sel];
-      this.l.info('tmpm : ', tmpm );
-      this.l.info('this : ', this );
-      if ( this._schema[`_${tmpm.name}_ref`] ) {
-        retval = {
-          model : tmpm,
-          sel   : _sel,
-          ref   : `_${tmpm.name}_ref`,
-          dir   : 'to',
-          erel  : WovModel.ER_ONE,
-        };
-      }
-    }
-    */
-
     // selector is a modelname
     else if ( selmod == null && this._schema[ref] != undefined ) {
       this.l.aspect('deRef', `  - selector is a model name`);
@@ -1116,95 +518,6 @@ class WovModel extends entity.WovEntityModel {
     return retval;
   }
 
-  /**
-   * Return the pointed at model (or other data from _options) from the _ref or _selector (either).
-   *
-   * 1) trans     - basically, this overrides all.
-   * 2) tablename - table next since this is a data layer.
-   * 3) modelname - if no match to tablename, assume model layer.
-   *
-   * @param {string} _ref      - a ref. ex. _tire_ref
-   * @param {string} _selector - a selctor. ex. tire aka from _tire_ref.
-   * @return {WovModel|object} - Model pointed at
-   */
-  static _deRef(_ref, _selector) {
-    let retval = null; // {model : null, ref};
-    let sel = null;
-    let ref = null;
-
-    // set the selector and ref to use, generated from either the _ref or _selector param
-    if ( _ref ) {
-      sel = _ref.substring(0, _ref.length - 4).substring(1);
-      ref = _ref;
-    }
-    else {
-      sel = _selector.toLowerCase();
-      ref = `_${sel}_ref`;
-    }
-    this.l.aspect('deRef', `${this.name}.deRefTo ${_ref}:${_selector}  ${ref}:${sel}`);
-
-
-    // use transmodel first (only 'to')
-    if ( this._transmodel[sel] != undefined ) {
-      this.l.aspect('deRef', `  - 1 : ${sel}`);
-      retval = {
-        model : this.cl.statelayer.getModel(this._transmodel[sel]),
-        dir   : 'to',
-        sel   : sel,
-        ref   : ref,
-        er    : WovModel.ER_ONE, // enforced by foreign key
-      };
-    }
-
-    // check if ref is to a tablename (both 'to' and 'from' possible)
-    if ( retval == null ) {
-      this.l.aspect('deRef', `  - 2 : ${sel}`);
-
-      // see if selector is a table name in the database, then see if this model has a ref to that tablename
-      /*
-      let tmpm = this.cl.table2model[sel];
-      if ( tmpm != null ) {
-        if ( this._schema[`_${tmpm.tablename}_ref`] ) {
-          retval = {
-            model : this._schema[`_${tmpm.tablename}_ref`],
-            dir   : 'to',
-            sel   : sel,
-            ref   : ref,
-            er    : WovModel.ER_ONE, // enforced by foreign key
-          };
-        } else if ( tmpm._schema[`_${this.name}_ref`] ) {
-          yes, from
-        }
-        } else if ( tmpm._schema[`_${this.tablename}_ref`] ) {
-          yes, from
-        }
-      }
-      */
-    }
-
-    if ( retval == null ) {
-      this.l.aspect('deRef', `  - 3 : ${sel}`);
-      if ( this._schema[ref] != undefined ) { model = this.cl.statelayer.getModel(sel); }
-    }
-
-    /*
-    retval = {
-      model : model,
-      ref   : ref,
-      sel   : sel,
-      dir   : dir,
-      er    : er,
-    };
-
-    if ( options.ref ) retval.ref = ref;
-    if ( options.sel ) retval.sel = sel;
-    if ( options.direction ) retval.direction = 'to';
-    */
-    this.l.aspect('deRef', `${this.name}.deRefTo ${sel} ${ref} to model '${(model?model.name:undefined)}'`, retval);
-
-    return retval;
-  }
-
 
   /**
    * Init the model and check all is ok.
@@ -1214,11 +527,8 @@ class WovModel extends entity.WovEntityModel {
    * @return {undefined} -
    */
   static init(_logger, _wovmodelclient) {
-    // this.l = _logger;
-    // this.cl= _wovmodelclient;
     entity.WovEntityModel.init(_logger, _wovmodelclient);
     let parent = Object.getPrototypeOf(this);
-
 
     // _logger.info(`init: this('${this.name}') parent('${parent.name}')  WovModel('${WovModel.name}').`);
     if ( parent.name != WovModel.name ) { parent.markHasChild();  }
@@ -1246,17 +556,6 @@ class WovModel extends entity.WovEntityModel {
 
 
   /**
-   * DEPRECATED.
-   *
-   * @param {integer} _id -
-   * @return {WovModel|Error} -
-   */
-  static async readByID(_id) {
-    Logger.g().logDeprecated('readByID -> getByID');
-    return this.getByID(_id);
-  }
-
-  /**
    * Reads in the data by the id. For polymorphic models, requires a 2nd read since the first read returns _model_t.
    *
    * @param {integer} _id -
@@ -1269,27 +568,10 @@ class WovModel extends entity.WovEntityModel {
     // console.log('data is ', data);
     if ( data != null && !(data instanceof Error) ) {
       retval = await this._polyReadCheck(data);
-      /*
-      if ( data._model_t == this.name ) { retval = new this(data); }
-      else { // polymorphic
-        let Mod = this.cl[data._model_t];
-        if ( Mod == null ) { this.cl.l.throwError(`ms.WovModel_getByID for '${this.name}' returned _model_t of '${data._model_t}' which does not exist on client.`); }
-        retval = await Mod.getByID(_id);
-      }
-      */
     }
     // Logger.g().info(`getByID( ${_id} ) of ${this.tablename} : `, retval);
     return retval;
   }
-
-
-  /**
-   * DEPRECATED.
-   *
-   * @param {Array<integer>} _ids - ids of models to load.
-   * @return {Promise} -
-   */
-  static async readByIDs(_ids) { Logger.g().logDeprecated('readByIDs -> getByIDs'); return this.getByIDs(_ids); }
 
 
   /**
@@ -1309,6 +591,7 @@ class WovModel extends entity.WovEntityModel {
     let q = `SELECT * FROM "wsv_${this.tablename}" WHERE ${qqs.join(' AND ')}`;
     return this.cl._runQuery(q, _ids, 'ws.src.WovModel_getByIDs');
   }
+
 
   /**
    * Internal function that is passed the data from a read of a model's table.
@@ -1334,15 +617,6 @@ class WovModel extends entity.WovEntityModel {
     }
     return retval;
   }
-
-
-  /**
-   * DEPRECATED: use getByXID.
-   *
-   * @param {string} _xid -
-   * @return {WovModel} - model instance
-   */
-  static async readByXID(_xid) { Logger.g().logDeprecated('readByXID -> getByXID'); return this.getByXID(_xid); }
 
 
   /**
@@ -1536,28 +810,6 @@ class WovModel extends entity.WovEntityModel {
               if ( m.debugme ) this.l.info(`    - mm is ${(mm != null? mm.model.name: undefined)}: `, mm);
               if ( mm.model == this) addit = true;
 
-              // let deref = k.substring(0, k.length - 4).substring(1); // dereffed k
-              // let jjj   = m._readInResolveModel(deref);
-              // this.l.info(`    - ${deref} : ${JSON.stringify(jjj, null, 2)}`);
-
-              // TODO: isn't this the conversion of selctor to model here used in code for readIn?
-
-              // See if ref points to:
-              //   1) something in transmodel
-              //   2) the tablename of this
-              //   3) the modelname of this
-
-              // deref k and see if the transmodel entry points to this model's name
-              /*
-              let kt = m._transmodel[k.substring(0, k.length - 4).substring(1)]; // see if dereffed k points to a model
-              let kk = null;
-              if ( kt == this.name ) { addit = true; kk = kt; }
-
-              // see if this other model's property points to the tablename of this model
-              if ( k == `_${this.tablename}_ref` ) { addit = true; kk = this.tablename; }
-              if ( m.debugme) this.l.info(`    - kt: ${kt}  tablename: ${this.tablename}   kk: ${kk}`);
-              */
-
               if ( addit ) {
                 let kk = k.substring(0, k.length - 4).substring(1); // pluck inner from reference
 
@@ -1665,106 +917,6 @@ class WovModel extends entity.WovEntityModel {
     }
 
     retval += `}`;
-
-    /*
-    retval += `const ${mod.name} = {\n`;
-    do {
-      this.l.info(`getGraphQLModelResolver : ${this.name}`);
-
-      // populate this
-      let mdata = {
-        attribname  : 'attribname',  // accountapplications
-        modelname   : 'ModelName',   // Account
-        modelreadin : 'ModelReadIn', // AccountApplications
-      };
-      mdata.modelname = mod.name;
-
-      // For own schema (pointing to another model)
-      for (let k in this._ownschema) {
-        if ( this._ownschema.hasOwnProperty(k) ) {
-          let v = this._ownschema[k];
-          let qv = null;
-
-          // objects
-          if ( this.isRef(k) ) {
-            this.l.info(`${this.name} : own var is a ref: ${k}`);
-            let kt = k.substring(0, k.length - 4).substring(1);
-            let gqlobject = null;
-            this.l.info(`  kt : ${kt} `, this._transmodel);
-            if ( this._transmodel[kt] !== undefined ) {
-              if ( kt != null ) { gqlobject = this._transmodel[kt]; }
-            }
-            else {
-              let mod = this.cl.getModelByTablename(kt);
-              if ( mod == null ) {
-                this.l.throwError(`Model '${this.name}' references '${kt}', but no known model. Add transmodel entry of '${this.name}::{ $  {kt} : X }'?`);
-              }
-              gqlobject = mod.name;
-            }
-            // this._graphQL.objs.push([kt, gqlobject]);
-
-            this.l.info(`  ${k} : ${qv}`);
-            mdata.modelreadin = `${gqlobject}`;
-            mdata.attribname = `${kt}`;
-
-            // echo it
-            let c = `  ${mdata.attribname} : async function(_parent, __, {args, dataSources}) {\n`+
-              `    let u = new dataSources.model.${mdata.modelname}(_parent);\n`+
-              `    await u.readIn('${mdata.modelreadin}');\n`+
-              `    return u.${mdata.attribname}.get();\n`+
-              `  },\n`;
-            this.l.info(`${c}`);
-            retval += c;
-          }
-        }
-      }
-
-      // for all other models, pointing to this, go through schema
-      let models = Object.values(this.cl.table2model);
-      for (let i in models) {
-        let m = models[i];
-        this.l.info(`${this.name} <== ${m.name} : (tablename '${m.tablename}') : transmodel of : `, m._transmodel);
-
-        // for all in schema
-        for (let k in m._ownschema) {
-          if ( m._ownschema.hasOwnProperty(k) ) {
-            // this.l.info(`  - ${m.name}.${k}`);
-            let addit = false;
-
-            // deref k and see if the transmodel entry points to this model's name
-            let kt = m._transmodel[k.substring(0, k.length - 4).substring(1)]; // see if dereffed k points to a model
-            // this.l.info('ktt : ', k.substring(0, k.length - 4).substring(1));
-            // this.l.info('kt : ', kt);
-            if ( kt == this.name ) addit = true;
-
-            // see if this other model's property points to the tablename of this model
-            if ( k == `_${this.tablename}_ref` ) { addit = true; }
-
-            if ( addit ) {
-              this.l.info(`    * adding ${m.name}.${k}`);
-              mdata.modelreadin = `${m.name}`;
-              mdata.attribname = m._plural || m.name.toLowerCase()+'s';
-
-              // echo it
-              let c = `  ${mdata.attribname} : async function(_parent, __, {args, dataSources}) {\n`+
-                `    let me = new dataSources.model.${mdata.modelname}(_parent);\n`+
-                `    await me.readInMany('${mdata.modelreadin}');\n`+
-                `    return me.${mdata.attribname}.get();\n`+
-                `  },\n`;
-              this.l.info(`${c}`);
-              retval += c;
-            }
-          }
-        }
-
-      }
-
-
-      mod = Object.getPrototypeOf(mod);
-    } while ( mod != WovModel );
-    */
-
-    // retval += `}`;
 
     return retval;
   };
