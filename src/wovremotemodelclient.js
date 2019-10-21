@@ -1,11 +1,12 @@
 
 /**
  * @typedef Logger
- * @typedef WovRemoteService
+ * @typedef WovRemoteModel
  * @typedef WovStateLayer
  */
 
 const entity = require('./entity');
+const Requester = require('./requester');
 
 /**
  * The client stores all the WovRemoteServices.
@@ -17,12 +18,13 @@ module.exports = class WovRemoteClient extends entity.WovEntityClient {
    * A constructor.
    *
    * @param {Logger} _l -
-   * @param {Array<WovRemoteModel>} _rservs - array of the WovRemoteModels created in the microservice.
+   * @param {Array<WovRemoteModel>} _rmods - array of the WovRemoteModels created in the microservice.
    */
-  constructor(_l, _rservs, _msrequesters) {
+  constructor(_l, _rmods) { // _msrequesters
     super(_l);
     this.l = _l;
-    this._rservs = _rservs;
+    this._rmods = _rmods;
+    this.ms = new Requester(this.l); // ms is short for microservice that this isconnected to
   };
 
   /**
@@ -35,26 +37,27 @@ module.exports = class WovRemoteClient extends entity.WovEntityClient {
    */
   async init(_sl) {
     this.statelayer = _sl;
-    this._rservs.forEach( function(rs) {
-      rs.init(this.l, this);
+    this._rmods.forEach( function(rm) {
+      rm.init(this.l, this);
 
       // attach X RemoteService to WovServiceClient
       // WoveonService.statelayer.rserv.X
       // WoveonService.statelayer.rserv.rserv_X
-      this[rs.name] = rs;
-      this[`rserv_${rs.name.toLowerCase()}`] = rs;
+      this[rm.name] = rm;
+      this[`rmod_${rm.name.toLowerCase()}`] = rm;
       // this.statelayer[`rserv_${rs.name}`] = rs;
-      this.statelayer[`${rs.name}`] = rs;
+      this.statelayer[`${rm.name}`] = rm;
     }.bind(this));
+
   };
 
 
   /**
-   * Getter for the WovRemoteService.
+   * Getter for the WovRemoteModel.
    *
    * @param {string} _name -
-   * @return {WovRemoteService} -
+   * @return {WovRemoteModel} -
    */
-  getRemoteService(_name) { return this._rservs[_name]; }
+  getRemoteModel(_name) { return this._rmods[_name]; }
 
 };

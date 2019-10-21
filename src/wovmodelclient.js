@@ -318,6 +318,249 @@ module.exports = class WovModelClient extends entity.WovEntityClient {
     return this._runSingularQuery(q, d, `selectByRef${_t}`);
   }
 
+
+
+
+  /**
+   * Reads in the data by the id. For polymorphic models, requires a 2nd read since the first read returns _model_t.
+   *
+   * @param {integer} _id -
+   * @param {WovModel} _Model - the Model type
+   * @return {WovModel|Error} -
+   */
+  async getByID(_id, _Model) {
+    let retval = null;
+    // console.log(`getByID(${_id} : this: `, this, this.tablename);
+    let data = await this._selectByID(_id, `wsv_${this.tablename}`);
+    // console.log('data is ', data);
+    if ( data != null && !(data instanceof Error) ) {
+      retval = await this._polyReadCheck(data);
+    }
+    // Logger.g().info(`getByID( ${_id} ) of ${this.tablename} : `, retval);
+    return retval;
+  }
+
+
+  /**
+     * Gets model instances by id array.
+     * TODO
+     *
+     * @param {Array<integer>} _ids - ids of models to load.
+     * @param {WovModel} _Model - the Model type
+     * @return {Promise} -
+     */
+    static async getByIDs(_ids, _Model) {
+      let qqs = [];
+      let xoff= 2; // offset from 0 due to parameters (starts at 1 anywany, then tablename param is 2)
+      // let retval = null;
+      // let x = 1;
+      // for (let id in _ids ) { qqs.push(`id=$${x++}::integer`); }
+
+      for (let i = 0; i< _ids.length; i++) { qqs.push(`id=$${i+xoff}::integer`); }
+      let q = `SELECT * FROM "wsv_${this.tablename}" WHERE ${qqs.join(' AND ')}`;
+      return this.cl._runQuery(q, _ids, 'ws.src.WovModel_getByIDs');
+    }
+
+      /**
+     * Get a model instance by the XID (external id) value.
+     * XIDs are good ways to hide internal identifiers from misuse (but keep in mind, ids are faster!).
+     *
+     * @param {integer} _xid -
+     * @return {WovModel} -
+     * TODO
+     */
+    static async getByXID(_xid) {
+      let retval = null;
+
+      if ( this._schema.xid == null ) { retval = WovReturn.retError(this.name, `Called 'getByXID' on model without 'xid'.`); }
+
+      if ( retval == null ) {
+        // console.log('getByXID : ', this.name, this.tablename, _xid);
+        let q = `SELECT * FROM wsv_${this.tablename} WHERE xid=$1::uuid`;
+        let d = [_xid];
+        let result = await this.cl._runSingularQuery(q, d, `${this.name}.getByXID`);
+        // console.log('result is ', result);
+        if ( result != null && !(result instanceof Error) ) { retval = new this(result); }
+      }
+
+      return retval;
+    }
+
+
+      /**
+       * TODO
+     * Deletes a row form the table that is the data of the model object.
+     *
+     * @param {integer} _id -
+     * @return {Promise} - ?returns I think the number of rows deleted?
+     */
+    static async deleteByID(_id) {
+      let q = `DELETE FROM ${this.tablename} WHERE id=$1::integer RETURNING id`;
+      let d = [_id];
+      return this.cl._runSingularQuery(q, d, `deleteByID${this.name}`);
+    }
+
+
+      /**
+     * Creates it in the database, then creates and returns the model.
+     *
+     * @param {object} _data -
+     * @return {WovModel|WovReturn<Error>} - returns the newly created object.
+     * TODO
+     */
+    static async createOne(_data) {
+      let retval = null;
+
+      // veryify data in
+      if ( ! (_data instanceof Object) ) {
+        retval = WovReturn.retError(_data, `${this.name}::createOne(...) requires _data to be an Object.`);
+      }
+
+      if ( retval == null ) {
+        let qp = this._buildQueryParams(_data, _data, 'insert');
+        let q = `INSERT INTO ${this.tablename} (${qp.colnames.join(', ')})
+               VALUES (${qp.cols.join(', ')})
+               RETURNING *`;
+
+        let result = await this.cl._runSingularQuery(q, qp.data, `createOne${this.name}`).catch(function(e) { return e; });
+        if ( result == null ) retval = WovReturn.retError(_data, `Failed to create ${this.name}'.`);
+        else if ( result instanceof Error ) { retval = WovReturn.retError(result, `Failed to create '${this.name}'.`); }
+        else retval = new this(result);
+      }
+
+      return retval;
+    }
+
+
+      /**
+     * Writes back to the DB. Unlike save, this does not require a model.
+     *
+     * @param {integer} _id -
+     * @param {object} _data - data to update on the model
+     * @return {?} -
+     * TODO
+     */
+    static async updateOne(_id, _data) {
+      // this.l.throwError(`Need to implement 'updateOne' for ${this.name}.`);
+      let qp = this._buildQueryParams(_data, _data, 'update');
+      // Logger.g().info('updateOne: ', qp);
+      let q = `UPDATE ${this.tablename}
+               SET ${qp.cols.join(', ')}
+               WHERE id = ${_id}
+               RETURNING *`;
+      return await this.cl._runSingularQuery(q, qp.data, `updateOne${this.name}`).catch(function(e) { return e; });
+    }
+
+
+    /**
+     * TODO
+     * Called to initialize the db table for the Model.
+     *
+     * WoveonService manipulates tables since it handles inheritance between models inside of a database that might not have that.
+     *
+     * The params set how it should handle existing data. Be VERY careful. doDrop should be false unless you are in testing.
+     *
+     * @param {boolean} _doDrop  - deletes the table model's table if exists (WARNING!!!!! CAREFULE!!!)
+     * @param {boolean} _doTable - create the table if not exists
+     * @param {boolean} _doView  - create the view if not exists (enables polyread)
+     * @return {undefined} -
+     */
+    static async doInitDB(_doDrop, _doTable, _doView) {
+      if ( this._schema == undefined ) { this.cl.l.throwError(`For model '${this.name}', No schema.`); }
+
+      let q1 = `DROP TABLE IF EXISTS ${this.tablename} CASCADE;`;
+      let q2 = null; // create table
+      let q3a = `DROP VIEW IF EXISTS "wsv_${this.tablename}"`;
+      let q3 = null; // create view
+      let qp = null; // query parameters
+      let schematouse = null;
+      let parent = Object.getPrototypeOf(this);
+      let d = []; // data
+
+      // handle inheritance tables
+      this.cl.l.aspect('ms.WovModel_doCreateTableQuery', `Model ${this.name} has parent of ${parent.name}, haschildren ${this._haschildren}.  `);
+      if ( parent.name == 'WovModel' ) { schematouse = this._schema; }
+      else { schematouse = this._ownschema; }
+
+      qp = this._buildQueryParams(schematouse, {}, 'create');
+      // Logger.g().info(`doCreateTableQuery: ${this.name} `, qp);
+
+      let cols = [];
+      for (let i=0; i< qp.colnames.length; i++) {
+        let colname = qp.colnames[parseInt(i)];
+        if ( colname != 'id' ) {
+          let coltype = qp.coltypes[parseInt(i)];
+          cols.push(`${colname} ${coltype}`);
+        }
+      }
+
+      // TODO _model_t as a lookup table
+      //
+
+
+      // Create tables so that _model_t is only in tables with inheritance. Create the views to fill in model_t.
+      if ( parent.name == 'WovModel' ) {
+        if ( this._haschildren == false ) {
+          q2 = `CREATE TABLE IF NOT EXISTS "${this.tablename}" ( id SERIAL PRIMARY KEY, ${cols.join(', ')} )`;
+          q3 = `CREATE VIEW "wsv_${this.tablename}" AS SELECT *, text '${this.name}' as _model_t FROM "${this.tablename}"`;
+        }
+        else {
+          q2 = `CREATE TABLE IF NOT EXISTS "${this.tablename}" ( id SERIAL PRIMARY KEY, _model_t varchar default '${this.name}', ${cols.join  (', ')} )`;
+          q3 = `CREATE VIEW "wsv_${this.tablename}" AS SELECT * FROM "${this.tablename}"`;
+        }
+      }
+      else  {
+        q2 = `CREATE TABLE IF NOT EXISTS ${this.tablename} ( _model_t varchar default '${this.name}', ${cols.join(', ')} ) INHERITS ( "${parent.tablename}" )`;
+        q3 = `CREATE VIEW "wsv_${this.tablename}" AS SELECT * FROM "${this.tablename}"`;
+      }
+
+      this.cl.l.aspect('ms.WovModel_doCreateTableQuery', `q1(${_doDrop}): `, q1);
+      this.cl.l.aspect('ms.WovModel_doCreateTableQuery', `q2(${_doTable}): `, q2);
+      this.cl.l.aspect('ms.WovModel_doCreateTableQuery', `q3(${_doView}): `, q3);
+
+      return (async function() { if ( _doDrop  ) await this.cl._runQuery(q1,  d, 'ms.WovModel__doCreateTableQuery'); }.bind(this))()
+        .then(async function() { if ( _doTable ) await this.cl._runQuery(q2,  d, 'ms.WovModel__doCreateTableQuery'); }.bind(this))
+        .then(async function() { if ( _doView  ) await this.cl._runQuery(q3a, d, 'ms.WovModel__doCreateTableQuery'); }.bind(this))
+        .then(async function() { if ( _doView  ) await this.cl._runQuery(q3,  d, 'ms.WovModel__doCreateTableQuery'); }.bind(this))
+        .catch(function(e) {
+          this.cl.l.error('error:', e);
+          return WovReturn.retError(e, `Failed to create table for '${this.tablename}'.`);
+        }.bind(this));
+    }
+
+
+
+
+     /**
+     * Internal function that is passed the data from a read of a model's table.
+     * If the _model_t does not match the model, reread correct table.
+     *
+     * @param {object} _data - data read in from some other read. (getByID, getByXID, readIn, readInMany, etc)
+     * @param {WovModel} _model - this model that the _data matches to; could be this, or another model
+     * if reading in from another; creates an instance of this normally, if the _model_t matches.
+     * Otherwise, gets the model of _model_t and creates.
+     * @return {WovModel} - the object.
+     *
+     * TODO - copied from WovModel
+     */
+    static async _polyReadCheck(_data, _model = null) {
+      let retval = null;
+      let Mod = _model || this;
+
+      this.cl.l.aspect('polyReadCheck', '_polyReadCheck: ', _data, (_model?_model.name:null));
+      if ( _data._model_t === undefined ) { throw Error('How did this happen. You have failed me.', _data, _model); }
+      else if ( _data._model_t == Mod.name ) { retval = new Mod(_data); }
+      else { // polymorphic
+        Mod = this.cl[_data._model_t]; // get the model
+        if ( Mod == null ) { this.cl.l.throwError(`ms.WovModel_getByID for '${this.name}' returned _model_t of '${_data._model_t}' which doe  s not exist on client.`); }
+        retval = await Mod.getByID(_data.id);
+      }
+      return retval;
+    }
+
+
+
+
   /** Capitalize string.
    * @param {string} _s -
    * @return {string}

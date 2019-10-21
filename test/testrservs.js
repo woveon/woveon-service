@@ -10,5 +10,8 @@ module.exports = function() {
   const Store = class Store extends Service.WovRemoteModel {
   };
 
-  return {Store};
+  const Car = class Car extends Service.WovRemoteModel {
+  };
+
+  return {Store, Car};
 };

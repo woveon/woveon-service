@@ -8,6 +8,7 @@
 const entity = require('./entity');
 const WR     = require('./wovreturn');
 const util   = require('util');
+const Requester = require('./requester');
 
 /**
  * A remote service is a connection to another service for data and functionality.
@@ -71,15 +72,18 @@ module.exports = class WovRemoteModel extends entity.WovEntityModel {
    *
    * @param {string} _qtype - ex. query or mutation
    * @param {string} _qname - name of the GraphQL query
-   * @param {object} _din   - data in, passed to the one assumed 'input' param
+   * @param {object} _din   - data in, passed to the one assumed 'input' param; if only a numbr, then assume id query
    * @param {string} _dout  - attributes returned
    * @return {WR} - attributes returned in data
    */
   static async callGraphQL(_qtype, _qname, _din, _dout) {
-    let q = `${_qtype} { ${_qname}(input : ${_din}) { ${_dout} } }`;
+    let q = null;
+    if ( (typeof _din) == 'number' ) { q = `${_qtype} { get${_qname}(id : ${_din}) { ${_dout} } }`; }
+    else q = `${_qtype} { ${_qname}(input : ${_din}) { ${_dout} } }`;
+
     // let q = `${_qtype} { ${_qname}(input : ${JSON.stringify(_din)}) { ${_dout} }`;
     this.l.info('q: ', q);
-    let retval = await this.cl.ms.post('', null, {query : q});
+    let retval = await this.cl.ms.post('/graphql', null, {query : q});
     this.l.info('retval: ', JSON.stringify(retval, null, 2) );
 
     /*
