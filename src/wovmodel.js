@@ -6,16 +6,16 @@ const entity = require('./entity');
 
 /**
  * @typedef integer
- * @typedef WovModelClient
+ * @typedef WovClientEntity
  * @typedef Promise
  * @typedef symbol
  */
 
 /**
  * This is a base class of every "thing" which has a model in our system.
- * It connects to the database through a wovmodelclient.
+ * It connects to the persistent store through a WovClient, which can be local via WovDB or remote via graphql calls.
  */
-class WovModel extends entity.WovEntityModel {
+class WovModel extends entity.WovModelEntity {
 
   static _schema     = null;   // the full schema of this model
   static _transmodel = {};     // defines the models for a ref (i.e. Refs that are not named after the model)
@@ -33,6 +33,10 @@ class WovModel extends entity.WovEntityModel {
   // enum basically
   static ER_ONE  = Symbol('one2one');
   static ER_MANY = Symbol('one2many');
+
+  // Static connections to client and logger
+  static cl = null;
+  static l  = null;
 
   /**
    * Creats a model from data retreived from the database.
@@ -121,6 +125,7 @@ class WovModel extends entity.WovEntityModel {
     if ( Object.keys(this._dirty).length > 0 ) retval = true;
     return retval;
   }
+
 
   /**
    * Flattens a model instance.
@@ -240,29 +245,10 @@ class WovModel extends entity.WovEntityModel {
       }
       else if ( resolved.dir == 'from' ) {
 
-        this.constructor.l.aspect('ws.src.WovModel_readIn', `handle from`);
+        this.constructor.l.aspect('ws.src.WovModel_readIn', `handle from: `, resolved.model.name);
 
-        let result = await resolved.model.getToMe(this.get(resolved.ref), _limiters);
-
-
-
-        /*
-
-        let q = `SELECT * FROM wsv_${resolved.model.tablename} WHERE ${resolved.ref}=$1::integer`;
-        let d = [this.get('id')];
-
-        // transform limiters
-        let ql = this._genLimiterQueries(_limiters, resolved.model, d.length); // omod was 2nd param
-        if ( ql.q != '' ) {
-          q += ` AND ${ql.q}`;
-          d = d.concat(ql.d);
-        }
-
-        let result = await resolved.model.cl._runQuery(q, d, `ws.src.${this.constructor.name}_readIn`)
-          .catch( function(e) {
-            return WovReturn.retError(e, `Failed reading table '${resolved.model.tablename}', column '${resolved.ref}' that point to '${this.constructor.name}, ${backselector}'.`);
-          }.bind(this));
-          */
+        // let result = await resolved.model.getToMe(this.get('id'), resolved.ref, _limiters);
+        let result = await this.constructor.cl.getToMe(this.get('id'), resolved.ref, resolved.model, _limiters);
 
         this.constructor.l.aspect('ws.src.WovModel_readIn', `Q result:`, result);
 
@@ -274,7 +260,7 @@ class WovModel extends entity.WovEntityModel {
             for (let i in result ) {
               if ( result.hasOwnProperty(i) ) {
                 let row = result[i];
-                let m = this.constructor._polyReadCheck(row, resolved.model); // TODO/ doesn't getByID also call polyReadCheck/
+                let m = this.constructor.cl._polyReadCheck(row, resolved.model); // TODO/ doesn't getByID also call polyReadCheck/ ??? passing resolved.model and not this.constructor? I think this is ok, since the poly is done here already
                 proms.push(m);
               }
             }
@@ -326,6 +312,7 @@ class WovModel extends entity.WovEntityModel {
    * @param {integer} _depth - tracks how deep this recurses
    * @return {object<{q,v}>} - additions to a SELECT query
    */
+  /*
   _genLimiterQueries(_l, _omod, _doff, _op = 'AND', _depth = 1) {
     let retval = {q : '', d : [] };
     let q = [];
@@ -373,6 +360,7 @@ class WovModel extends entity.WovEntityModel {
     // this.constructor.l.info(`${''.padEnd(_depth*2, ' ')}_genLimiterQueries returning : `, retval);
     return retval;
   }
+  */
 
 
   /**
@@ -384,19 +372,6 @@ class WovModel extends entity.WovEntityModel {
   isRef(_ref) {
     let retval = false;
     if ( this.constructor.isRef(_ref) && this._data[_ref] !== undefined ) { retval = true; }
-    return retval;
-  }
-
-  /**
-   * Helper function for isRef.
-   *
-   * @param {string} _ref - property to check
-   * @return {boolean} - true if it is a ref
-   */
-  static isRef(_ref) {
-    let retval = false;
-    if ( _ref == null ) {}
-    else if ( _ref.startsWith('_') && _ref.endsWith('_ref') ) { retval = true; }
     return retval;
   }
 
@@ -530,11 +505,16 @@ class WovModel extends entity.WovEntityModel {
    * Init the model and check all is ok.
    *
    * @param {Logger}         _logger         - woveon logger
-   * @param {WovModelClient} _wovmodelclient -
+   * @param {WovClientEntity} _wovclient -
    * @return {undefined} -
    */
-  static init(_logger, _wovmodelclient) {
-    entity.WovEntityModel.init(_logger, _wovmodelclient);
+  static init(_logger, _wovclient) {
+
+    // set static values
+    this.cl = _wovclient;
+    this.l  = _logger;
+    if ( entity.WovModelEntity.l == undefined ) entity.WovModelEntity.l = _logger;
+
     let parent = Object.getPrototypeOf(this);
 
     // _logger.info(`init: this('${this.name}') parent('${parent.name}')  WovModel('${WovModel.name}').`);
@@ -551,79 +531,20 @@ class WovModel extends entity.WovEntityModel {
    *
    * @return {undefined} -
    */
-  static markHasChild() { this._haschildren = true; /* this.l.info(`marking '${this.name}' as having children'.`); */ }
-
-
-  /**
-   * Simple check if `init` has been called on this class definition.
-   *
-   * @return {boolean} - true if it has, false if not
-   */
-  static isInited() { let retval = false; if ( this.l != null && this.cl != null ) retval = true; return retval; }
-
-
-  /**
-   * Asks the client to retrieve this model.
-   *
-   * @param {integer} _id -
-   * @return {WovModel|Error} -
-   */
-  static async getByID(_id) { return this.cl.getByID(_id, this); }
-
-
-  /**
-   * Retrieves multiple models.
-   *
-   * @param {Array<integer>} _ids - ids of models to load.
-   * @return {Promise} -
-   */
-  static async getByIDs(_ids) { return this.cl.getByIDs(_ids, this); }
+  static markHasChild() {
+    this._haschildren = true;
+    /* this.l.info(`marking '${this.name}' as having children'.`); */
+  }
 
 
   /**
    * Retreives models pointing to this, with limiters to restrict results.
+   *
    * @param {string} _ref - the ref to look up
-   * @param {object} _limiiters - object of the format in getToMe comments
+   * @param {object} _limiters - object of the format in getToMe comments
+   * @return {object} - ?
    */
-  async getToMe(_ref, _limiters = null) { return this.cl.getToMe(this.get(_id), _ref, this, _limiters); }
-
-
-  /**
-   * Get a model instance by the XID (external id) value.
-   * XIDs are good ways to hide internal identifiers from misuse (but keep in mind, ids are faster!).
-   *
-   * @param {integer} _xid -
-   * @return {WovModel} -
-   */
-  static async getByXID(_xid) { return this.cl.getByXID(_xid, this); }
-
-
-  /**
-   * Deletes a row form the table that is the data of the model object.
-   *
-   * @param {integer} _id -
-   * @return {Promise} - ?returns I think the number of rows deleted?
-   */
-  static async deleteByID(_id) { return this.cl.deleteByID(_id, this); }
-
-
-  /**
-   * Creates it in the database, then creates and returns the model.
-   *
-   * @param {object} _data -
-   * @return {WovModel|WovReturn<Error>} - returns the newly created object.
-   */
-  static async createOne(_data) { return this.cl.createOne(_data, this); }
-
-
-  /**
-   * Writes back to the DB. Unlike save, this does not require a model.
-   *
-   * @param {integer} _id -
-   * @param {object} _data - data to update on the model
-   * @return {?} -
-   */
-  static async updateOne(_id, _data) { return this.cl.updateOne(_id, _data, this); }
+  async getToMe(_id, _limiters = null) { return this.constructor.cl.getToMe(_id, _ref, this, _limiters); }
 
 
   /**
@@ -888,80 +809,6 @@ class WovModel extends entity.WovEntityModel {
 
 
   /**
-   * Called to initialize the db table for the Model.
-   *
-   * WoveonService manipulates tables since it handles inheritance between models inside of a database that might not have that.
-   *
-   * The params set how it should handle existing data. Be VERY careful. doDrop should be false unless you are in testing.
-   *
-   * @param {boolean} _doDrop  - deletes the table model's table if exists (WARNING!!!!! CAREFULE!!!)
-   * @param {boolean} _doTable - create the table if not exists
-   * @param {boolean} _doView  - create the view if not exists (enables polyread)
-   * @return {undefined} -
-   */
-  static async doInitDB(_doDrop, _doTable, _doView) {
-    if ( this._schema == undefined ) { this.cl.l.throwError(`For model '${this.name}', No schema.`); }
-
-    let q1 = `DROP TABLE IF EXISTS ${this.tablename} CASCADE;`;
-    let q2 = null; // create table
-    let q3a = `DROP VIEW IF EXISTS "wsv_${this.tablename}"`;
-    let q3 = null; // create view
-    let qp = null; // query parameters
-    let schematouse = null;
-    let parent = Object.getPrototypeOf(this);
-    let d = []; // data
-
-    // handle inheritance tables
-    this.cl.l.aspect('ms.WovModel_doCreateTableQuery', `Model ${this.name} has parent of ${parent.name}, haschildren ${this._haschildren}.`);
-    if ( parent.name == 'WovModel' ) { schematouse = this._schema; }
-    else { schematouse = this._ownschema; }
-
-    qp = this._buildQueryParams(schematouse, {}, 'create');
-    // Logger.g().info(`doCreateTableQuery: ${this.name} `, qp);
-
-    let cols = [];
-    for (let i=0; i< qp.colnames.length; i++) {
-      let colname = qp.colnames[parseInt(i)];
-      if ( colname != 'id' ) {
-        let coltype = qp.coltypes[parseInt(i)];
-        cols.push(`${colname} ${coltype}`);
-      }
-    }
-
-    // TODO _model_t as a lookup table
-
-    // Create tables so that _model_t is only in tables with inheritance. Create the views to fill in model_t.
-    if ( parent.name == 'WovModel' ) {
-      if ( this._haschildren == false ) {
-        q2 = `CREATE TABLE IF NOT EXISTS "${this.tablename}" ( id SERIAL PRIMARY KEY, ${cols.join(', ')} )`;
-        q3 = `CREATE VIEW "wsv_${this.tablename}" AS SELECT *, text '${this.name}' as _model_t FROM "${this.tablename}"`;
-      }
-      else {
-        q2 = `CREATE TABLE IF NOT EXISTS "${this.tablename}" ( id SERIAL PRIMARY KEY, _model_t varchar default '${this.name}', ${cols.join(', ')} )`;
-        q3 = `CREATE VIEW "wsv_${this.tablename}" AS SELECT * FROM "${this.tablename}"`;
-      }
-    }
-    else  {
-      q2 = `CREATE TABLE IF NOT EXISTS ${this.tablename} ( _model_t varchar default '${this.name}', ${cols.join(', ')} ) INHERITS ( "${parent.tablename}" )`;
-      q3 = `CREATE VIEW "wsv_${this.tablename}" AS SELECT * FROM "${this.tablename}"`;
-    }
-
-    this.cl.l.aspect('ms.WovModel_doCreateTableQuery', `q1(${_doDrop}): `, q1);
-    this.cl.l.aspect('ms.WovModel_doCreateTableQuery', `q2(${_doTable}): `, q2);
-    this.cl.l.aspect('ms.WovModel_doCreateTableQuery', `q3(${_doView}): `, q3);
-
-    return (async function() { if ( _doDrop  ) await this.cl._runQuery(q1,  d, 'ms.WovModel__doCreateTableQuery'); }.bind(this))()
-      .then(async function() { if ( _doTable ) await this.cl._runQuery(q2,  d, 'ms.WovModel__doCreateTableQuery'); }.bind(this))
-      .then(async function() { if ( _doView  ) await this.cl._runQuery(q3a, d, 'ms.WovModel__doCreateTableQuery'); }.bind(this))
-      .then(async function() { if ( _doView  ) await this.cl._runQuery(q3,  d, 'ms.WovModel__doCreateTableQuery'); }.bind(this))
-      .catch(function(e) {
-        this.cl.l.error('error:', e);
-        return WovReturn.retError(e, `Failed to create table for '${this.tablename}'.`);
-      }.bind(this));
-  }
-
-
-  /**
    * From an object with properties, build the col names and data for a query. If id is in _data, it is placed 1st.
    *
    * @param {object} _data - object to pull keys from (ex. this._data or this._dirty can be passed in)
@@ -969,6 +816,7 @@ class WovModel extends entity.WovEntityModel {
    * @param {object} _qtype - query type 'create', 'insert' or 'update'
    * @return {object} - cols : columns in database, data : values for the cols, found : if found some tables (useful for 'dirty')
    */
+  /*
   static _buildQueryParams(_data, _vals, _qtype) {
     let counter = 1;
     let retval = {colnames : [], cols : [], data : [], found : false, coltypes : [] };
@@ -1020,46 +868,9 @@ class WovModel extends entity.WovEntityModel {
 
     return retval;
   }
+  */
 
   // TODO: reload()
-
-
-  /**
-   * Build a query to save dirty values.
-   *
-   * @return {boolean|Error} - true if was saved, false if not saved (no dirty data), Error if error.
-   */
-  async save() {
-    let retval = false;
-    let qtype = null;
-    let savedata = null;
-
-    /*
-    if ( this.get('id') == null ) {
-      qtype    = 'insert';
-      savedata = this._data;
-    }
-    else*/ {
-      qtype    = 'update';
-      savedata = Object.assign({}, this._dirty, {id : this.get('id')});
-    }
-
-    this.constructor.cl.l.aspect(`${this.constructor.name}::save`, 'ws.WovModel.save()', this.savedata);
-    let qp = this.constructor._buildQueryParams(savedata, this.get(), qtype);
-    if ( qp.found == true ) {
-
-      let q = `UPDATE ${this.constructor.tablename}
-               SET ${qp.cols.join(', ')}
-               WHERE id=$1::integer`;
-      // this.constructor.cl.l.info('q: ', q);
-
-      retval = this.constructor.cl._runSingularQuery(q, qp.data, `ws.WovModel.save ${this.constructor.name}::save`).then(function() { return true; }).catch(function(e) { return e; });
-
-      // reset dirty
-      this._dirty = {};
-    }
-    return retval;
-  }
 
 
   /**

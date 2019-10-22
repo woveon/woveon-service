@@ -1,6 +1,6 @@
 
 /**
- * @typedef WovModelClient
+ * @typedef WovClientLocal
  * @typedef WovModel
  * @typedef WovRemoteServiceClient
  * @typedef WovEntityClient
@@ -10,8 +10,8 @@
  */
 
 // const Logger               = require('woveon-logger');
-const WovModelClient       = require('./wovmodelclient');
-const WovRemoteModelClient = require('./wovremotemodelclient');
+const WovClientLocal       = require('./wovclientlocal');
+// const WovRemoteModelClient = require('./wovremotemodelclient');
 const Logger               = require('woveon-logger');
 
 
@@ -74,7 +74,7 @@ module.exports = class WovStateLayer {
     for (let i=0; i<this._clients.length; i++ ) {
       let c = this._clients[i];
       // this.l.info('init client ', c);
-      if ( c instanceof WovModelClient ) {
+      if ( c instanceof WovClientLocal ) {
         await c.init(this, false, true, true);
       }
       else if ( c instanceof WovRemoteModelClient ) {

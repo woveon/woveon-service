@@ -13,13 +13,14 @@ const WovReturn        = require('./wovreturn');
 const Config           = require('./config');
 // const ModelLoader      = require('./modelloader');
 const WovUtil          = require('./wovutil');
-const WovModelClient   = require('./wovmodelclient');
+const WovClientLocal   = require('./wovclientlocal');
+// const WovClientRemote  = require('./wovclientremote');
 const WovModel         = require('./wovmodel');
 const WovModelMany     = require('./wovmodelmany');
 const WovStateLayer    = require('./wovstatelayer');
 
-const WovRemoteModelClient = require('./wovremotemodelclient');
-const WovRemoteModel       = require('./wovremotemodel');
+//const WovRemoteModelClient = require('./wovremotemodelclient');
+// const WovRemoteModel       = require('./wovremotemodel');
 
 const {WovDBPostgres, WovDBMongo} = require('./wovdb');
 const {DocMethod}                 = Listener;
@@ -312,10 +313,11 @@ module.exports.Requester        = Requester;
 
 // State Layer
 module.exports.WovStateLayer        = WovStateLayer;
-module.exports.WovModelClient       = WovModelClient;
+module.exports.WovClientLocal       = WovClientLocal;
+// module.exports.WovClientRemote      = WovClientRemote;
 module.exports.WovModel             = WovModel;
 module.exports.WovModelMany         = WovModelMany;
-module.exports.WovRemoteModelClient = WovRemoteModelClient;
-module.exports.WovRemoteModel       = WovRemoteModel;
+//module.exports.WovRemoteModelClient = WovRemoteModelClient;
+// module.exports.WovRemoteModel       = WovRemoteModel;
 module.exports.WovDBPostgres        = WovDBPostgres;
 module.exports.WovDBMongo           = WovDBMongo;

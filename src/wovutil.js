@@ -137,4 +137,44 @@ module.exports = {
     return retval;
   },
 
+
+  /**
+   * Capitalize string.
+   *
+   * @param {string} _s -
+   * @return {string} -
+   */
+  capitalize(_s)   { return _s.charAt(0).toUpperCase() + _s.slice(1); },
+
+
+  /**
+   * Uncapitalize string.
+   *
+   * @param {string} _s -
+   * @return {string} -
+   */
+  uncapitalize(_s) { return _s.charAt(0).toLowerCase() + _s.slice(1); },
+
+
+  /**
+   * Tests if an email is valid.
+   *
+   * NOTE: since _email is often from the commandline, and could be malicious, timeout.
+   *
+   * @param {string} _email -
+   * @return {string} - 'valid', 'invalid' and 'timeout' if took too long
+   */
+  async validateEmail(_email) {
+    const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA  -Z\-0-9]+\.)+[a-zA-Z]{2,}))$/; //eslint-disable-line
+
+    return new Promise( function(ret, rej) {
+      let retval = 'timeout';
+      setTimeout( function() { rej(retval); }, 500); // milliseconds
+      if ( re.test(_email) ) retval = 'valid';
+      else retval = 'invalid';
+      ret(retval);
+    });
+
+  },
+
 };
