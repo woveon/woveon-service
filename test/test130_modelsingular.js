@@ -10,7 +10,7 @@ const addContext = require('mochawesome/addContext');
 const {WovDBPostgres} = require('../src/wovdb');
 
 
-let mtag ='7c_model';
+let mtag ='test130';
 
 let logger = new Logger(mtag, {
   debug    : true,
@@ -42,7 +42,7 @@ describe(`> ${mtag}: `, async function() {
 
     testdb = new WovDBPostgres('testdb', logger);
     await testdb.connect();
-    cl = new Service.WovModelClient(logger, testdb, [M.SingularTestA, M.SingularTestB, M.SingularTestC]);
+    cl = new Service.WovClientLocal(logger, [M.SingularTestA, M.SingularTestB, M.SingularTestC], testdb);
     sl = new Service.WovStateLayer(logger, [cl]);
     await cl.init(sl, true, true, true);
   });

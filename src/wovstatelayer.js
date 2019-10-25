@@ -1,6 +1,7 @@
 
 /**
  * @typedef WovClientLocal
+ * @typedef WovClientRemote
  * @typedef WovModel
  * @typedef WovRemoteServiceClient
  * @typedef WovEntityClient
@@ -10,9 +11,12 @@
  */
 
 // const Logger               = require('woveon-logger');
-const WovClientLocal       = require('./wovclientlocal');
-// const WovRemoteModelClient = require('./wovremotemodelclient');
-const Logger               = require('woveon-logger');
+const WovClientLocal   = require('./wovclientlocal');
+const WovClientRemote  = require('./wovclientremote');
+const Logger           = require('woveon-logger');
+
+const {ApolloServer}    = require('apollo-server-express');
+const requireFromString = require('require-from-string');
 
 
 /**
@@ -24,6 +28,7 @@ module.exports = class WovStateLayer {
   l        = null; // the loggr object
   _clients = null; // the array of WovEntity Clients this layer has
   _models  = null; // the hash (by lowercase model name) of WovModels this state layer serves (added from clients)
+  _rs      = null; // GraphQL Remote Server for all local clients
 
 
   /**
@@ -43,8 +48,8 @@ module.exports = class WovStateLayer {
       let c = this._clients[i];
 
       // add to the state layer and check for a few errors
-      for (let k in c.table2model) {
-        let m = c.table2model[k];
+      for (let k in c._models) {
+        let m = c._models[k];
         if ( m == null ) throw Error(`Model of index 'k' is null?`);
         if ( this._models[m.name.toLowerCase()] != undefined ) {
           throw Error(`Model named '${m.name}' of index '${k}' already exists in state layer.`);
@@ -77,7 +82,7 @@ module.exports = class WovStateLayer {
       if ( c instanceof WovClientLocal ) {
         await c.init(this, false, true, true);
       }
-      else if ( c instanceof WovRemoteModelClient ) {
+      else if ( c instanceof WovClientRemote) {
         await c.init(this);
       }
       else {
@@ -106,37 +111,154 @@ module.exports = class WovStateLayer {
   /**
    * Call on each client.
    *
-   * @return {object} - {modeljs:,exportsjs:}
+   * @return {string} - all schemas
    */
-  getGraphQLModelResolvers() {
-    let retval = {modeljs : '', exportsjs : ''};
+  /*
+  getGraphQLSchemas() {
+    let retval = {
+      queries   : '',   // query definitions ex. getX(id : ID!) : X
+      mutations : '',   // mutations. ex. createX(xToCreate : iCreateX!) : X
+      query_t   : '',   // query/mutation types for mutations and create/update. ex. iCreateX { foo : String! }
+      schemas   : '',   //
+    };
 
     for (let i=0; i<this._clients.length; i++) {
       let cl = this._clients[i];
-      let result = cl.getGraphQLModelResolvers();
-      retval.modeljs += result.modeljs;
-      retval.exportsjs += result.exportsjs;
+      let result = cl.getGraphQLSchemas();
+      this.l.info('State layer client scheam: ', result);
+      retval.queries   += result.queries;
+      retval.mutations += result.mutations;
+      retval.query_t   += result.query_t;
+      retval.schemas   += result.schemas;
     }
 
     return retval;
   }
+  */
 
 
   /**
    * Call on each client.
    *
-   * @return {string} - all schemas
+   * @return {object} - {modeljs:,exportsjs:}
    */
-  getGraphQLSchemas() {
-    let retval = '';
+  /*
+  getGraphQLResolvers() {
+    let retval = {
+      queryjs    : '',   // query implementations
+      mutationjs : '',   // mutation implementations
+      modeljs    : '',   // data relationships of models (ex. const Car = { tires : async function(...) {...}}, )
+      exportsjs  : '',   // the models to export ex. "X, Y"
+    };
 
     for (let i=0; i<this._clients.length; i++) {
-      let cl = this._clients[i];
-      let result = cl.getGraphQLSchemas();
-      retval += result;
+      let cl     = this._clients[i];
+      let result = cl.getGraphQLResolvers();
+      retval.queryjs    += result.queryjs;
+      retval.mutationjs += result.mutationjs;
+      retval.modeljs    += result.modeljs;
+      retval.exportsjs  += result.exportsjs;
     }
 
+
+     this.gqlrs= new ApolloServer({
+        typeDefs  : gqlschema,
+        resolvers : requireFromString(gqlresolvers), // requirefromstring to turn into code
+        context   : ({req}) => {
+          let retval = {
+            httpVersionMajor : req.httpVersionMajor,
+            httpVersionMinor : req.httpVersionMinor,
+            httpVersion      : req.httpVersion,
+            headers          : req.headers,
+            rawHeaders       : req.rawHeaders,
+            originalUrl      : req.originalUrl,
+            args             : Object.assign({}, req.wov, req.params, req.query, req.body),
+          };
+          return retval;
+        },
+        dataSources    : () => ({sl : this.statelayer}),  // (State Layer)
+        formatError    : (error) => { Logger.g().error(JSON.stringify(error, null, 2)); return error; },
+        formatResponse : (_response, {context}) => {
+          Logger.g().aspect('listener.incoming', `Handled  : '${context.originalUrl}' with prot GraphQL: '${context.args.query}'`,
+            _response.data);
+          let retval = _response;
+          return retval;
+        },
+      });
+
     return retval;
+  }
+      */
+
+
+  /**
+   *
+   * @param {Express} _app - expressJS app to bind this server to
+   */
+  async startRemotesServer(_app, _port) {
+    let schemas = '';
+    let resolvers = '';
+
+    // Build Config from all local clients
+    for (let i=0; i<this._clients.length; i++) {
+      let cl     = this._clients[i];
+      if ( cl instanceof WovClientLocal ) {
+        let cfg = cl.getRemotesServerConfig();
+        schemas   += cfg.schemas;
+        resolvers += cfg.resolvers;
+      }
+    }
+
+    this.l.h3().info('schemas: ', schemas);
+    this.l.h3().info('resolvers: ', resolvers);
+    resolvers = requireFromString(resolvers);
+
+    let sl = this;
+
+    // Start GraphQL server for the Remote Server
+    this._rs = new ApolloServer({
+      typeDefs  : schemas,
+      resolvers : resolvers, // requireFromString(resolvers), // requirefromstring to turn into code
+      context   : ({req}) => {
+        let retval = {
+          httpVersionMajor : req.httpVersionMajor,
+          httpVersionMinor : req.httpVersionMinor,
+          httpVersion      : req.httpVersion,
+          headers          : req.headers,
+          rawHeaders       : req.rawHeaders,
+          originalUrl      : req.originalUrl,
+          args             : Object.assign({}, req.wov, req.params, req.query, req.body),
+        };
+        return retval;
+      },
+      dataSources : () => ({statelayer : sl}),  // (State Layer)
+      formatError : function(error) {
+        Logger.g().error(JSON.stringify(error, null, 2));
+        return error;
+      },
+      formatResponse : (_response, {context}) => {
+        Logger.g().info('response:', _response);
+        Logger.g().aspect('listener.incoming', `Handled  : '${context.originalUrl}' with prot GraphQL: '${context.args.query}'`,
+          _response.data);
+        let retval = _response;
+        return retval;
+      },
+      /*
+      formatResponse : (function(_response, {context}) {
+        this.l.g().aspect('listener.incoming', `Handled  : '${context.originalUrl}' with prot GraphQL: '${context.args.query}'`,
+          _response.data);
+        let retval = _response;
+        return retval;
+      }).bind(this),
+      */
+    });
+
+    this._rsapp = _app;
+    this._rs.applyMiddleware({app : this._rsapp}); // , path : '/graphql'});
+    this._rsapp.listen(_port);
+    this.l.info(`... loaded graphQL on: localhost:${_port}${this._rs.graphqlPath}`);
+
+
   }
 
 };

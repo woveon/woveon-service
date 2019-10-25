@@ -10,6 +10,10 @@
 const Logger    = require('woveon-logger');
 const WovReturn = require('./wovreturn');
 const entity    = require('./entity');
+// const {ApolloServer}    = require('apollo-server-express');
+// const requireFromString = require('require-from-string');
+
+
 // const WovModel  = require('./wovmodel');
 
 module.exports = class WovClientLocal extends entity.WovClientEntity {
@@ -19,14 +23,15 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
    * Constructor.
    *
    * @param {Logger} _l -
-   * @param {WovDBPostgres} _wmdb - WovDBPostgres (does not have to be connected yet)
    * @param {Array<WovModel>} _models - the models this loads onto this
+   * @param {WovDBPostgres} _wmdb - WovDBPostgres (does not have to be connected yet)
    * @param {Array<string>} _safeTables - database tables user can directly call selects on
    * @param {object} _modelInitOptions -
    */
-  constructor(_l, _wmdb, _models, _safeTables, _modelInitOptions) {
-    super(_l);
+  constructor(_l, _models, _wmdb, _safeTables, _modelInitOptions) {
+    super(_l, _models);
     this.wmdb = _wmdb;
+    this.gqlrs = null; // GraphQL Remote Server for the client
 
     // only Postgres for now (maybe additional sql servers as well, but untested)
     if ( _wmdb.constructor.name != 'WovDBPostgres' ) {
@@ -41,12 +46,9 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
     // Add each model to this, with its name. ex. this.User is a class for the User model
     this.table2model = {};
     _models.forEach( function(m) {
-      this.l.aspect('ms.WovClientLocal.constructor', `...loading WovModel : '${m.name}'. has child: ${m._haschildren}`);
-      this.l.aspect('ms.wovClientLocal.constructor', `...loading WovModel : '${m.name}' on client as 'model_${m.name.toLowerCase()}' and '${m.name}'`);
-      m.init(this.l, this); this[m.name] = m; this[`model_${m.name.toLowerCase()}`] = m; this.table2model[m.tablename] = m;
+      this.table2model[m.tablename] = m;
       this._safeTables[m.tablename] = true;          // auto-add each model's table
       this._safeTables[`wsv_${m.tablename}`] = true; // auto-add each model's view
-
     }.bind(this));
   }
 
@@ -77,8 +79,8 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
    * @return {Promise<undefined>} -
    */
   async init(_sl, _doDrop, _doTable, _doView) {
+    entity.WovClientEntity.prototype.init.call(this, _sl);
     let models = Object.values(this.table2model);
-    this.statelayer = _sl;
     for (let k in models ) {
       if ( models.hasOwnProperty(k) ) {
         let m = models[k];
@@ -107,12 +109,20 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
    */
   getGraphQLSchemas() {
     let models = Object.values(this.table2model);
-    let retval = '';
+    let retval = {
+      queries   : '',    // query definitions ex. getX(id : ID!) : X
+      mutations : '',    // mutations. ex. createX(xToCreate : iCreateX!) : X
+      query_t   : '',    // query/mutation types for mutations and create/update. ex. iCreateX { foo : String! }
+      schemas   : '',    //
+    };
     for (let k in models ) {
       if ( models.hasOwnProperty(k) ) {
         let m = models[k];
         let s = m.getGraphQLSchema();
-        retval += '\n'+s;
+        retval.queries   += s.queries;
+        retval.mutations += s.mutations;
+        retval.query_t   += s.query_t;
+        retval.schemas   += s.schemas;
       }
     }
     return retval;
@@ -124,19 +134,22 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
    *
    * @return {object} - {modeljs:,exportsjs:}
    */
-  getGraphQLModelResolvers() {
+  getGraphQLResolvers() {
     let models = Object.values(this.table2model);
     let retval = {
-      modeljs   : '',
-      exportsjs : '',
-      // exportsjs : 'module.exports = {',
+      queryjs    : '',
+      mutationjs : '',
+      modeljs    : '',
+      exportsjs  : '',
     };
     for (let k in models ) {
       if ( models.hasOwnProperty(k) ) {
         let m = models[k];
-        let s = m.getGraphQLModelResolver();
-        retval.modeljs += '\n'+s;
-        retval.exportsjs += `${m.name}, `;
+        let s = m.getGraphQLResolver();
+        retval.queryjs    += s.queryjs;
+        retval.mutationjs += s.mutationjs;
+        retval.modeljs    += s.modeljs;
+        retval.exportsjs  += s.exportsjs;
       }
     }
 
@@ -180,6 +193,7 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
    * @param {string} _aspect - name of logging aspect to test
    * @param {boolean} _wr    - true to return value in WovReturn object
    * @return {Array} - Promise that returns results. or, throws error
+   *                 - for updates, r.rows is [], and is not an error.
    */
   _runQuery(_q, _d, _aspect, _wr = false) {
     if ( (typeof _q) != 'string' ) { _wr = _aspect; _aspect = _d; _d = null; }
@@ -203,6 +217,7 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
         rej(e);
       }
       if ( _wr ) retval = WovReturn.retSuccess(retval);
+      // this.l.info('_runQueyr ret: ', retval);
       ret(retval); // return retval;
     }.bind(this));
   }
@@ -291,7 +306,7 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
       this._runQuery(_q, _d, _aspect, false)
         .then( function(r) {
           let retval = r[0] || null;
-          if ( _wr ) retval = WovReturn.retSuccess(retval);
+          if ( _wr ) retval = WovReturn.retSuccess(retval); // TODO: This should not be needed since _runQueyr has this already?
           ret(retval);
         })
         .catch( function(e) { if ( _wr ) e = WovReturn.retError(e, `FAILED Postgres Singular Query '${_aspect}'`); rej(e); } );
@@ -388,6 +403,8 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
       else retval = new _Model(result);
     }
 
+    this.l.info('ClientLocal: createOne retval : ', retval);
+
     return retval;
   }
 
@@ -398,7 +415,7 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
    * @param {integer} _id -
    * @param {object} _data - data to update on the model
    * @param {WovModel.class} _Model - the class to create an object from
-   * @return {?} -
+   * @return {object} - data
    */
   async updateOne(_id, _data, _Model) {
     // this.l.throwError(`Need to implement 'updateOne' for ${_Model.name}.`);
@@ -408,7 +425,13 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
                SET ${qp.cols.join(', ')}
                WHERE id = ${_id}
                RETURNING *`;
-    return await this._runSingularQuery(q, qp.data, `updateOne${_Model.name}`).catch(function(e) { return e; });
+    return await this._runSingularQuery(q, qp.data, `updateOne${_Model.name}`)
+      .then(function(r, r2) {
+        if ( r == null ) return new Error(`WovClientLocal::updateOne(${_id}, ${JSON.stringify(_data)}, ${_Model.name}) : model of id not found`);
+        Logger.g().info('updateOne returning: ', r, r2);
+        return r;
+      })
+      .catch(function(e) { return e; });
   }
 
 
@@ -431,39 +454,48 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
    *
    * @param {integer} _id -
    * @param {WovModel} _Model - the Model class
-   * @return {WovModel|Error} -
+   * @return {WovModel|null} -
    */
   async getByID(_id, _Model) {
-    let retval = null;
-    // console.log(`getByID(${_id} : this: `, this, this.tablename);
-    let data = await this._selectByID(_id, `wsv_${_Model.tablename}`);
-    // console.log('data is ', data);
-    if ( data != null && !(data instanceof Error) ) {
-      retval = await this._polyReadCheck(data, _Model);
+    // this.l.info(`getByID(${_id} : this: `, this, this.tablename);
+    let retval = await this._selectByID(_id, `wsv_${_Model.tablename}`);
+    // this.l.info('retval is ', retval);
+    if ( retval != null && !(retval instanceof Error) ) {
+      retval = await this._polyReadCheck(retval, _Model);
     }
-    // Logger.g().info(`getByID( ${_id} ) of ${this.tablename} : `, retval);
+    this.l.info(`getByID( ${_id} ) of ${_Model.tablename} : `, retval);
     return retval;
   }
 
 
   /**
    * Gets model instances by id array.
-   * TODO.
    *
    * @param {Array<integer>} _ids - ids of models to load.
    * @param {WovModel.class} _Model - the model class
-   * @return {Promise} -
+   * @return {Promise<WovModel|null>} - just like getByID
    */
-  static async getByIDs(_ids, _Model) {
+  async getByIDs(_ids, _Model) {
+    let p = [];
     let qqs = [];
-    let xoff= 2; // offset from 0 due to parameters (starts at 1 anywany, then tablename param is 2)
-    // let retval = null;
-    // let x = 1;
-    // for (let id in _ids ) { qqs.push(`id=$${x++}::integer`); }
+    let xoff= 1; // offset from 0 due to parameters (starts at 1 anywany, then tablename param is 2)
 
+    // do all DB queries at once (instead of caling getByID repeatedly)
     for (let i = 0; i< _ids.length; i++) { qqs.push(`id=$${i+xoff}::integer`); }
-    let q = `SELECT * FROM "wsv_${this.tablename}" WHERE ${qqs.join(' AND ')}`;
-    return this.cl._runQuery(q, _ids, 'ws.src.WovModel_getByIDs');
+    let q = `SELECT * FROM "wsv_${_Model.tablename}" WHERE ${qqs.join(' OR ')}`;
+    let result = await this._runQuery(q, _ids, 'ws.src.WovModel_getByIDs');
+    // this.l.info('result of fetching all models: ', result);
+
+    for (let i = 0; i< _ids.length; i++) {
+      let rid = _ids[i];
+      let r = result.find((e) => { return e.id == rid; });
+
+      // add Error or promise to array (Errors will just return, Promises we will wait for)
+      if ( r != null && !(r instanceof Error) ) { p[i] = await this._polyReadCheck(r, _Model); }
+      else p[i] = null; // Error(`_Model not found, of id(${rid}).`);
+    }
+
+    return Promise.all(p);
   }
 
   /**
@@ -723,7 +755,7 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
     if ( _data._model_t === undefined ) { throw Error('How did this happen. You have failed me.', _data, Mod); }
     else if ( _data._model_t == Mod.name ) { retval = new Mod(_data); }
     else { // polymorphic
-      Mod = this.cl[_data._model_t]; // get the model
+      Mod = this[_data._model_t]; // get the model
       if ( Mod == null ) { this.l.throwError(`polyReadCheck for '${Mod.name}' returned _model_t of '${_data._model_t}' which does not exist on client.`); }
       retval = await Mod.getByID(_data.id);
     }
@@ -789,5 +821,92 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
     // this.constructor.l.info(`${''.padEnd(_depth*2, ' ')}_genLimiterQueries returning : `, retval);
     return retval;
   }
+
+
+  /**
+   * Called to generate configuration for a GraphQL Remote Server from the models on this local client.
+   *
+   * @return {object} - schema and resolver strings
+   */
+  getRemotesServerConfig() {
+    let retval = {schemas : null, resolvers : null};
+
+    // Model Remote Schema
+    // ---------------------------------------------------------------------
+    let gqlschemadata = this.getGraphQLSchemas();
+    let gqlschemas = `
+
+# ---------------------------------------------------------------------
+# Query Definitions
+# ---------------------------------------------------------------------
+type Query {
+${gqlschemadata.queries}
+}
+
+  
+# ---------------------------------------------------------------------
+# Mutation Definitions
+# ---------------------------------------------------------------------
+type Mutation {
+${gqlschemadata.mutations}
+}
+
+
+# ---------------------------------------------------------------------
+# Query Input Types
+# ---------------------------------------------------------------------
+# input IDs { ids : [ID!] }
+${gqlschemadata.query_t}
+
+  
+# ---------------------------------------------------------------------
+# Schemas
+# ---------------------------------------------------------------------
+${gqlschemadata.schemas}
+
+`;
+
+    // Model Remote Resolvers
+    // ---------------------------------------------------------------------
+    let gqlresolversdata = this.getGraphQLResolvers();
+    let gqlresolvers = `
+
+// --------------------------------------------------------------------- 
+// Query Implementations
+// --------------------------------------------------------------------- 
+const Query = {
+${gqlresolversdata.queryjs}
+};
+
+// --------------------------------------------------------------------- 
+// Mutation Implementations
+// --------------------------------------------------------------------- 
+const Mutation = {
+${gqlresolversdata.mutationjs}
+};
+
+// --------------------------------------------------------------------- 
+// Model Implementations
+// --------------------------------------------------------------------- 
+${gqlresolversdata.modeljs}
+
+module.exports = {Query, Mutation, ${gqlresolversdata.exportsjs}}
+`;
+
+    Logger.g().info('Model Remote Schema');
+    Logger.g().h3().info(gqlschemas);
+
+    Logger.g().info('Model Remote Resolvers');
+    Logger.g().h3().info(gqlresolvers);
+
+    retval.schemas   = gqlschemas;
+    retval.resolvers = gqlresolvers;
+
+    return retval;
+  }
+
+
+  // end GraphQL Server for Remote MS
+  // =====================================================================
 
 };

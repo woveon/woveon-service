@@ -5,60 +5,10 @@
  * @typedef WovModel
  * @typedef Promise
  * @typedef WovReturn
+ * @typedef WovStateLayer
  */
 
-
-/**
- */
-class WovClientEntity {
-
-  /**
-   * Client.
-   *
-   * @param {WoveonLogger} _l -
-   */
-  constructor(_l) {
-    this.l = _l;
-  }
-
-
-  /**
-   * Does nothing, but is basically pure virtual.
-   *
-   * @return {null} -
-   */
-  static async init() { throw Error('Implement me: WovClientEntity::init.'); }
-
-
-  /**
-   * Saves this model to persistent storage via the client.
-   *
-   * @param {WovModel} _model - the model to save
-   * @return {boolean|Error} - true if was saved, false if not saved (no dirty data), Error if error
-   */
-  async saveOne(_model) { throw Error('Implement me: WovClientEntity::saveOne.'); }
-
-
-  /**
-   * Generate the javascript code to resolve the schema for this client. Override as needed.
-   *
-   * @return {object} - {modeljs:,exportsjs:}
-   */
-  getGraphQLModelResolvers() {
-    return {
-      modeljs   : '',
-      exportsjs : '',
-    };
-  }
-
-  /**
-   * Generates graphql schemas for the client. Override as needed.
-   *
-   * @return {string} -
-   */
-  getGraphQLSchemas() { return ''; }
-};
-
+const Logger = require('woveon-logger');
 
 /**
  */
@@ -68,7 +18,7 @@ class WovModelEntity {
 
 
   /**
-   * Client.
+   * Model.
    */
   constructor() {
   }
@@ -104,7 +54,7 @@ class WovModelEntity {
    * Deletes a row form the table that is the data of the model object.
    *
    * @param {integer} _id -
-   * @return {Promise} - ?returns I think the number of rows deleted?
+   * @return {Promise} - returns {id : X} where X is id of the deleted model
    */
   static async deleteByID(_id) { return this.cl.deleteByID(_id, this); }
 
@@ -113,18 +63,20 @@ class WovModelEntity {
    * Asks the client to retrieve this model.
    *
    * @param {integer} _id -
+   * @param {string} _fields - for remote clients, a string of the fields you wish to return; null will return all known fields of this model
    * @return {WovModel|Error} -
    */
-  static async getByID(_id) { return this.cl.getByID(_id, this); }
+  static async getByID(_id, _fields = null) { return this.cl.getByID(_id, this, _fields); }
 
 
   /**
    * Retrieves multiple models.
    *
    * @param {Array<integer>} _ids - ids of models to load.
+   * @param {string} _fields - for remote clients, a string of the fields you wish to return; null will return all known fields of this model
    * @return {Promise} -
    */
-  static async getByIDs(_ids) { return this.cl.getByIDs(_ids, this); }
+  static async getByIDs(_ids, _fields = null) { return this.cl.getByIDs(_ids, this, _fields); }
 
 
   /**
@@ -135,7 +87,6 @@ class WovModelEntity {
    * @return {WovModel} -
    */
   static async getByXID(_xid) { return this.cl.getByXID(_xid, this); }
-
 
 
   /**
@@ -158,6 +109,92 @@ class WovModelEntity {
    * @return {boolean} - true if it has, false if not
    */
   static isInited() { let retval = false; if ( this.l != null && this.cl != null ) retval = true; return retval; }
+
+};
+
+
+/**
+ */
+class WovClientEntity {
+
+
+  /**
+   * Client.
+   *
+   * @param {WoveonLogger} _l -
+   * @param {Array<WovModel>} _models - models on this client
+   */
+  constructor(_l, _models) {
+    this.l = _l;
+    this._models = _models;
+
+    _models.forEach( function(m) {
+      this.l.aspect('ms.WovClient.constructor', `...loading WovModel : '${m.name}'. has child: ${m._haschildren}`);
+      this.l.aspect('ms.wovClient.constructor', `...loading WovModel : '${m.name}' on client as 'model_${m.name.toLowerCase()}' and '${m.name}'`);
+      m.init(this.l, this);
+      this[m.name] = m;
+      this[`model_${m.name.toLowerCase()}`] = m;
+    }.bind(this));
+  }
+
+
+  /**
+   * Sets the statelayer for the client.
+   *
+   * @param {WovStateLayer} _sl -
+   * @return {undefined} -
+   */
+  async init(_sl) { this.statelayer = _sl; }
+
+  /**
+   * Does nothing, but is basically pure virtual.
+   *
+   * @return {null} -
+   */
+  static async init() { throw Error('Implement me: WovClientEntity::init.'); }
+
+
+  /**
+   * Saves this model to persistent storage via the client.
+   *
+   * @param {WovModel} _model - the model to save
+   * @return {boolean|Error} - true if was saved, false if not saved (no dirty data), Error if error
+   */
+  async saveOne(_model) { throw Error('Implement me: WovClientEntity::saveOne.'); }
+
+
+  /**
+   * Generates graphql schemas for the client. Override as needed.
+   *
+   * @return {string} -
+   */
+  /*
+  getGraphQLSchemas() {
+    return {
+      queries   : '',    // query definitions ex. getX(id : ID!) : X
+      mutations : '',    // mutations. ex. createX(xToCreate : iCreateX!) : X
+      query_t   : '',    // query/mutation types for mutations and create/update. ex. iCreateX { foo : String! }
+      schemas   : '',    //
+    };
+  }
+  */
+
+
+  /**
+   * Generate the javascript code to resolve the schema for this client. Override as needed.
+   *
+   * @return {object} - {modeljs:,exportsjs:}
+   */
+  /*
+  getGraphQLResolvers() {
+    return {
+      queryjs    : '',   // query implementations
+      mutationjs : '',   // mutation implementations
+      modeljs    : '',   // data relationships of models (ex. const Car = { tires : async function(...) {...}}, )
+      exportsjs  : '',   // the models to export ex. "X, Y"
+    };
+  }
+  */
 
 };
 

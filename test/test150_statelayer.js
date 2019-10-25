@@ -6,16 +6,16 @@ const Service   = require('../src/index');
 const express   = require('express');
 
 const {ApolloServer, gql} = require('apollo-server-express');
-const requireFromString = require('require-from-string');
+const requireFromString   = require('require-from-string');
 
 
 const TESTPORT=3010;
 
 const TMS        = (require('./testmodels'))();
-const TRS        = (require('./testrservs'))();
+const TRS        = (require('./testrmodels'))();
 
 
-let mtag ='11_statelayer';
+let mtag ='test150';
 
 let logger = new Logger(mtag, {
   debug    : true,
@@ -58,7 +58,7 @@ describe(`> ${mtag}: `, async function() {
 
 
   it('> Create a basic State Layer', async function() {
-    cl  = new Service.WovModelClient(logger, testdb, [TMS.Car, TMS.Tire, TMS.Wheel]);
+    cl  = new Service.WovClientLocal(logger, [TMS.Car, TMS.Tire, TMS.Wheel], testdb);
     sl  = new Service.WovStateLayer(logger, [cl]);
     await sl.init();
 
@@ -77,11 +77,10 @@ describe(`> ${mtag}: `, async function() {
 
   it(`> Create the GraphQL listener`, async function() {
 
-    //listener = new Service.Listener(TESTPORT, logger, null, null, 'local');
-    //await listener.init();
+    // listener = new Service.Listener(TESTPORT, logger, null, null, 'local');
+    // await listener.init();
 
     // resolver code
-   
 
     // the sl.Car has no client to get the Car
     let mrbase = `
@@ -90,16 +89,19 @@ const Query = {
 
   getCar : async function(_parent, _qargs, {args, dataSources}) { 
     console.log('---- getCar hit ', _qargs); 
-    console.log('1111', dataSources.sl.Car);
-    console.log('2222', dataSources.sl.Car.cl);
+    console.log('------ getCar hit w/ parent ', _parent); 
+    // console.log('1111', dataSources.sl.Car);
+    // console.log('2222', dataSources.sl.Car.cl);
     let car = await dataSources.sl.Car.getByID(_qargs.id);
-    console.log('car is :', car.get());
-    return car;
+    console.log('3333: car is :', car.get());
+    console.log('4444: car is :', car);
+    console.log('5555: car flattened is :', car.flatten());
+    return car.flatten();
   },
 };
 // const Mutation = { };
 `;
-    let mr = sl.getGraphQLModelResolvers();
+    let mr = sl.getGraphQLResolvers();
     logger.info(`mr : ${mrbase}\n${mr.modeljs}\n\nmodule.exports = {Query, ${mr.exportsjs}}`);
     let modelresolvers = requireFromString(`${mrbase}\n${mr.modeljs}\n\nmodule.exports = {Query, ${mr.exportsjs}}`);
 
@@ -150,11 +152,12 @@ ${sl.getGraphQLSchemas()}
         };
         return retval;
       },
-      dataSources    : () => ({sl: sl}), // TODO this.statelayer (State Layer)
+      dataSources    : () => ({sl : sl}), // TODO this.statelayer (State Layer)
       formatError    : (error) => { logger.error(JSON.stringify(error, null, 2)); return error; },
       formatResponse : (_response, {context}) => {
         logger.aspect('listener.incoming', `Handled  : '${context.originalUrl}' with prot GraphQL: '${context.args.query}'`,
           _response.data);
+        /*
         let retval = null;
         if (_response.errors != undefined ) {
           retval = WR.retError(_response.errors);
@@ -162,6 +165,10 @@ ${sl.getGraphQLSchemas()}
         else {
           retval = WR.retSuccess(_response.data);
         }
+        logger.info('retval : ', retval);
+        */
+        logger.info('response: ', _response);
+        let retval = _response; // .data; // .flatten({keepinstance : false});
         logger.info('retval : ', retval);
         return retval;
       },
@@ -197,14 +204,14 @@ ${sl.getGraphQLSchemas()}
 
   it('> Create a remote State Layer', async function() {
 
-    rcl = new Service.WovRemoteModelClient(logger, [TRS.Car, TRS.Store]);
+    rcl = new Service.WovClientRemote(logger, [TRS.Car]); // TRS.Store
     rsl = new Service.WovStateLayer(logger, [rcl]);
     await rsl.init();
 
     // Make sure remote services are on the rserv client
-    expect(rsl.Store).to.not.be.undefined;
-    expect(rsl._clients[0].Store).to.not.be.undefined;
-    expect(rsl.Store.isInited()).to.be.true;
+//    expect(rsl.Store).to.not.be.undefined;
+//    expect(rsl._clients[0].Store).to.not.be.undefined;
+//    expect(rsl.Store.isInited()).to.be.true;
     expect(rsl.Car).to.not.be.undefined;
     expect(rsl.Car.isInited()).to.be.true;
 
@@ -213,6 +220,10 @@ ${sl.getGraphQLSchemas()}
     logger.h1().info('calling...');
     let result = await rsl.Car.callGraphQL('query', 'Car', car.get('id'), 'nameplate make license state combo');
     logger.info('result: ', JSON.stringify(result, null, 2));
+    expect(result.success).to.be.true;
+    expect(result.data.data.getCar).to.exist;
+    expect(result.data.data.getCar).to.deep.equal((() => { let retval = JSON.parse(JSON.stringify(car.get())); delete retval.id; return retval; })() );
+    expect(car.get('id')).to.exist;
 
   });
 

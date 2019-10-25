@@ -58,7 +58,7 @@ class WovModel extends entity.WovModelEntity {
   /**
    * Gets the data of the key, or if null, returns all data.
    *
-   * @param {string} _key -
+   * @param {string} _key - returns the given value for the key; if null, returns all (by ref unless _options.dup is true)
    * @param {object} _options - additional options
    * @return {*} -
    */
@@ -79,6 +79,11 @@ class WovModel extends entity.WovModelEntity {
           else retval[k] = result[k];
         }
       }
+
+      // duplicate instead of direct return
+      else if ( options.dup ) { retval = Object.assign({}, result); }
+
+      // direct return
       else { retval = result; }
     }
     else {
@@ -517,7 +522,8 @@ class WovModel extends entity.WovModelEntity {
 
     let parent = Object.getPrototypeOf(this);
 
-    // _logger.info(`init: this('${this.name}') parent('${parent.name}')  WovModel('${WovModel.name}').`);
+    _logger.info(`init: this('${this.name}') parent('${parent.name}')  WovModel('${WovModel.name}').`);
+    _logger.info(`this.tablename ${this.tablename}`);
     if ( parent.name != WovModel.name ) { parent.markHasChild();  }
     if ( this.tablename   == null ) throw Error(`WovModel of class '${this.name}' requires model to set static: 'tablename'.`);
     if ( this._transmodel == null ) throw Error(`WovModel of class '${this.name}' requires model to set static: '_transmodel'.`);
@@ -635,7 +641,7 @@ class WovModel extends entity.WovModelEntity {
       if ( this.debugme) this.l.info('  - models to this');
 
       // for all other models, pointing to this, go through schema
-      let models = Object.values(this.cl.table2model);
+      let models = Object.values(this.cl._models);
       for (let i in models) {
         let m = models[i];
         // this.l.info(`${this.name} <== ${m.name} : (tablename '${m.tablename}') : transmodel of : `, m._transmodel);
@@ -701,66 +707,190 @@ class WovModel extends entity.WovModelEntity {
    *
    * @return {string} - javascript code
    */
-  static getGraphQLModelResolver() {
-    let retval = '';
+  static getGraphQLResolver() {
+    let retval = {
+        queryjs    : '',
+        mutationjs : '',
+        modeljs    : '',
+        exportsjs  : '',
+      };
 
-    // this.l.info('_graphQL object ', this._graphQL);
     if ( this._graphQL == null ) this.initGraphQLSchema();
 
-    // ex. this._graphQL.objs =  [ 'account', 'Account']
-    retval += `const ${this.name} = {\n`;
-    for (let i=0; i<this._graphQL.objs.length; i++) {
-      let o = this._graphQL.objs[i];
-      if ( o[1][0] != '[' ) {
-
-        // rewrite readIn and readInMany so that if there is no model, use __resolveType to select Model
-
-        retval +=
-          `  ${o[0]} : async function(_parent, __, {args, dataSources}) {\n`+
-          // `    console.log('asking to readIn: ${o[1]} : ${this.name}  ${o[0]}');\n`+
-          // `    console.log(' __: ', __);\n`+
-          // `    console.log(' _parent: ', _parent);\n`+
-          // `    console.log(' context ', Object.keys(__));\n`+
-          // `    console.log(' this.__resolveType: ', dataSources.statelayer.${this.name}.__resolveType);\n`+
-          // `    let mm = dataSources.statelayer['${o[1]}'];\n`+
-          // `    console.log('  dataSources model for ',mm);\n`+ // model does not exist
-          // `    if ( mm == null ) mm = dataSources.statelayer[dataSources.statelayer.${this.name}.__resolveType(_parent)];\n`+
-          // `    console.log('  need to read in model of : ', mm);\n`+
-          `    let me = new dataSources.statelayer.${this.name}(_parent);\n`+
-          // `    if ( me == null ) { console.log('ERROR: no model "${this.name}".'); return null; }\n`+
-          // `    else { await me.readIn('${o[1]}'); return me.${o[0]}.get(); }\n`+
-          `    console.log('**** resolver ${this.name} : readin : ${o[0]}, ${o[1]}');\n`+
-          `    await me.readIn('${o[0]}');\n`+
-          `    console.log('  after readin : ', me);\n`+
-          `    if ( me.${o[0]} == null ) { console.log('WARNING: no value for "${this.name}.${o[0]}".'); }\n`+
-          `    return me.${o[0]}.get();\n`+
-          `  },\n`;
-      }
-      else {
-        retval +=
-          `  ${o[0]} : async function(_parent, __, {args, dataSources}) {\n`+
-          `    console.log('asking to readInMany: ${o[1]}');\n`+
-          `    let me = new dataSources.statelayer.${this.name}(_parent);\n`+
-          `    await me.readInMany('${o[1].slice(1, -1)}');\n`+
-          `    return me.${o[0]}.get();\n`+
-          `  },\n`;
-      }
-    }
-
-    // extra resolver functionality
-    if ( this._graphQLExtResolvers != undefined ) {
-      let ks = Object.keys(this._graphQLExtResolvers);
-      for (let i=0; i<ks.length; i++) {
-        let k = ks[i];
-        let o = this._graphQLExtResolvers[k];
-        retval += `  ${k} : ${o.toString()},\n`;
-      }
-    }
-
-    retval += `}`;
+    retval.queryjs    = this.getGraphQLResolver_QueryJS();
+    retval.mutationjs = this.getGraphQLResolver_MutationJS();
+    retval.modeljs    = this.getGraphQLResolver_ModelJS();
+    retval.exportsjs  = this.getGraphQLResolver_ExportsJS();
 
     return retval;
   };
+
+
+  /**
+   * Resolvers for queries.
+   *
+   * @return {string} -
+   */
+  static getGraphQLResolver_QueryJS() {
+    let retval = null;
+    if ( this._graphQL == null ) this.initGraphQLSchema();
+    if ( this._graphQL.rQueryJS == null ) { retval = this._graphQL.rQueryJS; }
+    if ( retval == null ) {
+      retval  = `\n  // --- ${this.name}\n`;
+      retval += `  get${this.name}ByID  : async function(_parent, _args, {dataSources}) {\n`+
+                // `    console.log('getByID args: ', _args);\n`+
+                `    let retval = await dataSources.statelayer.${this.name}.getByID(_args.id);\n`+
+                // `    console.log('getbyid1: ', retval);\n`+
+                `    if ( retval == null ) return null;\n`+
+                `    else return retval.flatten({deleteid : false, deleterefs : false, deletesensitive : false});\n`+
+                `  },\n`;
+      retval += `  get${this.name}ByXID : async function(_parent, _args, {dataSources}) {\n`+
+                `    return dataSources.statelayer.${this.name}.getByXID(_args.xid);\n`+
+                `  },\n`;
+      retval += `  get${this.name}ByIDs : async function(_parent, _args, {dataSources}) {\n`+
+                `    let retval = undefined;\n`+
+                `    console.log('getByIDs args: ', _args);\n`+
+                `    let result = await dataSources.statelayer.${this.name}.getByIDs(_args.ids);\n`+
+                `    console.log('getbyids1: ', result);\n`+
+                `    if ( result == null ) retval = null;\n`+
+                `    else {\n`+
+                `      retval = [];\n`+
+                `      for (let i=0; i<result.length; i++) {\n`+
+                `        retval[i] = result[i];\n`+
+                `        if ( retval[i] != null ) {\n`+ // ignore nulls, which were bad ids
+                `          retval[i] = result[i].flatten({deleteid : false, deleterefs : false, deletesensitive : false});\n`+
+                `        }\n`+
+                `      }\n`+
+                `    }\n`+
+                `    console.log('--- getByIDs retval: ', retval);\n`+
+                `    return retval;\n`+
+                `  },\n`;
+
+      this._graphQL.rQueryJS = retval;
+    }
+
+    return retval;
+  }
+
+  /**
+   * Resolvers for mutations.
+   *
+   * @return {string} -
+   */
+  static getGraphQLResolver_MutationJS() {
+    let retval = null;
+    if ( this._graphQL == null ) this.initGraphQLSchema();
+    if ( this._graphQL.rMutationJS == null ) { retval = this._graphQL.rMutationJS; }
+    if ( retval == null ) {
+      retval  = `\n  // --- ${this.name}\n`;
+      retval += `  create${this.name} : async function(_, {_createThis${this.name}}, {dataSources}) {\n`+
+                `    let retval = await dataSources.statelayer.${this.name}.createOne(_createThis${this.name});\n`+
+                `    if ( retval == null ) return null;\n`+
+                `    else return retval.flatten({deleteid : false, deleterefs : false, deletesensitive : false});\n`+
+                `  },\n`;
+      retval += `  update${this.name} : async function(_, {_id, _updateThis${this.name}}, {dataSources}) {\n`+
+                `    let retval = await dataSources.statelayer.${this.name}.updateOne(_id, _updateThis${this.name});\n`+
+                `    console.log('update ', retval);\n`+
+                `    if ( retval instanceof Error ) return retval;\n`+
+                `    else return retval;\n`+
+                `  },\n`;
+                // `    else return retval.flatten({deleteid : false, deleterefs : false, deletesensitive : false});\n`+
+      retval += `  delete${this.name} : async function(_, {_id}, {dataSources}) {\n`+
+                `    return await dataSources.statelayer.${this.name}.deleteByID(_id);\n`+
+                `  },\n`;
+
+      this._graphQL.rMutationJS = retval;
+    }
+
+    return retval;
+  }
+
+
+  /**
+   * Resolvers for data relationships. Ex. Car -> Tire so creats 'tires' method on Car.
+   *
+   * @return {string} -
+   */
+  static getGraphQLResolver_ModelJS() {
+    let retval = null;
+    if ( this._graphQL == null ) this.initGraphQLSchema();
+    if ( this._graphQL.rModelJS== null ) { retval = this._graphQL.rModelJS; }
+    if ( retval == null ) {
+
+      // ex. this._graphQL.objs =  [ 'account', 'Account']
+      retval = `const ${this.name} = {\n`;
+      for (let i=0; i<this._graphQL.objs.length; i++) {
+        let o = this._graphQL.objs[i];
+        if ( o[1][0] != '[' ) {
+
+          // rewrite readIn and readInMany so that if there is no model, use __resolveType to select Model
+
+          retval +=
+            `  ${o[0]} : async function(_parent, __, {args, dataSources}) {\n`+
+            // `    console.log('asking to readIn: ${o[1]} : ${this.name}  ${o[0]}');\n`+
+            // `    console.log(' __: ', __);\n`+
+            // `    console.log(' _parent: ', _parent);\n`+
+            // `    console.log(' context ', Object.keys(__));\n`+
+            // `    console.log(' this.__resolveType: ', dataSources.statelayer.${this.name}.__resolveType);\n`+
+            // `    let mm = dataSources.statelayer['${o[1]}'];\n`+
+            // `    console.log('  dataSources model for ',mm);\n`+ // model does not exist
+            // `    if ( mm == null ) mm = dataSources.statelayer[dataSources.statelayer.${this.name}.__resolveType(_parent)];\n`+
+            // `    console.log('  need to read in model of : ', mm);\n`+
+            `    let me = new dataSources.statelayer.${this.name}(_parent);\n`+
+            // `    if ( me == null ) { console.log('ERROR: no model "${this.name}".'); return null; }\n`+
+            // `    else { await me.readIn('${o[1]}'); return me.${o[0]}.get(); }\n`+
+            `    console.log('**** resolver ${this.name} : readin : ${o[0]}, ${o[1]}');\n`+
+            `    await me.readIn('${o[0]}');\n`+
+            `    console.log('  after readin : ', me);\n`+
+            `    if ( me.${o[0]} == null ) { console.log('WARNING: no value for "${this.name}.${o[0]}".'); }\n`+
+            `    return me.${o[0]}.get();\n`+
+            `  },\n`;
+        }
+        else {
+          retval +=
+            `  ${o[0]} : async function(_parent, __, {args, dataSources}) {\n`+
+            `    console.log('asking to readInMany: ${o[1]}');\n`+
+            `    let me = new dataSources.statelayer.${this.name}(_parent);\n`+
+            `    await me.readInMany('${o[1].slice(1, -1)}');\n`+
+            `    return me.${o[0]}.get();\n`+
+            `  },\n`;
+        }
+      }
+
+      // extra resolver functionality
+      if ( this._graphQLExtResolvers != undefined ) {
+        let ks = Object.keys(this._graphQLExtResolvers);
+        for (let i=0; i<ks.length; i++) {
+          let k = ks[i];
+          let o = this._graphQLExtResolvers[k];
+          retval += `  ${k} : ${o.toString()},\n`;
+        }
+      }
+
+      retval += `}\n`;
+      this._graphQL.rModelJS = retval;
+    }
+
+    return retval;
+  }
+
+
+  /**
+   * Resolvers for exports.
+   *
+   * @return {string} -
+   */
+  static getGraphQLResolver_ExportsJS() {
+    let retval = null;
+    if ( this._graphQL == null ) this.initGraphQLSchema();
+    if ( this._graphQL.rExportsJS == null ) { retval = this._graphQL.rExportsJS; }
+    if ( retval == null ) {
+      retval = `${this.name}, `;
+      this._graphQL.rExportsJS = retval;
+    }
+
+    return retval;
+  }
 
 
   /**
@@ -769,7 +899,7 @@ class WovModel extends entity.WovModelEntity {
    * @return {string} - GraphQL type definition for this Model
    */
   static getGraphQLSchema() {
-    this.initGraphQLSchema();
+    if ( this._graphQL == null ) this.initGraphQLSchema();
     let mod = this;
 
     // this.l.info(`getGraphQLSchema: ${this.name}: `, mod._graphQL );
@@ -798,12 +928,31 @@ class WovModel extends entity.WovModelEntity {
       mod = Object.getPrototypeOf(mod);
     } while ( mod != WovModel );
 
-    let retval = '';
-    if ( extlines.length != 0 ) retval += extlines.join('\n');
-    retval += `type ${this.name} {\n`+
-              `  ${'id'.padEnd(firstvarlength)} : ID!\n`+
-              `  ${lines.join('\n  ')}`+
-              `\n}`;
+    let retval = {
+      queries   : '',
+      mutations : '',
+      query_t   : '',
+      schemas   : '',
+    };
+
+    // queries
+    retval.queries   += this.getGraphQLSchema_Query_getByID();
+    retval.queries   += this.getGraphQLSchema_Query_getByIDs();
+    retval.queries   += this.getGraphQLSchema_Query_getByXID();
+    retval.queries   += this.getGraphQLSchema_Query_getToMe();
+    retval.query_t   += this.getGraphQLSchema_QueryTypes();
+    retval.mutations += this.getGraphQLSchema_Mutations();
+
+    // mutations
+    // query_t
+
+    // schemas
+    if ( extlines.length != 0 ) retval.schemas += extlines.join('\n');
+    retval.schemas += `type ${this.name} {\n`+
+                      `  ${'id'.padEnd(firstvarlength)} : ID!\n`+
+                      `  ${lines.join('\n  ')}`+
+                      `\n}\n`;
+
     return retval;
   }
 
@@ -871,6 +1020,174 @@ class WovModel extends entity.WovModelEntity {
   */
 
   // TODO: reload()
+  //
+  //
+
+  static getGraphQLQuery_createOne() {
+    let retval = `                       
+    create${this.name}(${this.name}ToCreate : iCreate${this.name}!);
+    `;
+    unfinished();
+  }
+
+
+  // =====================================================================
+  // ---------------------------------------------------------------------
+  // GraphQL functions
+  // ---------------------------------------------------------------------
+
+
+  /**
+   * GraphQL Query Generator.
+   * TODO: Move to RemoteClient.
+   *
+   * @return {string} -
+   */
+  static getGraphQLSchema_Query_getByID() {
+    let retval = null;
+    if ( this._graphQL == null ) this.initGraphQLSchema();
+    if ( this._graphQL.qGetByID == null ) { retval = this._graphQL.qGetByID; }
+    if ( retval == null ) {
+
+      Logger.g().info('gg is ', this._graphQL);
+
+      // build vars list
+      /*
+      let v = [];
+      for (let i=0; i<this._graphQL.vars.length; i++) {
+        let vv = this._graphQL.vars[i];
+        Logger.g().info('  vv is ', vv);
+        v.push(vv[0]);
+      }
+      Logger.g().info('v is ', v);
+      */
+
+      retval = `  get${this.name}ByID(id : ID!) : ${this.name}\n`;
+      // retval= `  get${this.name}ByID($id:ID!) {\n`+
+      //         `    ${this.name}(id:$id) { ${v.join(' ')} };\n`+
+      //         `  }\n`;
+      this._graphQL.qGetByID = retval;
+    }
+    return retval;
+  }
+
+
+  /**
+   * GraphQL Query Generator.
+   * TODO: finish.
+   *
+   * @return {string} -
+   */
+  static getGraphQLSchema_Query_getByIDs() {
+    let retval = null;
+    if ( this._graphQL == null ) this.initGraphQLSchema();
+    if ( this._graphQL.qGetByIDs == null ) { retval = this._graphQL.qGetByIDs; }
+    if ( retval == null ) {
+      retval = `  get${this.name}ByIDs(ids : [ID!]) : [${this.name}]\n`;
+      // retval = `  # TODO\n`+
+      //          `  get${this.name}ByIDs($id:ID!) {\n`+
+      //          `    ${this.name}(id:$id) { };\n`+
+      //          `  }\n`;
+      this._graphQL.qGetByIDs = retval;
+    }
+    return retval;
+  }
+
+
+  /**
+   * GraphQL Query Generator.
+   *
+   * @return {string} -
+   */
+  static getGraphQLSchema_Query_getByXID() {
+    let retval = null;
+    if ( this._graphQL == null ) this.initGraphQLSchema();
+    if ( this._graphQL.qGetByXID == null ) { retval = this._graphQL.qGetByXID; }
+    if ( retval == null ) {
+      retval = `  get${this.name}ByXID(xid : String!) : ${this.name}\n`;
+      // retval= `  get${this.name}ByXID($xid:string!) {\n`+
+      //         `    ${this.name}(xid:$xid);\n`+
+      //         `  }\n`;
+      this._graphQL.qGetByXID = retval;
+    }
+    return retval;
+  }
+
+  /**
+   * GraphQL Query Generator.
+   * TODO: finish.
+   *
+   * @param {WovModel} _ModelOther - the Model class
+   * @return {string} -
+   */
+  static getGraphQLSchema_Query_getToMe(_ModelOther) {
+    let retval = '  # getToMe TODO\n';
+    /*
+      if ( this._graphQL == null ) this.initGraphQLSchema();
+      if ( this._graphQL.qGetToMe == null ) { retval = this._graphQL.qGetToMe; }
+      if ( retval == null ) {
+        retval= `query get${this.name}ToMe($id:ID!) {`+
+                `  ${this.name}(id:$id);`+
+                `}`;
+        this._graphQL.qGetToMe = retval;
+      }
+      */
+    return retval;
+  }
+
+
+  /**
+   * GraphQL Query types, used in mutations and such.
+   *
+   * @return {string} -
+   */
+  static getGraphQLSchema_QueryTypes() {
+    let retval = null;
+    if ( this._graphQL == null ) this.initGraphQLSchema();
+    if ( this._graphQL.querytypes == null ) { retval = this._graphQL.querytypes; }
+    if ( retval == null ) {
+      let varlength = 10;
+      this._graphQL.vars.forEach(function(p) { varlength = Math.max(varlength, p[0].length); });
+
+      retval = `input i${this.name} {\n`;
+
+      for (let i=0; i<this._graphQL.vars.length; i++) {
+        let vv = this._graphQL.vars[i];
+        Logger.g().info('  vv is ', vv);
+        retval += `  ${vv[0].padEnd(varlength, ' ')} : ${vv[1]}\n`;
+      }
+
+      retval += `}\n`;
+    }
+    return retval;
+  }
+
+
+  /**
+   * GraphQL Query Generator.
+   * TODO: finish.
+   *
+   * @return {string} -
+   */
+  static getGraphQLSchema_Mutations() {
+    let retval = null;
+    if ( this._graphQL == null ) this.initGraphQLSchema();
+    if ( this._graphQL.mutations == null ) { retval = this._graphQL.mutations; }
+    if ( retval == null ) {
+      retval  = `\n`;
+      retval += `  # --- ${this.name}\n`;
+      retval += `  create${this.name}(_createThis${this.name} : i${this.name}!) : ${this.name}\n`;
+      retval += `  update${this.name}(_id : ID!, _updateThis${this.name} : i${this.name}!) : ${this.name}\n`; // "save" as well
+      retval += `  delete${this.name}(_id : ID!) : Boolean\n`;
+    }
+    return retval;
+  }
+
+
+  // ---------------------------------------------------------------------
+  // GraphQL functions
+  // ---------------------------------------------------------------------
+  // =====================================================================
 
 
   /**
@@ -972,6 +1289,54 @@ class WovModel extends entity.WovModelEntity {
     }.bind(this));
   }
 
+
+  /**
+   * Overlysimple GraphQL call. A helper function.
+   *
+   * @param {string} _qtype - ex. query or mutation
+   * @param {string} _qname - name of the GraphQL query
+   * @param {object} _din   - data in, passed to the one assumed 'input' param; if only a numbr, then assume id query
+   * @param {string} _dout  - attributes returned
+   * @return {WovReturn}    - attributes returned in data
+   */
+  static async callGraphQL(_qtype, _qname, _din, _dout) {
+    let q = null;
+    if ( (typeof _din) == 'number' ) { q = `${_qtype} { get${_qname}(id : ${_din}) { ${_dout} } }`; }
+    else q = `${_qtype} { ${_qname}(input : ${_din}) { ${_dout} } }`;
+
+    // let q = `${_qtype} { ${_qname}(input : ${JSON.stringify(_din)}) { ${_dout} }`;
+    this.l.info('q: ', q);
+    let retval = await this.cl.ms.post('/graphql', null, {query : q});
+    this.l.info('retval: ', JSON.stringify(retval, null, 2) );
+
+    /*
+    if ( r.statusCode != 200 ) {
+      retval = WR.retError({qname : _qname, qin : _din}, `Failed GraphQL call "${_qtype}:${_qname}"`);
+    }
+    else { retval = WR.retSuccess(r.data.data[qname]); }
+    */
+    return retval;
+  }
+
+
+  /**
+   * Generates all the fields as a space separated list (used for queries).
+   *
+   * Uses/creates cache where possible.
+   *
+   * @return {string} -
+   */
+  static getAllGraphQLFields() {
+    if ( this._graphQL == null ) this.initGraphQLSchema();
+
+    let retval = this._graphQL.allfields;
+    if ( retval == null ) {
+      retval = '';
+      for (let i=0; i<this._graphQL.vars.length; i++) { retval += `${this._graphQL.vars[i][0]} `; }
+      this._graphQL.fields = retval;
+    }
+    return retval;
+  }
 
   /**
    * Convert string to a Symbol. This symbol is used in comparisons as they are faster to compare.

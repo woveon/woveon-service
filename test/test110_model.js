@@ -13,6 +13,7 @@ const TestModel2 = TMS.TestModel2;
 const TestModel3 = TMS.TestModel3;
 const MP         = TMS.MP;
 
+const performance = require('perf_hooks').performance;
 
 let mtag ='test110';
 
@@ -25,7 +26,7 @@ let logger = new Logger(mtag, {
   titles : false,
 });
 
-describe(`> ${mtag}: `, async function() {
+describe(`> ${mtag}: Generic Model Tests`, async function() {
 
   let cl     = null;
   let statelayer = null;
@@ -56,8 +57,8 @@ describe(`> ${mtag}: `, async function() {
 
     testdb = new WovDBPostgres('testdb', logger);
     await testdb.connect();
-    cl = new Service.WovClientLocal(logger, testdb,
-      [TestModel, TestModel2, TestModel3, MP, TMS.Car, TMS.Tire, TMS.Wheel, TMS.ParentModel, TMS.ChildModel, TMS.ChildChildModel, TMS.AssModelP, TMS.AssModelC, TMS.ReadInA, TMS.ReadInB, TMS.ReadInC, TMS.ReadInCChild, TMS.AA, TMS.BB, TMS.CC]); // , ['testtable', 'testtable2', 'testmodel3', 'mp']);
+    cl = new Service.WovClientLocal(logger,
+      [TestModel, TestModel2, TestModel3, MP, TMS.Car, TMS.Tire, TMS.Wheel, TMS.ParentModel, TMS.ChildModel, TMS.ChildChildModel, TMS.AssModelP, TMS.AssModelC, TMS.ReadInA, TMS.ReadInB, TMS.ReadInC, TMS.ReadInCChild, TMS.AA, TMS.BB, TMS.CC], testdb); // , ['testtable', 'testtable2', 'testmodel3', 'mp']);
     sl = new Service.WovStateLayer(logger, [cl]);
     await cl.init(sl, true, true, true);
   });
@@ -174,8 +175,6 @@ describe(`> ${mtag}: `, async function() {
     });
 
     it(`> create : ${__fileloc}`, async function() {
-      // logger.info('TestModel.cl: ', TestModel.cl);
-      logger.info('TestModel.cl.createOne: ', TestModel.cl.createOne);
       let val = await TestModel.createOne(data);
       // logger.info('val: ', val);
       expect(val.get('id')).to.equal(data.id, val);
@@ -363,7 +362,9 @@ describe(`> ${mtag}: `, async function() {
         logger.info(' use cache : ', usecache);
         let ac = [];
         for (let i=0; i<n; i++) {
+          as = performance.now();
           result = TMS.AA.deRef(null, 'CC:toa1', usecache);
+          ac.push(performance.now()-as);
         }
         logger.info(' - first ', ac[1]-ac[0]);
         for (let i=0; i< ac.length; i++) { logger.info(` - ${i} : ${ac[i]}`); }

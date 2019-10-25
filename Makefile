@@ -61,8 +61,12 @@ pg :
 	PGPASSWORD=${POSTGRES_PASSWORD} psql -h localhost -U postgres -d "${WOV_DB}" || printf '\nERROR: run "make pg-start" to start postgres (and make pg-db to populate it)\n\n'
 
 test : .FORCE
-	${ENVS} mocha -b $$TEST --timeout ${DEFAULTTESTTIMEOUT}
+	$(eval TESTFILE := $(shell ls test/${TEST}*) )
+	${ENVS} mocha -b ${TESTFILE} --timeout ${DEFAULTTESTTIMEOUT}
+#	${ENVS} mocha -b $$TEST --timeout ${DEFAULTTESTTIMEOUT}
 
 test-html : .FORCE
-	${ENVS} WOV_TEST=$$TEST mocha -b $$TEST --timeout ${DEFAULTTESTTIMEOUT} --reporter mochawesome --reporter-options reportDir=.mochawesome-report ; open -g ./.mochawesome-report/mochawesome.html
+	$(eval TESTFILE := $(shell ls test/${TEST}*) )
+	${ENVS} WOV_TEST=${TEST} mocha -b ${TESTFILE} --timeout ${DEFAULTTESTTIMEOUT} --reporter mochawesome --reporter-options reportDir=.mochawesome-report ; open -g ./.mochawesome-report/mochawesome.html
+#	${ENVS} WOV_TEST=$$TEST mocha -b $$TEST --timeout ${DEFAULTTESTTIMEOUT} --reporter mochawesome --reporter-options reportDir=.mochawesome-report ; open -g ./.mochawesome-report/mochawesome.html
 

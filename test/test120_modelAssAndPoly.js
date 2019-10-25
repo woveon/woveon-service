@@ -10,7 +10,7 @@ const addContext = require('mochawesome/addContext');
 const {WovDBPostgres} = require('../src/wovdb');
 
 
-let mtag ='7b_model';
+let mtag ='test120';
 
 let logger = new Logger(mtag, {
   debug    : true,
@@ -42,12 +42,7 @@ describe(`> ${mtag}: `, async function() {
 
     testdb = new WovDBPostgres('testdb', logger);
     await testdb.connect();
-    /*
-    await C.data('db').connect()
-      .then(() => { logger.verbose('  ... db connected'); })
-      .catch( (e) => { logger.throwError('  ... db connection error', e.stack); });
-      */
-    cl = new Service.WovModelClient(logger, testdb, [M.ParentModel, M.ChildModel, M.ChildChildModel, M.AssModelP, M.AssModelC, M.ReadInA, M.ReadInB, M.ReadInC, M.ReadInCChild]);
+    cl = new Service.WovClientLocal(logger, [M.ParentModel, M.ChildModel, M.ChildChildModel, M.AssModelP, M.AssModelC, M.ReadInA, M.ReadInB, M.ReadInC, M.ReadInCChild], testdb);
     sl = new Service.WovStateLayer(logger, [cl]);
     await cl.init(sl, true, true, true);
   });
@@ -246,7 +241,7 @@ describe(`> ${mtag}: `, async function() {
       expect(result).to.not.be.null;
       expect(result).to.include({
         dir : 'to',
-        ref       : '_namedb_ref',
+        ref : '_namedb_ref',
       });
       expect(result.model.name).to.equal('ReadInB');
 

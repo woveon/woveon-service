@@ -110,7 +110,11 @@ module.exports = function() {
   ReadInB.setSchema({schema : {_named_ref : 'integer', _readina_ref : 'integer'}, trans : {named : 'ReadInA'}});
 
   const ReadInC = class ReadInC extends Service.WovModel { static tablename   = 'readinc'; };
-  ReadInC.setSchema({schema : {_nameda_ref : 'integer', _readina_ref : 'integer'}, trans : {nameda : 'ReadInA'}});
+  ReadInC.setSchema({
+    schema : {_nameda_ref : 'integer', _readina_ref : 'integer'},
+    trans  : {nameda : 'ReadInA'},
+    erels  : {readina : 'many', nameda : 'many'},
+  });
 
   const ReadInCChild = class ReadInCChild extends ReadInC { static tablename   = 'readincchild'; };
   ReadInCChild.setSchema({schema : {_namedb_ref : 'integer', _readinb_ref : 'integer'}, trans : {namedb : 'ReadInB'}});
