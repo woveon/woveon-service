@@ -1,12 +1,12 @@
 
 const expect    = require('chai').expect;
 const Logger    = require('woveon-logger');
-const WR        = require('../src/wovreturn');
+// const WR        = require('../src/wovreturn');
 const Service   = require('../src/index');
 const express   = require('express');
 
-const {ApolloServer, gql} = require('apollo-server-express');
-const requireFromString   = require('require-from-string');
+// const {ApolloServer, gql} = require('apollo-server-express');
+// const requireFromString   = require('require-from-string');
 
 const TESTPORT=3010;
 
@@ -25,36 +25,35 @@ let logger = new Logger(mtag, {
 });
 
 
-
 describe(`> ${mtag}: `, async function() {
 
-    let sl = null;       // state layer
-    let cl = null;       // client
-    let rsl = null;      // remote state layer
-    let rcl = null;      // remote client
-    let gqls = null;     // GraphQL Server
-    let car = null;
-    let listener = null; // listener for GraphGL Server
-    let testdb = null;
-    let clogger = new Logger('config', {debug : true, showName : true, dbCharLen : 40, color : 'bgBlue white'}, {});
-    Service.Config.staticconfig=1;
+  let listener = null;
+  let lsl = null;      // remote state layer
+  let lcl = null;      // remote client
+  let rsl = null;      // remote state layer
+  let rcl = null;      // remote client
+  let testdb = null;
+  let clogger = new Logger('config', {debug : true, showName : true, dbCharLen : 40, color : 'bgBlue white'}, {});
+  Service.Config.staticconfig=1;
 
-    new Service.Config(clogger, [
-      'WOV_testdb_type',         // postgres, mongo, etc.
-      'WOV_testdb_username',     // ex. 'postgres'
-      'WOV_testdb_endpoint',     // 'localhost' for ssh tunneling, AWS db for pod
-      'WOV_testdb_database',     // 'woveon' is default
-      'WOV_testdb_port',         // ssh tunneling port, or postgres default port 5432
-    ],
-      ['WOV_testdb_password'], {blankenvvars : false});
+  new Service.Config(clogger, [
+    'WOV_testdb_type',         // postgres, mongo, etc.
+    'WOV_testdb_username',     // ex. 'postgres'
+    'WOV_testdb_endpoint',     // 'localhost' for ssh tunneling, AWS db for pod
+    'WOV_testdb_database',     // 'woveon' is default
+    'WOV_testdb_port',         // ssh tunneling port, or postgres default port 5432
+  ],
+    ['WOV_testdb_password'], {blankenvvars : false});
 
 
-    // setup the service
-    before(async function() {
-      this.timeout(3000);
-      testdb = new Service.WovDBPostgres('testdb', logger);
-      await testdb.connect();
-    });
+  // setup the service
+  before(async function() {
+    this.timeout(3000);
+    testdb = new Service.WovDBPostgres('testdb', logger);
+    await testdb.connect();
+    listener = new Service.Listener(TESTPORT, logger, null, '/testing');
+    await listener.init();
+  });
 
 
   it('> Create local and remote state layers', async function() {
@@ -147,12 +146,14 @@ describe(`> ${mtag}: `, async function() {
     lcar2 = null;
     lcar3 = null;
 
-    await lsl.startRemotesServer(express(), TESTPORT);
+    // await lsl.startRemotesServer(express(), TESTPORT);
+    await lsl.initModelsServer(listener);
+    await listener.listen();
 
 
     // RemoteClient tests
     // ---------------------------------------------------------------------
-    let msr = new Service.Requester(logger, `http://localhost:${TESTPORT}`);
+    let msr = new Service.Requester(logger, `http://localhost:${TESTPORT}${listener.root}/models/graphql`);
     rcl = new Service.WovClientRemote(logger, [rTMS.Car, rTMS.Tire, rTMS.Wheel], msr);
     rsl = new Service.WovStateLayer(logger, [rcl]);
     await rsl.init();

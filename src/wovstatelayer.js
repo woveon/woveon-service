@@ -8,6 +8,7 @@
  * @typedef WovEntityModel
  * @typedef WovStateLayer
  * @typedef Logger
+ * @typedef Listener
  */
 
 // const Logger               = require('woveon-logger');
@@ -192,10 +193,15 @@ module.exports = class WovStateLayer {
 
 
   /**
+   * Initializes the Models Server on the given listener at path _listener.root/models/graphql.
    *
-   * @param {Express} _app - expressJS app to bind this server to
+   * The Models Server is how a microservice externalizes its local models to the system for basic
+   * crud operations.
+   *
+   * @param {Listener} _listener - listener to listen on. generally, the microservice's listener.
+   * @return {undefined} -
    */
-  async startRemotesServer(_app, _port) {
+  async initModelsServer(_listener) {
     let schemas = '';
     let resolvers = '';
 
@@ -253,10 +259,8 @@ module.exports = class WovStateLayer {
       */
     });
 
-    this._rsapp = _app;
-    this._rs.applyMiddleware({app : this._rsapp}); // , path : '/graphql'});
-    this._rsapp.listen(_port);
-    this.l.info(`... loaded graphQL on: localhost:${_port}${this._rs.graphqlPath}`);
+    this._rs.applyMiddleware({app : _listener.app, path : `${_listener.root}/models/graphql`}); // , path : '/graphql'});
+    this.l.info(`... loaded graphQL at route: '${this._rs.graphqlPath}'`);
 
 
   }
