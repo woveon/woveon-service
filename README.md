@@ -14,7 +14,7 @@ WoveonService is a microservice development platform, designed for REST/GraphQL 
 
 ## See the [Wiki](https://github.com/woveon/woveon-service/wiki) for documentation.
 
-![Microservice Overview](https://raw.githubusercontent.com/wiki/woveon/woveon-service/imgs/wovservice_0002.png)
+<img src="https://raw.githubusercontent.com/wiki/woveon/woveon-service/imgs/wovservice_0002.png" width="600" alt="WoveonService Microservice Overview Diagram">
 
 ## Origins
 
