@@ -12,7 +12,7 @@ WoveonService is a microservice development platform, designed for REST/GraphQL 
 - performing application computations
 - a clear, organized and small API
 
->> See the [Wiki](https://github.com/woveon/woveon-service/wiki) for documentation.
+## See the [Wiki](https://github.com/woveon/woveon-service/wiki) for documentation.
 
 ![Microservice Overview](https://raw.githubusercontent.com/wiki/woveon/woveon-service/imgs/wovservice_0002.png)
 
@@ -23,5 +23,5 @@ We first built on ExpressJS, with clear and understandable code until the API gr
 
 ## About Woveon
 
->> Woveon is an enterprise conversation management software. Using AI and machine learning, it helps businesses take control of their conversations - to provide exceptional customer experience, audit for compliance, and maximize revenue.
+Woveon is an enterprise conversation management software. Using AI and machine learning, it helps businesses take control of their conversations - to provide exceptional customer experience, audit for compliance, and maximize revenue.
 
