@@ -23,7 +23,8 @@ all:
 	@echo "  : make mongo-stop  -> stops local db Docker container"
 	@echo "  : make test        -> run tests"
 	@echo "  : make test-html   -> run tests with GUI output"
-	@echo "       TEST=test/X ----> add to make test/test-html to select a specific test"
+	@echo "       TEST=X ----> add to make test/test-html to select a specific test"
+	@echo "       ex. make test-html TEST=test110"
 	@echo ""
 
 

@@ -51,7 +51,7 @@ module.exports = class WovClientRemote extends entity.WovClientEntity {
 
 
   /**
-   * Reads in the data by the id.
+   * Reads in the models by the id.
    *
    * @param {integer} _id -
    * @param {WovModel} _Model - the Model class
@@ -64,14 +64,15 @@ module.exports = class WovClientRemote extends entity.WovClientEntity {
     let qq = `get${_Model.name}ByID`;
     let q  = `query { ${qq}(id : ${_id}) { id ${fields}} }`;
 
-    this.l.info('q: ', q);
+    // this.l.aspect('ws.getByID', `getByID(${_id}) q: `, q);
     let result = await this.msr.post('/graphql', null, {query : q});
-    this.l.info('result: ', JSON.stringify(result, null, 2) );
+    // this.l.info('result: ', JSON.stringify(result, null, 2) );
+    this.l.aspect('ws.getByID', `getByID(${_id}) q: `, q, '\nresult: ', JSON.stringify(result, null, 2) );
 
 
     if ( result.success == true ) {
       let d = result.data.data[qq];
-      this.l.info('d is ', d);
+      // this.l.info('d is ', d);
       if ( d != null ) { d.id = parseInt(d.id); retval = new _Model(d); }
       else retval = null; // default value, but placing this code here to be explicit
     }
@@ -86,22 +87,30 @@ module.exports = class WovClientRemote extends entity.WovClientEntity {
     return retval;
   }
 
+  /**
+   * Reads in the models by the ids.
+   *
+   * @param {Array<integer>} _ids -
+   * @param {WovModel} _Model - the Model class
+   * @param {string|null} _fields - space sparates string of fields to return. null returns all known to model.
+   * @return {WovModel|Error} -
+   */
   async getByIDs(_ids, _Model, _fields) {
     let retval = null;
     let fields = _fields || _Model.getAllGraphQLFields();
     let qq = `get${_Model.name}ByIDs`;
     let q  = `query { ${qq}(ids : [${_ids}]) { id ${fields}} }`;
 
-    this.l.info('q: ', q);
+    // this.l.info('q: ', q);
     let result = await this.msr.post('/graphql', null, {query : q});
-    this.l.info('result: ', JSON.stringify(result, null, 2) );
+    // this.l.info('result: ', JSON.stringify(result, null, 2) );
 
 
     if ( result.success == true ) {
       let dd = result.data.data[qq];
       for (let i=0; i<dd.length; i++) {
         let d = dd[i];
-        this.l.info('d is ', d);
+        // this.l.info('d is ', d);
         if ( d != null ) { d.id = parseInt(d.id); result.data.data[qq][i] = new _Model(d); }
         else result.data.data[qq][i] = null; // default value, but placing this code here to be explicit
       }
@@ -122,7 +131,7 @@ module.exports = class WovClientRemote extends entity.WovClientEntity {
   /**
    * Creates from data.
    *
-   * @param {integer} _data -
+   * @param {object} _data -
    * @param {WovModel} _Model - the Model class
    * @param {string|null} _fields - space sparates string of fields to return. null returns all known to model.
    * @return {WovModel|Error} -
@@ -144,11 +153,20 @@ module.exports = class WovClientRemote extends entity.WovClientEntity {
     }
     else { retval = result; }
 
+    this.l.aspect('ws.createOne', `createOne( ${_data} ) of ${_Model.tablename} : `, retval);
+
+
     return retval;
   }
 
 
   /**
+   * Updates a model of the given id.
+   *
+   * @param {integer} _id - id of the model
+   * @param {object} _data -
+   * @param {WovModel} _Model - the Model class
+   * @param {string|null} _fields - space sparates string of fields to return. null returns all known to model.
    * @return {WovModel|Error} -
    */
   async updateOne(_id, _data, _Model, _fields) {
@@ -159,10 +177,10 @@ module.exports = class WovClientRemote extends entity.WovClientEntity {
              `  ${qq}(_id : $_id, _updateThis${_Model.name} : $input) { id ${fields} }\n`+
              `}\n`;  // TODO : cache this
 
-    this.l.info('updateOne call : ', q);
-    this.l.info('updateOne call data : ', _data);
+    // this.l.info('updateOne call : ', q);
+    // this.l.info('updateOne call data : ', _data);
     let result = await this.msr.post('/graphql', null, {query : q, variables : {_id : _id, input : _data}});
-    this.l.info('updateOne result: ', result);
+    // this.l.info('updateOne result: ', result);
 
     if ( result.success == true ) {
       let d = result.data.data[qq];
@@ -174,12 +192,15 @@ module.exports = class WovClientRemote extends entity.WovClientEntity {
     }
     else { retval = result; }
 
-    this.l.info('updateOne retval: ', JSON.stringify(retval));
+    // this.l.info('updateOne retval: ', JSON.stringify(retval));
     return retval;
   }
 
 
   /**
+   * Tells the model to save.
+   *
+   * @param {WovModel} _model -
    * @return {boolean} - true on success, false on failure
    */
   async saveOne(_model) {
@@ -192,8 +213,8 @@ module.exports = class WovClientRemote extends entity.WovClientEntity {
     });
 
     let result = await this.updateOne(_model.get('id'), updata, _model.constructor, 'id');
-    this.l.info('saveOne retval: ', JSON.stringify(result));
-    this.l.info('model : ', _model.get());
+    // this.l.info('saveOne retval: ', JSON.stringify(result));
+    // this.l.info('model : ', _model.get());
 
     // reset dirty if success
     if ( (result instanceof Error) == false ) { _model._dirty = {}; retval = true; }

@@ -72,8 +72,12 @@ module.exports = function() {
 
 
   // ---------------------------------------------------------------------
-  // Car / Tire / Wheel
-  const Car = class Car extends Service.WovModel { static tablename = 'car'; };
+  // Vehicle / Car / Tire / Wheel
+
+  const Vehicle = class Vehicle extends Service.WovModel { static tablename = 'vehicle'; };
+  Vehicle.setSchema({schema : {numtires : 'integer'}});
+
+  const Car = class Car extends Vehicle { static tablename = 'car'; };
   Car.setSchema({
     schema : {
       nameplate : 'text',
@@ -168,7 +172,7 @@ module.exports = function() {
     ParentModel, ChildModel, ChildChildModel,
     AssModelP, AssModelC,
     MP,
-    Car, Tire, Wheel,
+    Vehicle, Car, Tire, Wheel,
     ReadInA, ReadInB, ReadInC, ReadInCChild,
     SingularTestA, SingularTestB, SingularTestC,
     AA, BB, CC,

@@ -81,15 +81,17 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
   async init(_sl, _doDrop, _doTable, _doView) {
     entity.WovClientEntity.prototype.init.call(this, _sl);
     let models = Object.values(this.table2model);
-    for (let k in models ) {
-      if ( models.hasOwnProperty(k) ) {
-        let m = models[k];
+    for (let i=0; i<models.length; i++) {
+      // this.l.info(`model k  ${i} ,  len:${models.length}`);
+      // if ( models.hasOwnProperty(k) ) {
+        let m = models[i];
+        // this.l.info(`model ${m.name}: isInited? ${m.isInited()}.`);
         if ( m.isInited() ) {
-          // this.l.info('doInitDB for model : ', m.name);
+          // this.l.info('WovClientLocal initDB for model : ', m.name);
           // let result = await models[k].doInitDB(_doDrop, _doTable, _doView);
-          let result = await this.doInitDB(_doDrop, _doTable, _doView, models[k]);
+          let result = await this.doInitDB(_doDrop, _doTable, _doView, models[i]);
           if ( result instanceof WovReturn ) {
-            this.l.info('result: ', result);
+            // this.l.info('result: ', result);
             this.l.rethrowError(result.data, `Error creating table for model '${m.name}'.`);
           }
 
@@ -97,8 +99,9 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
           // this.statelayer[`model_${m.name}`] = m;
           // if ( this.statelayer != null ) this.statelayer[`${m.name}`] = m;
         }
-      }
+      // }
     }
+    // this.l.info(`done ClientLocal init`);
   }
 
 
@@ -109,12 +112,7 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
    */
   getGraphQLSchemas() {
     let models = Object.values(this.table2model);
-    let retval = {
-      queries   : '',    // query definitions ex. getX(id : ID!) : X
-      mutations : '',    // mutations. ex. createX(xToCreate : iCreateX!) : X
-      query_t   : '',    // query/mutation types for mutations and create/update. ex. iCreateX { foo : String! }
-      schemas   : '',    //
-    };
+    let retval = entity.getBlankServerConfig_Schemas();
     for (let k in models ) {
       if ( models.hasOwnProperty(k) ) {
         let m = models[k];
@@ -136,12 +134,7 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
    */
   getGraphQLResolvers() {
     let models = Object.values(this.table2model);
-    let retval = {
-      queryjs    : '',
-      mutationjs : '',
-      modeljs    : '',
-      exportsjs  : '',
-    };
+    let retval = entity.getBlankServerConfig_Resolvers();
     for (let k in models ) {
       if ( models.hasOwnProperty(k) ) {
         let m = models[k];
@@ -385,25 +378,37 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
    */
   async createOne(_data, _Model) {
     let retval = null;
+    let Mod = _Model;
 
     // veryify data in
     if ( ! (_data instanceof Object) ) {
-      retval = WovReturn.retError(_data, `${_Model.name}::createOne(...) requires _data to be an Object.`);
+      retval = WovReturn.retError(_data, `${Mod.name}::createOne(...) requires _data to be an Object.`);
+    }
+
+    // Polymorphic models are possible when _data has _model_t.
+    if ( _data._model_t !== undefined ) {
+      // TODO create a test case for this
+      if ( _data._model_t != Mod.name ) { // polymorphic
+        Mod = this[_data._model_t]; // get the model
+        if ( Mod == null ) { this.l.throwError(`createOne for '${_data._model_t}' failed to find model on client.`); }
+      }
     }
 
     if ( retval == null ) {
-      let qp = this._buildQueryParams(_data, _data, 'insert', _Model);
-      let q = `INSERT INTO ${_Model.tablename} (${qp.colnames.join(', ')})
+      this.l.info('createOne with model ', Mod.name);
+      let qp = this._buildQueryParams(_data, _data, 'insert', Mod);
+      let q = `INSERT INTO ${Mod.tablename} (${qp.colnames.join(', ')})
                VALUES (${qp.cols.join(', ')})
                RETURNING *`;
 
-      let result = await this._runSingularQuery(q, qp.data, `createOne${_Model.name}`).catch(function(e) { return e; });
-      if ( result == null ) retval = WovReturn.retError(_data, `Failed to create ${_Model.name}'.`);
-      else if ( result instanceof Error ) { retval = WovReturn.retError(result, `Failed to create '${_Model.name}'.`); }
-      else retval = new _Model(result);
+      let result = await this._runSingularQuery(q, qp.data, `createOne${Mod.name}`).catch(function(e) { return e; });
+      if ( result == null ) retval = WovReturn.retError(_data, `Failed to create ${Mod.name}'.`);
+      else if ( result instanceof Error ) { retval = WovReturn.retError(result, `Failed to create '${Mod.name}'.`); }
+      else retval = new Mod(result);
     }
 
-    this.l.info('ClientLocal: createOne retval : ', retval);
+    // this.l.info('ClientLocal: createOne retval : ', retval);
+    this.l.aspect('ws.createOne', `createOne( ${_data} ) of ${Mod.tablename} : `, retval);
 
     return retval;
   }
@@ -428,7 +433,7 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
     return await this._runSingularQuery(q, qp.data, `updateOne${_Model.name}`)
       .then(function(r, r2) {
         if ( r == null ) return new Error(`WovClientLocal::updateOne(${_id}, ${JSON.stringify(_data)}, ${_Model.name}) : model of id not found`);
-        Logger.g().info('updateOne returning: ', r, r2);
+        // Logger.g().info('updateOne returning: ', r, r2);
         return r;
       })
       .catch(function(e) { return e; });
@@ -457,13 +462,13 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
    * @return {WovModel|null} -
    */
   async getByID(_id, _Model) {
-    // this.l.info(`getByID(${_id} : this: `, this, this.tablename);
+    // this.l.aspect('ws.getByID', `getByID(${_id} : this: `, this, this.tablename);
     let retval = await this._selectByID(_id, `wsv_${_Model.tablename}`);
-    // this.l.info('retval is ', retval);
     if ( retval != null && !(retval instanceof Error) ) {
       retval = await this._polyReadCheck(retval, _Model);
     }
-    this.l.info(`getByID( ${_id} ) of ${_Model.tablename} : `, retval);
+    this.l.aspect('ws.getByID', `getByID( ${_id} ) of ${_Model.tablename} : `, retval);
+    // this.l.aspect('ws.getByID', 'retval is ', retval);
     return retval;
   }
 
@@ -502,23 +507,22 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
    * Get a model instance by the XID (external id) value.
    * XIDs are good ways to hide internal identifiers from misuse (but keep in mind, ids are faster!).
    *
-   * @param {integer} _xid -
+   * @param {string} _xid -
    * @param {WovModel.class} _Model - the model class
    * @return {WovModel} -
-   * TODO
    */
-  static async getByXID(_xid, _Model) {
+  async getByXID(_xid, _Model) {
     let retval = null;
 
-    if ( this._schema.xid == null ) { retval = WovReturn.retError(this.name, `Called 'getByXID' on model without 'xid'.`); }
+    if ( _Model._schema.xid == null ) { retval = WovReturn.retError(this.name, `Called 'getByXID' on model without 'xid'.`); }
 
     if ( retval == null ) {
       // console.log('getByXID : ', this.name, this.tablename, _xid);
-      let q = `SELECT * FROM wsv_${this.tablename} WHERE xid=$1::uuid`;
+      let q = `SELECT * FROM wsv_${_Model.tablename} WHERE xid=$1::uuid`;
       let d = [_xid];
-      let result = await this.cl._runSingularQuery(q, d, `${this.name}.getByXID`);
+      let result = await this._runSingularQuery(q, d, `${_Model.name}.getByXID`);
       // console.log('result is ', result);
-      if ( result != null && !(result instanceof Error) ) { retval = new this(result); }
+      if ( result != null && !(result instanceof Error) ) { retval = new _Model(result); }
     }
 
     return retval;
@@ -659,9 +663,9 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
       q3 = `CREATE VIEW "wsv_${_Model.tablename}" AS SELECT * FROM "${_Model.tablename}"`;
     }
 
-    this.l.aspect('ms.WovModel_doCreateTableQuery', `q1(${_doDrop}): `, q1);
+    this.l.aspect('ms.WovModel_doCreateTableQuery', `q1(${_doDrop}): `,  q1);
     this.l.aspect('ms.WovModel_doCreateTableQuery', `q2(${_doTable}): `, q2);
-    this.l.aspect('ms.WovModel_doCreateTableQuery', `q3(${_doView}): `, q3);
+    this.l.aspect('ms.WovModel_doCreateTableQuery', `q3(${_doView}): `,  q3);
 
     return (async function() { if ( _doDrop  ) await this._runQuery(q1,  d, 'ms.WovModel__doCreateTableQuery'); }.bind(this))()
       .then(async function() { if ( _doTable ) await this._runQuery(q2,  d, 'ms.WovModel__doCreateTableQuery'); }.bind(this))
@@ -726,7 +730,14 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
           else if ( _qtype == 'insert' ) { retval.cols.push(`$${counter++}::${_Model._schema[_key]}`); }
           else if ( _qtype == 'create' ) { retval.cols.push(`$${counter++}::${_Model._schema[_key]}`); retval.coltypes.push(_Model._schema[_key]); }
           retval.colnames.push(`"${_key}"`);
-          retval.data.push(vals[_key]);
+
+          if ( entity.WovModelEntity.isRef(_key) ) {
+            // ASSUMPTION: if _key is a ref, then look for _X_ref or if nothing in _vals for that ref, look for X_id
+            let v = vals[_key];
+            if ( v === undefined ) { v = vals[entity.WovModelEntity.refToID(_key)]; }
+            retval.data.push(v); // als[_key]);
+          }
+          else { retval.data.push(vals[_key]); }
         }
       }
     }.bind(this));
@@ -823,24 +834,29 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
   }
 
 
+  // getRemotesServerConfigStrings()
   /**
-   * Called to generate configuration for a GraphQL Remote Server from the models on this local client.
+   * Called to generate configuration for a GraphQL Server from the models on this local client, plus passed in code.
    *
    * @return {object} - schema and resolver strings
    */
-  getRemotesServerConfig() {
+  /*
+  getGraphQLServerConfigStrings(_schemaadditions, _resolveradditions) {
     let retval = {schemas : null, resolvers : null};
+    let customschema = Object.assign(entity.getBlankServerConfig_Schema(), _schemaadditions);
+
 
     // Model Remote Schema
     // ---------------------------------------------------------------------
-    let gqlschemadata = this.getGraphQLSchemas();
+    let genschemadata = this.getGraphQLSchemas();
     let gqlschemas = `
 
 # ---------------------------------------------------------------------
 # Query Definitions
 # ---------------------------------------------------------------------
 type Query {
-${gqlschemadata.queries}
+${genschemadata.queries}
+${customschema.queries}
 }
 
   
@@ -848,7 +864,8 @@ ${gqlschemadata.queries}
 # Mutation Definitions
 # ---------------------------------------------------------------------
 type Mutation {
-${gqlschemadata.mutations}
+${genschemadata.mutations}
+${customschema.mutations}
 }
 
 
@@ -856,15 +873,19 @@ ${gqlschemadata.mutations}
 # Query Input Types
 # ---------------------------------------------------------------------
 # input IDs { ids : [ID!] }
-${gqlschemadata.query_t}
+${genschemadata.query_t}
+${customschema.query_t}
 
   
 # ---------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------
-${gqlschemadata.schemas}
+${genschemadata.schemas}
+${customschema.schemas}
 
 `;
+
+    keep working below
 
     // Model Remote Resolvers
     // ---------------------------------------------------------------------
@@ -904,6 +925,7 @@ module.exports = {Query, Mutation, ${gqlresolversdata.exportsjs}}
 
     return retval;
   }
+  */
 
 
   // end GraphQL Server for Remote MS

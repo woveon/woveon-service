@@ -3,7 +3,6 @@ const expect    = require('chai').expect;
 const Logger    = require('woveon-logger');
 // const WR        = require('../src/wovreturn');
 const Service   = require('../src/index');
-const express   = require('express');
 
 // const {ApolloServer, gql} = require('apollo-server-express');
 // const requireFromString   = require('require-from-string');
@@ -56,6 +55,108 @@ describe(`> ${mtag}: `, async function() {
   });
 
 
+  it(`> ${mtag} : GraphQL generation and initing`, async function() {
+    let cardata = {
+      make      : 'Honda',
+      nameplate : 'Pilot',
+      license   : 'Z55555',
+      state     : 'GA',
+      combo     : '1234',
+      numtires  : 4,
+    };
+
+    // deinit models, client and state layer, and delete db tables
+    [lTMS.Vehicle, lTMS.Car, lTMS.Tire, lTMS.Wheel].forEach( function(m) { m.l = null; m.cl = null; });
+    lcl = new Service.WovClientLocal(logger, [lTMS.Vehicle, lTMS.Car, lTMS.Tire, lTMS.Wheel], testdb);
+    lsl = new Service.WovStateLayer(logger, [lcl]);
+    await lsl.init({drop : true}); // drops and recreates all model tables in the db
+    [lTMS.Vehicle, lTMS.Car, lTMS.Tire, lTMS.Wheel].forEach( function(m) { m.l = null; m.cl = null; });
+    lcl = null;
+    lsl = null;
+
+
+    // fails because no client
+    try {
+      await lTMS.Car.createOne(cardata);
+      throw Error(`Should have failed here since model's client is not created`);
+    }
+    catch (e) {}
+
+
+    // create client but without Vehicle, the parent of Car
+    lcl = new Service.WovClientLocal(logger, [lTMS.Car, lTMS.Tire, lTMS.Wheel], testdb);
+    try {
+      await lTMS.Car.createOne(cardata);
+      throw Error(`Should have failed here since Car's parent Vehicle was not inited`);
+    }
+    catch (e) {}
+
+    // Now fails since no state layer
+    try {
+      lcl = new Service.WovClientLocal(logger, [lTMS.Vehicle, lTMS.Car, lTMS.Tire, lTMS.Wheel], testdb);
+      lTMS.Car.getGraphQLSchema();
+      throw Error(`Should have failed here since the client will call getModel on state layer that does not exist.`);
+    }
+    catch (e) {}
+
+    // deinit models
+    [lTMS.Vehicle, lTMS.Car, lTMS.Tire, lTMS.Wheel].forEach( function(m) { m.l = null; m.cl = null; });
+
+
+    // greater spew on these models
+    // lTMS.Vehicle.debugme = true;
+    // lTMS.Car.debugme = true;
+    // lTMS.Tire.debugme = true;
+
+    lcl = new Service.WovClientLocal(logger, [lTMS.Vehicle, lTMS.Car, lTMS.Tire, lTMS.Wheel], testdb);
+    lsl = new Service.WovStateLayer(logger, [lcl]);
+    await lsl.init();
+    // NOTE: should pass even though state layer is not inited
+
+    // schema
+    let s_v = lTMS.Vehicle.getGraphQLSchema();
+    logger.info('Vehicle schema: ', s_v);
+    logger.info('Vehicle_graphQL', lTMS.Vehicle._graphQL);
+    expect(lTMS.Vehicle._graphQL.vars.length).to.equal(1);
+
+    let s_t = lTMS.Tire.getGraphQLSchema();
+    logger.info('Tire schema: ', s_t);
+    logger.info('Tire _graphQL', lTMS.Tire._graphQL);
+    expect(lTMS.Tire._graphQL.vars.length).to.equal(4);
+
+    let s_c = lTMS.Car.getGraphQLSchema();
+    logger.info('Car has own', lTMS.Car.hasOwnProperty('_graphQL'));
+    logger.info('Car schema: ', s_c);
+    logger.info('Car _graphQL', lTMS.Car._graphQL);
+    expect(lTMS.Car._graphQL.vars.length).to.equal(5);
+
+
+    // deinit and try all again, with order of modls changed
+
+    [lTMS.Vehicle, lTMS.Car, lTMS.Tire, lTMS.Wheel].forEach( function(m) { m.l = null; m.cl = null; });
+    lcl = new Service.WovClientLocal(logger, [lTMS.Car, lTMS.Vehicle, lTMS.Tire, lTMS.Wheel], testdb);
+    lsl = new Service.WovStateLayer(logger, [lcl]);
+    await lsl.init();
+
+    // schema
+    s_v = lTMS.Vehicle.getGraphQLSchema();
+    logger.info('Vehicle schema: ', s_v);
+    logger.info('Vehicle_graphQL', lTMS.Vehicle._graphQL);
+    expect(lTMS.Vehicle._graphQL.vars.length).to.equal(1);
+
+    s_t = lTMS.Tire.getGraphQLSchema();
+    logger.info('Tire schema: ', s_t);
+    logger.info('Tire _graphQL', lTMS.Tire._graphQL);
+    expect(lTMS.Tire._graphQL.vars.length).to.equal(4);
+
+    s_c = lTMS.Car.getGraphQLSchema();
+    logger.info('Car has own', lTMS.Car.hasOwnProperty('_graphQL'));
+    logger.info('Car schema: ', s_c);
+    logger.info('Car _graphQL', lTMS.Car._graphQL);
+    expect(lTMS.Car._graphQL.vars.length).to.equal(5);
+
+  });
+
   it('> Create local and remote state layers', async function() {
     let cardata1 = {
       make      : 'Ford',
@@ -63,6 +164,7 @@ describe(`> ${mtag}: `, async function() {
       license   : 'A11111',
       state     : 'PA',
       combo     : '1234',
+      numtires  : 4,
     };
     let cardata2 = {
       make      : 'Mazda',
@@ -70,6 +172,7 @@ describe(`> ${mtag}: `, async function() {
       license   : 'B22222',
       state     : 'DE',
       combo     : '5678',
+      numtires  : 4,
     };
     let lcar1 = null;
     let lcar2 = null;
@@ -81,10 +184,10 @@ describe(`> ${mtag}: `, async function() {
 
     // LocalClient tests
     // ---------------------------------------------------------------------
+    [lTMS.Vehicle, lTMS.Car, lTMS.Tire, lTMS.Wheel].forEach( function(m) { m.l = null; m.cl = null; });
     lcl = new Service.WovClientLocal(logger, [lTMS.Car, lTMS.Tire, lTMS.Wheel], testdb);
     lsl = new Service.WovStateLayer(logger, [lcl]);
-    await lsl.init();
-    await lcl.init(lsl, true, true, true);
+    await lsl.init({drop : true});
 
 
     // create car 1 : createOne (use this for remote tests)
@@ -147,23 +250,24 @@ describe(`> ${mtag}: `, async function() {
     lcar3 = null;
 
     // await lsl.startRemotesServer(express(), TESTPORT);
-    await lsl.initModelsServer(listener);
+    await lsl.initProtServer(listener);
     await listener.listen();
 
 
     // RemoteClient tests
     // ---------------------------------------------------------------------
-    let msr = new Service.Requester(logger, `http://localhost:${TESTPORT}${listener.root}/models/graphql`);
-    rcl = new Service.WovClientRemote(logger, [rTMS.Car, rTMS.Tire, rTMS.Wheel], msr);
+    let msr = new Service.Requester(logger, `http://localhost:${TESTPORT}${listener.root}/prot/graphql`);
+    rcl = new Service.WovClientRemote(logger, [rTMS.Car, rTMS.Vehicle, rTMS.Tire, rTMS.Wheel], msr);
     rsl = new Service.WovStateLayer(logger, [rcl]);
     await rsl.init();
-    await rcl.init(rsl);
 
 
     // cross-local/remote : local car 1 equals to remote car 1
     logger.info('lcar1 id ', lcar1.get('id'));
+    // logger.info('Car Schema: ', rsl.Car.getGraphQLSchema());
     rcar1 = await rsl.Car.getByID(lcar1.get('id'));
-    logger.info('rcar1 : ', rcar1);
+    logger.info('lcar1 : ', lcar1.get());
+    logger.info('rcar1 : ', rcar1.get());
     expect(lcar1.get()).to.deep.equal(rcar1.get());
 
     // getByID returns null if not found

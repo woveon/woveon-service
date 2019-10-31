@@ -441,6 +441,9 @@ class WovModel extends entity.WovModelEntity {
     // selector is a modelname
     else if ( selmod == null && this._schema[ref] != undefined ) {
       this.l.aspect('deRef', `  - selector is a model name`);
+      if ( this.cl.statelayer == null ) {
+        throw Error(`In Model ${this.name}: your client has no statelayer when looking to call WovStateLayer::getModel(${sel}).`);
+      }
       retval = {
         model : this.cl.statelayer.getModel(sel),
         sel   : sel,
@@ -515,6 +518,9 @@ class WovModel extends entity.WovModelEntity {
    */
   static init(_logger, _wovclient) {
 
+    if (this.isInited() ) { throw Error(`Model has already been inited : '${this.name}'.`); }
+    _logger.info(`WovModel init ('${this.name}'): `);
+
     // set static values
     this.cl = _wovclient;
     this.l  = _logger;
@@ -522,8 +528,8 @@ class WovModel extends entity.WovModelEntity {
 
     let parent = Object.getPrototypeOf(this);
 
-    _logger.info(`init: this('${this.name}') parent('${parent.name}')  WovModel('${WovModel.name}').`);
-    _logger.info(`this.tablename ${this.tablename}`);
+    // _logger.info(`init: this('${this.name}') parent('${parent.name}')  WovModel('${WovModel.name}').`);
+    // _logger.info(`this.tablename ${this.tablename}`);
     if ( parent.name != WovModel.name ) { parent.markHasChild();  }
     if ( this.tablename   == null ) throw Error(`WovModel of class '${this.name}' requires model to set static: 'tablename'.`);
     if ( this._transmodel == null ) throw Error(`WovModel of class '${this.name}' requires model to set static: '_transmodel'.`);
@@ -546,31 +552,50 @@ class WovModel extends entity.WovModelEntity {
   /**
    * Retreives models pointing to this, with limiters to restrict results.
    *
+   * @param {integer} _id - the id of 'me' to look up
    * @param {string} _ref - the ref to look up
    * @param {object} _limiters - object of the format in getToMe comments
    * @return {object} - ?
    */
-  async getToMe(_id, _limiters = null) { return this.constructor.cl.getToMe(_id, _ref, this, _limiters); }
+  // async getToMe(_id, _ref, _limiters = null) { return this.constructor.cl.getToMe(_id, _ref, this, _limiters); }
 
 
   /**
-   * Convert a schema to a GraphQL schema.
+   * Convert the model schema to a GraphQL schema.
    * - Build all vars and objs for this object (heritable traits stay in parent class).
    *
-   * @return {string} -
+   * @return {null} -
    */
   static initGraphQLSchema() {
-    let retval = null;
-
+    // let retval = null;
 
     // skip if already done
-    if ( this.hasOwnProperty('_graphQL') == false ) {
+    // this.l.info(`in ${this.name}: initGraphQLSchema : '${this.hasOwnProperty('_graphQL')}' '${this._graphQL}'`);
+    if ( this._graphQL == null || this.hasOwnProperty('_graphQL') == false ) {
+
+      // go to parent
+      let parent = Object.getPrototypeOf(this);
+      if ( parent.name != WovModel.name ) {
+        if (this.debugme) this.l.info(`calling initGraphQLSchema on parent: ${parent.name}: `);
+        parent.initGraphQLSchema();
+        if (this.debugme) this.l.info(`  - done with parent call, back in ${this.name}`);
+      }
+
+      // check for client (i.e. it has been inited)
+      if (this.debugme) this.l.info(`is ${this.name} inited? : ${this.isInited()}`);
+      if ( this.isInited() == false ) {
+        throw Error(`WovModel.${this.name} has not been inited yet. Did you add it to a client when initing your clients?`);
+      }
+
       if (this.debugme) this.l.info(`initGraphQLSchema: ${this.name}: `, this._ownschema);
       this._graphQL = {
         model : this.name,
         vars  : [],
         objs  : [],
       };
+
+      // check parent already inited
+
 
       // for own vars and objects
       for (let k in this._ownschema) {
@@ -644,12 +669,12 @@ class WovModel extends entity.WovModelEntity {
       let models = Object.values(this.cl._models);
       for (let i in models) {
         let m = models[i];
-        // this.l.info(`${this.name} <== ${m.name} : (tablename '${m.tablename}') : transmodel of : `, m._transmodel);
+        if (this.debugme) this.l.info(`${this.name} <== ${m.name} : (tablename '${m.tablename}') : transmodel of : `, m._transmodel);
 
         // for all in schema
         for (let k in m._ownschema) {
           if ( m._ownschema.hasOwnProperty(k) ) {
-            if ( m.debugme ) this.l.info(`  - ${m.name}.${k}`);
+            if ( m.debugme || this.debugme ) this.l.info(`  - checking is ref of : ${m.name}.${k} to ${this.name}`);
             if ( WovModel.isRef(k) ) {
               let addit = false;
 
@@ -692,13 +717,14 @@ class WovModel extends entity.WovModelEntity {
       }
     }
 
-    // go to parent
-    let parent = Object.getPrototypeOf(this);
-    if ( parent.name != WovModel.name ) parent.initGraphQLSchema();
+    // go to parent NOTE: moved this BEFORE so can error if parent is not inited
+    // let parent = Object.getPrototypeOf(this);
+    // if ( parent.name != WovModel.name ) parent.initGraphQLSchema();
 
 
     // this.l.info(`${this.name} : `, this._graphQL);
-    return retval;
+    // return retval;
+    return null;
   }
 
 
@@ -708,15 +734,9 @@ class WovModel extends entity.WovModelEntity {
    * @return {string} - javascript code
    */
   static getGraphQLResolver() {
-    let retval = {
-        queryjs    : '',
-        mutationjs : '',
-        modeljs    : '',
-        exportsjs  : '',
-      };
+    let retval = entity.getBlankServerConfig_Resolvers();
 
-    if ( this._graphQL == null ) this.initGraphQLSchema();
-
+    this.initGraphQLSchema();
     retval.queryjs    = this.getGraphQLResolver_QueryJS();
     retval.mutationjs = this.getGraphQLResolver_MutationJS();
     retval.modeljs    = this.getGraphQLResolver_ModelJS();
@@ -733,7 +753,7 @@ class WovModel extends entity.WovModelEntity {
    */
   static getGraphQLResolver_QueryJS() {
     let retval = null;
-    if ( this._graphQL == null ) this.initGraphQLSchema();
+    this.initGraphQLSchema();
     if ( this._graphQL.rQueryJS == null ) { retval = this._graphQL.rQueryJS; }
     if ( retval == null ) {
       retval  = `\n  // --- ${this.name}\n`;
@@ -779,7 +799,7 @@ class WovModel extends entity.WovModelEntity {
    */
   static getGraphQLResolver_MutationJS() {
     let retval = null;
-    if ( this._graphQL == null ) this.initGraphQLSchema();
+    this.initGraphQLSchema();
     if ( this._graphQL.rMutationJS == null ) { retval = this._graphQL.rMutationJS; }
     if ( retval == null ) {
       retval  = `\n  // --- ${this.name}\n`;
@@ -813,10 +833,11 @@ class WovModel extends entity.WovModelEntity {
    */
   static getGraphQLResolver_ModelJS() {
     let retval = null;
-    if ( this._graphQL == null ) this.initGraphQLSchema();
+    this.initGraphQLSchema();
     if ( this._graphQL.rModelJS== null ) { retval = this._graphQL.rModelJS; }
     if ( retval == null ) {
 
+      // TODO: inheritance?
       // ex. this._graphQL.objs =  [ 'account', 'Account']
       retval = `const ${this.name} = {\n`;
       for (let i=0; i<this._graphQL.objs.length; i++) {
@@ -857,6 +878,7 @@ class WovModel extends entity.WovModelEntity {
         }
       }
 
+      // TODO? inheritance?
       // extra resolver functionality
       if ( this._graphQLExtResolvers != undefined ) {
         let ks = Object.keys(this._graphQLExtResolvers);
@@ -882,7 +904,7 @@ class WovModel extends entity.WovModelEntity {
    */
   static getGraphQLResolver_ExportsJS() {
     let retval = null;
-    if ( this._graphQL == null ) this.initGraphQLSchema();
+    this.initGraphQLSchema();
     if ( this._graphQL.rExportsJS == null ) { retval = this._graphQL.rExportsJS; }
     if ( retval == null ) {
       retval = `${this.name}, `;
@@ -899,7 +921,7 @@ class WovModel extends entity.WovModelEntity {
    * @return {string} - GraphQL type definition for this Model
    */
   static getGraphQLSchema() {
-    if ( this._graphQL == null ) this.initGraphQLSchema();
+    this.initGraphQLSchema();
     let mod = this;
 
     // this.l.info(`getGraphQLSchema: ${this.name}: `, mod._graphQL );
@@ -928,23 +950,15 @@ class WovModel extends entity.WovModelEntity {
       mod = Object.getPrototypeOf(mod);
     } while ( mod != WovModel );
 
-    let retval = {
-      queries   : '',
-      mutations : '',
-      query_t   : '',
-      schemas   : '',
-    };
 
-    // queries
+    // schema
+    let retval = entity.getBlankServerConfig_Schemas();
     retval.queries   += this.getGraphQLSchema_Query_getByID();
     retval.queries   += this.getGraphQLSchema_Query_getByIDs();
     retval.queries   += this.getGraphQLSchema_Query_getByXID();
     retval.queries   += this.getGraphQLSchema_Query_getToMe();
     retval.query_t   += this.getGraphQLSchema_QueryTypes();
     retval.mutations += this.getGraphQLSchema_Mutations();
-
-    // mutations
-    // query_t
 
     // schemas
     if ( extlines.length != 0 ) retval.schemas += extlines.join('\n');
@@ -1045,11 +1059,11 @@ class WovModel extends entity.WovModelEntity {
    */
   static getGraphQLSchema_Query_getByID() {
     let retval = null;
-    if ( this._graphQL == null ) this.initGraphQLSchema();
+    this.initGraphQLSchema();
     if ( this._graphQL.qGetByID == null ) { retval = this._graphQL.qGetByID; }
     if ( retval == null ) {
 
-      Logger.g().info('gg is ', this._graphQL);
+      // Logger.g().info('gg is ', this._graphQL);
 
       // build vars list
       /*
@@ -1062,7 +1076,7 @@ class WovModel extends entity.WovModelEntity {
       Logger.g().info('v is ', v);
       */
 
-      retval = `  get${this.name}ByID(id : ID!) : ${this.name}\n`;
+      retval = `    get${this.name}ByID(id : ID!) : ${this.name}\n`;
       // retval= `  get${this.name}ByID($id:ID!) {\n`+
       //         `    ${this.name}(id:$id) { ${v.join(' ')} };\n`+
       //         `  }\n`;
@@ -1080,10 +1094,10 @@ class WovModel extends entity.WovModelEntity {
    */
   static getGraphQLSchema_Query_getByIDs() {
     let retval = null;
-    if ( this._graphQL == null ) this.initGraphQLSchema();
+    this.initGraphQLSchema();
     if ( this._graphQL.qGetByIDs == null ) { retval = this._graphQL.qGetByIDs; }
     if ( retval == null ) {
-      retval = `  get${this.name}ByIDs(ids : [ID!]) : [${this.name}]\n`;
+      retval = `    get${this.name}ByIDs(ids : [ID!]) : [${this.name}]\n`;
       // retval = `  # TODO\n`+
       //          `  get${this.name}ByIDs($id:ID!) {\n`+
       //          `    ${this.name}(id:$id) { };\n`+
@@ -1101,10 +1115,10 @@ class WovModel extends entity.WovModelEntity {
    */
   static getGraphQLSchema_Query_getByXID() {
     let retval = null;
-    if ( this._graphQL == null ) this.initGraphQLSchema();
+    this.initGraphQLSchema();
     if ( this._graphQL.qGetByXID == null ) { retval = this._graphQL.qGetByXID; }
     if ( retval == null ) {
-      retval = `  get${this.name}ByXID(xid : String!) : ${this.name}\n`;
+      retval = `    get${this.name}ByXID(xid : String!) : ${this.name}\n`;
       // retval= `  get${this.name}ByXID($xid:string!) {\n`+
       //         `    ${this.name}(xid:$xid);\n`+
       //         `  }\n`;
@@ -1123,7 +1137,7 @@ class WovModel extends entity.WovModelEntity {
   static getGraphQLSchema_Query_getToMe(_ModelOther) {
     let retval = '  # getToMe TODO\n';
     /*
-      if ( this._graphQL == null ) this.initGraphQLSchema();
+      this.initGraphQLSchema();
       if ( this._graphQL.qGetToMe == null ) { retval = this._graphQL.qGetToMe; }
       if ( retval == null ) {
         retval= `query get${this.name}ToMe($id:ID!) {`+
@@ -1143,19 +1157,28 @@ class WovModel extends entity.WovModelEntity {
    */
   static getGraphQLSchema_QueryTypes() {
     let retval = null;
-    if ( this._graphQL == null ) this.initGraphQLSchema();
+    this.initGraphQLSchema();
     if ( this._graphQL.querytypes == null ) { retval = this._graphQL.querytypes; }
     if ( retval == null ) {
-      let varlength = 10;
-      this._graphQL.vars.forEach(function(p) { varlength = Math.max(varlength, p[0].length); });
+      let lengthvar = 10;
+      let lengthtype= 8;
+      this._graphQL.vars.forEach(function(p) {
+        lengthvar  = Math.max(lengthvar, p[0].length);
+        lengthtype = Math.max(lengthtype, p[1].length);
+      });
 
       retval = `input i${this.name} {\n`;
 
-      for (let i=0; i<this._graphQL.vars.length; i++) {
-        let vv = this._graphQL.vars[i];
-        Logger.g().info('  vv is ', vv);
-        retval += `  ${vv[0].padEnd(varlength, ' ')} : ${vv[1]}\n`;
-      }
+      // trace through inheritance model to get all values
+      let mod = this;
+      do {
+        for (let i=0; i<mod._graphQL.vars.length; i++) {
+          let vv = mod._graphQL.vars[i];
+          // Logger.g().info('  vv is ', vv);
+          retval += `  ${vv[0].padEnd(lengthvar, ' ')} : ${vv[1].padEnd(lengthtype, ' ')}   # from model ${mod.name}\n`;
+        }
+        mod = Object.getPrototypeOf(mod);
+      } while ( mod != WovModel );
 
       retval += `}\n`;
     }
@@ -1171,7 +1194,7 @@ class WovModel extends entity.WovModelEntity {
    */
   static getGraphQLSchema_Mutations() {
     let retval = null;
-    if ( this._graphQL == null ) this.initGraphQLSchema();
+    this.initGraphQLSchema();
     if ( this._graphQL.mutations == null ) { retval = this._graphQL.mutations; }
     if ( retval == null ) {
       retval  = `\n`;
@@ -1179,6 +1202,8 @@ class WovModel extends entity.WovModelEntity {
       retval += `  create${this.name}(_createThis${this.name} : i${this.name}!) : ${this.name}\n`;
       retval += `  update${this.name}(_id : ID!, _updateThis${this.name} : i${this.name}!) : ${this.name}\n`; // "save" as well
       retval += `  delete${this.name}(_id : ID!) : Boolean\n`;
+
+      this._graphQL.mutaitons = retval;
     }
     return retval;
   }
@@ -1217,7 +1242,10 @@ class WovModel extends entity.WovModelEntity {
    */
   static async setSchema(_sc) {
 
-    if ( _sc.schema == undefined ) _sc.schema = {};
+    if ( _sc.schema == undefined ) {
+      throw new Error(`WovModel::setSchema requires at least a 'schema' value in passed in values. (on '${_sc.schema}')`);
+      // _sc.schema = {};
+    }
     if ( _sc.trans  == undefined ) _sc.trans  = {};
     if ( _sc.erels  == undefined ) _sc.erels  = {};
 
@@ -1327,13 +1355,19 @@ class WovModel extends entity.WovModelEntity {
    * @return {string} -
    */
   static getAllGraphQLFields() {
-    if ( this._graphQL == null ) this.initGraphQLSchema();
-
+    this.initGraphQLSchema();
     let retval = this._graphQL.allfields;
     if ( retval == null ) {
       retval = '';
-      for (let i=0; i<this._graphQL.vars.length; i++) { retval += `${this._graphQL.vars[i][0]} `; }
-      this._graphQL.fields = retval;
+
+      // find all vars, tracing back
+      let mod = this;
+      do {
+        for (let i=0; i<mod._graphQL.vars.length; i++) { retval += `${mod._graphQL.vars[i][0]} `; }
+        mod = Object.getPrototypeOf(mod);
+      } while ( mod != WovModel );
+
+      this._graphQL.allfields = retval;
     }
     return retval;
   }

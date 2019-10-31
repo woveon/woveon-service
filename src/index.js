@@ -1,5 +1,8 @@
 
 // let wtf = require('wtfnode'); // debugging code for not cleanly shutting down
+/**
+ * @typedef integer
+ */
 
 const autoBind       = require('auto-bind-inheritance');
 const CryptoJS       = require('crypto-js'); // library with convenient syntax
@@ -18,9 +21,6 @@ const WovClientRemote  = require('./wovclientremote');
 const WovModel         = require('./wovmodel');
 const WovModelMany     = require('./wovmodelmany');
 const WovStateLayer    = require('./wovstatelayer');
-
-//const WovRemoteModelClient = require('./wovremotemodelclient');
-// const WovRemoteModel       = require('./wovremotemodel');
 
 const {WovDBPostgres, WovDBMongo} = require('./wovdb');
 const {DocMethod}                 = Listener;
@@ -66,19 +66,27 @@ module.exports = class Service {
 
   /**
    * Listener just started.
-  */
+   *
+   * @return {undefined} -
+   */
   async onStartup() {};
+
 
   /**
    * Just ended calls to onStartup. So, after last child class's
    * onStartup. Useful for starting a wakeup process.
+   *
+   * @return {undefined} -
    */
   async onPostStartup() {};
+
 
   /**
    * Called after child's onShutdown, when shutdown was started by the service.
    * NOTE: Call child's onShutdown first, since this is a virtual destructor.
-  */
+   *
+   * @return {undefined} -
+   */
   async onShutdown() {
     if ( this.listener.islistening) await this.listener.close();
     this.listener = null;
@@ -87,7 +95,8 @@ module.exports = class Service {
 
   /**
    * For now, just return true unless this.db exists, then check connection.
-   * @return {bool} - true, since still running
+   *
+   * @return {boolean} - true, since still running
    */
   async onHealth() {
     let retval = null;
@@ -107,19 +116,20 @@ module.exports = class Service {
 
   /**
    * Create the service.
+   *
    * @param {object} _options - additional options
-   *     : name - overwrite the _name
-   *     : port - port this listens on
-   *     : logger - pass in a logger
-   *     : staticdir - where static html is served from, null means no staticdir
-   *     : baseroute - prepended to each endpoint ex. https://host/baseroute/route
+   * : name - overwrite the _name
+   * : port - port this listens on
+   * : logger - pass in a logger
+   * : staticdir - where static html is served from, null means no staticdir
+   * : baseroute - prepended to each endpoint ex. https://host/baseroute/route
    *
-   *     : controllers - object with controller functions that get bound to this service (called in constructor)
-   *     : protects    - function that adds routes to the listener (bound to this service when called in onInit)
-   *     : routes      - function that adds routes to the listener (bound to this service when called in onInit)
+   * : controllers - object with controller functions that get bound to this service (called in constructor)
+   * : protects    - function that adds routes to the listener (bound to this service when called in onInit)
+   * : routes      - function that adds routes to the listener (bound to this service when called in onInit)
    *
-   *     : applayer    - functionality to apply to this service
-   *     : statelayer  - access to stateful data
+   * : applayer    - functionality to apply to this service
+   * : statelayer  - access to stateful data
    *
    */
   constructor(_options) {
@@ -193,7 +203,7 @@ module.exports = class Service {
   /**
    * Starts the listener listening.
    *
-   * @param {bool} _requestip -
+   * @return {undefined} -
    */
   async startup() {
     try {
@@ -214,6 +224,8 @@ module.exports = class Service {
   /**
    * Turns off the service by closing the listener.
    * NOTE: Make sure your service already shut down anything it was managing in onShutdown.
+   *
+   * @return {undefined} -
    */
   async doShutdown() {
     this.logger.aspect('service-levels', '  ... service shutdown');
@@ -222,8 +234,10 @@ module.exports = class Service {
 
 
   /**
+   * Deprecated.
+   *
    * @return {string} -
-    */
+   */
   static generateToken() {
     Logger.g().logDeprecated('generateToken should be called on WovUtil');
     return uuidv4();
@@ -232,7 +246,8 @@ module.exports = class Service {
 
   /**
    * Used to generate tokens. Uses upperalpha/number chars.
-   * @param {int} length - defaults to 20 if empty
+   *
+   * @param {integer} length - defaults to 20 if empty
    * @return {string} - random length string
    */
   static generateRandomString(length = 20) {
@@ -242,7 +257,9 @@ module.exports = class Service {
 
 
   /**
-   * @param {int} length - number of bytes in string returned
+   * Utility function.
+   *
+   * @param {integer} length - number of bytes in string returned
    * @return {string} -
    */
   static generateOrderedString(length = 20) {
@@ -261,6 +278,9 @@ module.exports = class Service {
 
 
   /**
+   * Resets to start, the orderd generateOrderedString function.
+   *
+   * @return {undefined} -
    */
   static orderedStringReset() {
     Logger.g().logDeprecated('orderedStringReset should be called on WovUtil');
@@ -270,6 +290,7 @@ module.exports = class Service {
 
   /**
    * Decrypt data with AES, using a salted key.
+   *
    * @param {*} _saltedkey -
    * @param {*} _secret - Content string to encrypt
    * @return {string} - _secret decrypted to UTF8 string
@@ -284,6 +305,7 @@ module.exports = class Service {
 
   /**
    * Encrypt data with AES, using a salted key.
+   *
    * @param {*} _saltedkey -
    * @param {*} _secret - Thing to encrypt. UTF8, bytes, etc. JSON.stringify don't care.
    * @return {object} - call toString() on the object to get the string
@@ -312,12 +334,13 @@ module.exports.Listener         = Listener;
 module.exports.Requester        = Requester;
 
 // State Layer
+module.exports.entity               = require('./entity');
 module.exports.WovStateLayer        = WovStateLayer;
 module.exports.WovClientLocal       = WovClientLocal;
 module.exports.WovClientRemote      = WovClientRemote;
 module.exports.WovModel             = WovModel;
 module.exports.WovModelMany         = WovModelMany;
-//module.exports.WovRemoteModelClient = WovRemoteModelClient;
+// module.exports.WovRemoteModelClient = WovRemoteModelClient;
 // module.exports.WovRemoteModel       = WovRemoteModel;
 module.exports.WovDBPostgres        = WovDBPostgres;
 module.exports.WovDBMongo           = WovDBMongo;

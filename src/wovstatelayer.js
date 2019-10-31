@@ -15,6 +15,7 @@
 const WovClientLocal   = require('./wovclientlocal');
 const WovClientRemote  = require('./wovclientremote');
 const Logger           = require('woveon-logger');
+const entity           = require('./entity');
 
 const {ApolloServer}    = require('apollo-server-express');
 const requireFromString = require('require-from-string');
@@ -69,19 +70,26 @@ module.exports = class WovStateLayer {
    */
   isInited() { return this._inited; }
 
+
   /**
    * Any async calls to set up the layer.
    *
+   * @param {object} _lcl_i - local client init values
    * @return {WovStateLayer} - returns itself ex. new WovStateLayer(...).init()
    */
-  async init() {
+  async init(_lcl_i = {}) {
+
+    this.l.h2().info('Statelayer init');
+
+    // local client init
+    let lcl_i = Object.assign({}, {drop : false, table : true, view : true}, _lcl_i);
 
     // this.l.info('WovStateLayer init called');
     for (let i=0; i<this._clients.length; i++ ) {
       let c = this._clients[i];
       // this.l.info('init client ', c);
       if ( c instanceof WovClientLocal ) {
-        await c.init(this, false, true, true);
+        await c.init(this, lcl_i.drop, lcl_i.table, lcl_i.view);
       }
       else if ( c instanceof WovClientRemote) {
         await c.init(this);
@@ -192,40 +200,88 @@ module.exports = class WovStateLayer {
       */
 
 
+  // =====================================================================
+  // ---------------------------------------------------------------------
+  // Servers
+  // ---------------------------------------------------------------------
+
+
+  /**
+   * The 'pub' server exposes functionality to the world.
+   *
+   * NOTE: it does not send ids by default, using xid instead.
+   *
+   * This is a Helper function to call _initServer, creating the 'pub' server..
+   *
+   * @param {Listener} _listener - listener to listen on. generally, the microservice's listener.
+   * @param {object} _schemaadditions - additional GraphQL schema additions
+   * @param {object} _resolveradditions - object with code to add resolvers : {Query : , Mutation : , ...}
+   * @return {undefined} -
+   */
+  async initPubServer(_listener, _schemaadditions = {}, _resolveradditions = {}) {
+    this._initServer('pub', _listener, _schemaadditions, _resolveradditions);
+  }
+
+
+  /**
+   * The 'prot' server serves models on WovLocalClients (i.e. models it owns) to other microservices in the
+   * system and SHOULD NOT BE EXPOSED TO THE WORLD (except for testing/dev).
+   *
+   * This is a Helper function to call _initServer, creating the 'prot' server..
+   *
+   * @param {Listener} _listener - listener to listen on. generally, the microservice's listener.
+   * @param {object} _schemaadditions - additional GraphQL schema additions
+   * @param {object} _resolveradditions - object with code to add resolvers : {Query : , Mutation : , ...}
+   * @return {undefined} -
+   */
+  async initProtServer(_listener, _schemaadditions = {}, _resolveradditions = {}) {
+    this._initServer('prot', _listener, _schemaadditions, _resolveradditions);
+  }
+
+
   /**
    * Initializes the Models Server on the given listener at path _listener.root/models/graphql.
    *
    * The Models Server is how a microservice externalizes its local models to the system for basic
    * crud operations.
    *
+   * @param {string} _name - The name/type of the server, used to set the route.
    * @param {Listener} _listener - listener to listen on. generally, the microservice's listener.
+   * @param {object} _schemaadditions - additional GraphQL schema additions
+   * @param {object} _resolveradditions - object with CODE to add resolvers : {Query : , Mutation : , ...}
    * @return {undefined} -
    */
-  async initModelsServer(_listener) {
-    let schemas = '';
-    let resolvers = '';
+  async _initServer(_name, _listener, _schemaadditions = {}, _resolveradditions = {}) {
+    let servercfgstrings = {schemas : entity.getBlankServerConfig_Schemas(), resolvers : entity.getBlankServerConfig_Resolvers()};
+
+
+    // add in passed in at top
+    Object.assign(servercfgstrings.schemas, _schemaadditions);
 
     // Build Config from all local clients
     for (let i=0; i<this._clients.length; i++) {
       let cl     = this._clients[i];
       if ( cl instanceof WovClientLocal ) {
-        let cfg = cl.getRemotesServerConfig();
-        schemas   += cfg.schemas;
-        resolvers += cfg.resolvers;
+        entity.mergeServerConfigStrings_Schemas(servercfgstrings.schemas,     cl.getGraphQLSchemas());
+        entity.mergeServerConfigStrings_Resolvers(servercfgstrings.resolvers, cl.getGraphQLResolvers());
       }
     }
 
-    this.l.h3().info('schemas: ', schemas);
-    this.l.h3().info('resolvers: ', resolvers);
-    resolvers = requireFromString(resolvers);
+    // this.l.h3().info('schemas   : ', servercfgstrings.schemas);
+    // this.l.h3().info('resolvers1 : ', servercfgstrings.resolvers);
+    // resolvers = requireFromString(resolvers);
+    // resolvers = Object.assign(resolvers, _resolveradditions);
+    let resolvercode = requireFromString(WovStateLayer.buildGraphQLServer_Resolvers(servercfgstrings.resolvers));
+    entity.mergeServerConfigCode_Resolvers(resolvercode, _resolveradditions);
+    // this.l.h3().info('resolvers2 : ', resolvercode);
 
-    let sl = this;
 
     // Start GraphQL server for the Remote Server
+    // NOTE: creates a schema text file, and a resolver code object
     this._rs = new ApolloServer({
-      typeDefs  : schemas,
-      resolvers : resolvers, // requireFromString(resolvers), // requirefromstring to turn into code
-      context   : ({req}) => {
+      typeDefs  : WovStateLayer.buildGraphQLServer_Schemas(servercfgstrings.schemas),
+      resolvers : resolvercode,
+      context   : ({req}) => {  // eslint-disable-line key-spacing
         let retval = {
           httpVersionMajor : req.httpVersionMajor,
           httpVersionMinor : req.httpVersionMinor,
@@ -237,32 +293,115 @@ module.exports = class WovStateLayer {
         };
         return retval;
       },
-      dataSources : () => ({statelayer : sl}),  // (State Layer)
+      dataSources : () => ({statelayer : this}),  // (State Layer)
       formatError : function(error) {
         Logger.g().error(JSON.stringify(error, null, 2));
         return error;
       },
       formatResponse : (_response, {context}) => {
-        Logger.g().info('response:', _response);
+        // Logger.g().info('response:', _response);
         Logger.g().aspect('listener.incoming', `Handled  : '${context.originalUrl}' with prot GraphQL: '${context.args.query}'`,
           _response.data);
         let retval = _response;
         return retval;
       },
-      /*
-      formatResponse : (function(_response, {context}) {
-        this.l.g().aspect('listener.incoming', `Handled  : '${context.originalUrl}' with prot GraphQL: '${context.args.query}'`,
-          _response.data);
-        let retval = _response;
-        return retval;
-      }).bind(this),
-      */
     });
 
-    this._rs.applyMiddleware({app : _listener.app, path : `${_listener.root}/models/graphql`}); // , path : '/graphql'});
-    this.l.info(`... loaded graphQL at route: '${this._rs.graphqlPath}'`);
-
-
+    // this.l.info('_listener root : ', _listener.root);
+    this._rs.applyMiddleware({app : _listener.app, path : `${_listener.root}/${_name}/graphql`});
+    this.l.info(`... loaded StateLayer '${_name}' server as GraphQL at route: '${this._rs.graphqlPath}'`);
   }
+
+
+  /**
+   * Given an entity.getBlankServerConfig_Schema() object (build from custom and LocalClient model data), write a
+   * GraphQL server schema.
+   *
+   * @param {object} _schemastrings - a entity.getBlankServerConfig_Schema() object
+   * @return {string} -
+   */
+  static buildGraphQLServer_Schemas(_schemastrings) {
+    let retval = `
+
+  # ---------------------------------------------------------------------
+  # Query Definitions
+  # ---------------------------------------------------------------------
+  type Query {
+  ${_schemastrings.queries}
+  }
+
+
+  # ---------------------------------------------------------------------
+  # Mutation Definitions
+  # ---------------------------------------------------------------------
+  type Mutation {
+  ${_schemastrings.mutations}
+  }
+
+
+  # ---------------------------------------------------------------------
+  # Query Input Types
+  # ---------------------------------------------------------------------
+  # input IDs { ids : [ID!] }
+  ${_schemastrings.query_t}
+
+
+  # ---------------------------------------------------------------------
+  # Schemas
+  # ---------------------------------------------------------------------
+  ${_schemastrings.schemas}
+
+  `;
+
+    // Logger.g().info('buildGraphQLServer_Schemas : ', retval);
+
+    return retval;
+  }
+
+
+  /**
+   * Given an entity.getBlankServerConfig_Resolver() object (build from custom and LocalClient model data), write a
+   * javascript for a server resolver.
+   *
+   * @param {object} _resolverstrings - a entity.getBlankServerConfig_Resolver() object
+   * @return {string} -
+   */
+  static buildGraphQLServer_Resolvers(_resolverstrings) {
+    let retval = `
+
+const Logger = require('woveon-logger');
+
+// ---------------------------------------------------------------------
+// Query Implementations
+// ---------------------------------------------------------------------
+const Query = {
+${_resolverstrings.queryjs}
+};
+
+// ---------------------------------------------------------------------
+// Mutation Implementations
+// ---------------------------------------------------------------------
+const Mutation = {
+${_resolverstrings.mutationjs}
+};
+
+// ---------------------------------------------------------------------
+// Model Implementations
+// ---------------------------------------------------------------------
+${_resolverstrings.modeljs}
+
+module.exports = {Query, Mutation, ${_resolverstrings.exportsjs}}
+`;
+
+    // Logger.g().info('buildGraphQLServer_Resolvers : ', retval);
+
+    return retval;
+  }
+
+
+  // ---------------------------------------------------------------------
+  // end Servers
+  // ---------------------------------------------------------------------
+  // =====================================================================
 
 };

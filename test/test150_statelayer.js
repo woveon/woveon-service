@@ -58,7 +58,9 @@ describe(`> ${mtag}: `, async function() {
 
 
   it('> Create a basic State Layer', async function() {
-    cl  = new Service.WovClientLocal(logger, [TMS.Car, TMS.Tire, TMS.Wheel], testdb);
+    let tlmodels = [TMS.Vehicle, TMS.Car, TMS.Tire, TMS.Wheel];
+    tlmodels.forEach( function(m) { m.l = null; m.cl = null; }); // remove any previous init
+    cl  = new Service.WovClientLocal(logger, tlmodels, testdb);
     sl  = new Service.WovStateLayer(logger, [cl]);
     await sl.init();
 

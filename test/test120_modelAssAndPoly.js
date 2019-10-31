@@ -42,7 +42,10 @@ describe(`> ${mtag}: `, async function() {
 
     testdb = new WovDBPostgres('testdb', logger);
     await testdb.connect();
-    cl = new Service.WovClientLocal(logger, [M.ParentModel, M.ChildModel, M.ChildChildModel, M.AssModelP, M.AssModelC, M.ReadInA, M.ReadInB, M.ReadInC, M.ReadInCChild], testdb);
+
+    let tmodels = [M.ParentModel, M.ChildModel, M.ChildChildModel, M.AssModelP, M.AssModelC, M.ReadInA, M.ReadInB, M.ReadInC, M.ReadInCChild];
+    tmodels.forEach( function(m) { m.l = null; m.cl = null; }); // remove any previous init
+    cl = new Service.WovClientLocal(logger, tmodels, testdb);
     sl = new Service.WovStateLayer(logger, [cl]);
     await cl.init(sl, true, true, true);
   });

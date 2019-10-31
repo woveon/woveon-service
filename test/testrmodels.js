@@ -11,7 +11,10 @@ module.exports = function() {
     static tablename = 'store';
   };
 
-  const Car = class Car extends Service.WovModel { static tablename = 'car'; };
+  const Vehicle = class Vehicle extends Service.WovModel { static tablename = 'vehicle'; };
+  Vehicle.setSchema({schema : {numtires : 'integer'}});
+
+  const Car = class Car extends Vehicle { static tablename = 'car'; };
   Car.setSchema({
     schema : {
       nameplate : 'text',
@@ -25,5 +28,5 @@ module.exports = function() {
     sensitive : ['combo'],
   });
 
-  return {Store, Car};
+  return {Store, Vehicle, Car};
 };

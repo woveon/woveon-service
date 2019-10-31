@@ -29,7 +29,6 @@ let logger = new Logger(mtag, {
 describe(`> ${mtag}: Generic Model Tests`, async function() {
 
   let cl     = null;
-  let statelayer = null;
   let testdb = null;
   let clogger = new Logger('config', {debug : true, showName : true, dbCharLen : 40, color : 'bgBlue white'}, {});
   Service.Config.staticconfig=1;
@@ -57,8 +56,11 @@ describe(`> ${mtag}: Generic Model Tests`, async function() {
 
     testdb = new WovDBPostgres('testdb', logger);
     await testdb.connect();
-    cl = new Service.WovClientLocal(logger,
-      [TestModel, TestModel2, TestModel3, MP, TMS.Car, TMS.Tire, TMS.Wheel, TMS.ParentModel, TMS.ChildModel, TMS.ChildChildModel, TMS.AssModelP, TMS.AssModelC, TMS.ReadInA, TMS.ReadInB, TMS.ReadInC, TMS.ReadInCChild, TMS.AA, TMS.BB, TMS.CC], testdb); // , ['testtable', 'testtable2', 'testmodel3', 'mp']);
+
+    let tmodels = [TestModel, TestModel2, TestModel3, MP, TMS.Car, TMS.Tire, TMS.Wheel, TMS.ParentModel, TMS.ChildModel, TMS.ChildChildModel, TMS.AssModelP, TMS.AssModelC, TMS.ReadInA, TMS.ReadInB, TMS.ReadInC, TMS.ReadInCChild, TMS.AA, TMS.BB, TMS.CC];
+    tmodels.forEach( function(m) { m.l = null; m.cl = null; }); // remove any previous init
+
+    cl = new Service.WovClientLocal(logger, tmodels, testdb);
     sl = new Service.WovStateLayer(logger, [cl]);
     await cl.init(sl, true, true, true);
   });
@@ -217,6 +219,15 @@ describe(`> ${mtag}: Generic Model Tests`, async function() {
       expect(TestModel.isRef('name')).to.be.false;
       expect(TestModel2.isRef('title')).to.be.false;
       expect(TestModel2.isRef('_testmodel_ref')).to.be.true;
+    });
+
+    it(`> ref/id converstion : ${__fileloc}`, async function() {
+      expect(Service.entity.WovModelEntity.refToID('_X_ref')).to.equal('X_id');
+      expect(Service.entity.WovModelEntity.refToID('_XXX_ref')).to.equal('XXX_id');
+      expect(Service.entity.WovModelEntity.refToID('__XXX__ref')).to.equal('_XXX__id');
+      expect(Service.entity.WovModelEntity.idToRef('X_id')).to.equal('_X_ref');
+      expect(Service.entity.WovModelEntity.idToRef('XXX_id')).to.equal('_XXX_ref');
+      expect(Service.entity.WovModelEntity.idToRef('_XXX__id')).to.equal('__XXX__ref');
     });
 
     it(`> flatten : ${__fileloc}`, async function() {
