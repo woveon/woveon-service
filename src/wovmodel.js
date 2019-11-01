@@ -252,15 +252,18 @@ class WovModel extends entity.WovModelEntity {
 
         this.constructor.l.aspect('ws.src.WovModel_readIn', `handle from: `, resolved.model.name);
 
-        // let result = await resolved.model.getToMe(this.get('id'), resolved.ref, _limiters);
-        let result = await this.constructor.cl.getToMe(this.get('id'), resolved.ref, resolved.model, _limiters);
+        let result = await resolved.model.getToMe(this.get('id'), resolved.ref, _limiters);
+        // let result = await this.constructor.cl.getToMe(this.get('id'), resolved.ref, resolved.model, _limiters);
 
         this.constructor.l.aspect('ws.src.WovModel_readIn', `Q result:`, result);
+        this.constructor.l.info('result  : ', result);
+        this.constructor.l.info('resolved: ', resolved);
 
         if ( result != null ) {
           if (result instanceof Error) { retval = result; }
           else {
-            let models = null;
+            let models = result; null;
+            /*
             let proms  = [];
             for (let i in result ) {
               if ( result.hasOwnProperty(i) ) {
@@ -271,6 +274,7 @@ class WovModel extends entity.WovModelEntity {
             }
             await Promise.all(proms).then(function(_models) { models = _models; });
             // this.constructor.l.info('all loaded model instances: ', models);
+            */
 
             // add these to this
             if ( resolved.erel == this.constructor.ER_ONE ) {
@@ -761,8 +765,11 @@ class WovModel extends entity.WovModelEntity {
                 // `    console.log('getByID args: ', _args);\n`+
                 `    let retval = await dataSources.statelayer.${this.name}.getByID(_args.id);\n`+
                 // `    console.log('getbyid1: ', retval);\n`+
-                `    if ( retval == null ) return null;\n`+
-                `    else return retval.flatten({deleteid : false, deleterefs : false, deletesensitive : false});\n`+
+                `    if ( retval != null ) {\n`+
+                `      retval = retval.flatten({deleteid : false, deleterefs : false, deletesensitive : false});\n`+
+                `      console.log('getbyid2: ', retval);\n`+
+                `    }\n`+
+                `    return retval;\n`+
                 `  },\n`;
       retval += `  get${this.name}ByXID : async function(_parent, _args, {dataSources}) {\n`+
                 `    return dataSources.statelayer.${this.name}.getByXID(_args.xid);\n`+
@@ -783,6 +790,22 @@ class WovModel extends entity.WovModelEntity {
                 `      }\n`+
                 `    }\n`+
                 `    console.log('--- getByIDs retval: ', retval);\n`+
+                `    return retval;\n`+
+                `  },\n`;
+      retval += `  get${this.name}ToMe : async function(_parent, _args, {dataSources}) {\n`+
+                `    console.log('--- WovModel get${this.name}ToMe with args : ', _args);\n`+
+                `    console.log('    dataSources.statelayer.${this.name}: ', dataSources.statelayer.${this.name});\n`+
+                `    let retval = undefined;\n`+
+                `    let result = await dataSources.statelayer.${this.name}.getToMe(_args.id, _args.ref);\n`+
+                `    console.log('--- getToMe result: ', result);\n`+
+                `    if ( result == null ) retval = null;\n`+
+                `    else {\n`+
+                `      retval = [];\n`+
+                `      for (let i=0; i<result.length; i++) {\n`+
+                `        retval[i] = result[i].flatten({deleteid : false, deleterefs : false, deletesensitive : false});\n`+
+                `      }\n`+
+                `    }\n`+
+                `    console.log('--- getToMe retval: ', retval);\n`+
                 `    return retval;\n`+
                 `  },\n`;
 
@@ -870,9 +893,15 @@ class WovModel extends entity.WovModelEntity {
         else {
           retval +=
             `  ${o[0]} : async function(_parent, __, {args, dataSources}) {\n`+
-            `    console.log('asking to readInMany: ${o[1]}');\n`+
+            `    console.log('asking to readIn: ${o[1]}');\n`+
             `    let me = new dataSources.statelayer.${this.name}(_parent);\n`+
-            `    await me.readInMany('${o[1].slice(1, -1)}');\n`+
+            `    console.log('mod is ', me);\n`+
+            `    console.log('mod qargs ', __);\n`+
+            `    console.log('mod args ', args);\n`+
+            `    console.log('mod readIn is ', me.readIn);\n`+
+            `    console.log('mod is readIn of "${o[1].slice(1, -1)}"');\n`+
+            `    await me.readIn('${o[1].slice(1, -1)}');\n`+
+            `    console.log('mod tires: ', me.tires);\n`+
             `    return me.${o[0]}.get();\n`+
             `  },\n`;
         }
@@ -1135,17 +1164,13 @@ class WovModel extends entity.WovModelEntity {
    * @return {string} -
    */
   static getGraphQLSchema_Query_getToMe(_ModelOther) {
-    let retval = '  # getToMe TODO\n';
-    /*
-      this.initGraphQLSchema();
-      if ( this._graphQL.qGetToMe == null ) { retval = this._graphQL.qGetToMe; }
-      if ( retval == null ) {
-        retval= `query get${this.name}ToMe($id:ID!) {`+
-                `  ${this.name}(id:$id);`+
-                `}`;
-        this._graphQL.qGetToMe = retval;
-      }
-      */
+    let retval = null; // '  # getToMe TODO\n';
+    this.initGraphQLSchema();
+    if ( this._graphQL.qGetToMe == null ) { retval = this._graphQL.qGetToMe; }
+    if ( retval == null ) {
+      retval= `    get${this.name}ToMe(id : ID!, ref : String!) : [${this.name}]\n`;
+      this._graphQL.qGetToMe = retval;
+    }
     return retval;
   }
 
@@ -1203,7 +1228,7 @@ class WovModel extends entity.WovModelEntity {
       retval += `  update${this.name}(_id : ID!, _updateThis${this.name} : i${this.name}!) : ${this.name}\n`; // "save" as well
       retval += `  delete${this.name}(_id : ID!) : Boolean\n`;
 
-      this._graphQL.mutaitons = retval;
+      this._graphQL.mutations = retval;
     }
     return retval;
   }

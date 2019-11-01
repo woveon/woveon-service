@@ -214,12 +214,13 @@ module.exports = class WovStateLayer {
    * This is a Helper function to call _initServer, creating the 'pub' server..
    *
    * @param {Listener} _listener - listener to listen on. generally, the microservice's listener.
+   * @param {string} _endpoint_ext - MACHINE:PORT/ROOT/pubENDPOINT_EXT, where the default is /graphql
    * @param {object} _schemaadditions - additional GraphQL schema additions
    * @param {object} _resolveradditions - object with code to add resolvers : {Query : , Mutation : , ...}
    * @return {undefined} -
    */
-  async initPubServer(_listener, _schemaadditions = {}, _resolveradditions = {}) {
-    this._initServer('pub', _listener, _schemaadditions, _resolveradditions);
+  async initPubServer(_listener, _endpoint_ext, _schemaadditions = {}, _resolveradditions = {}) {
+    this._initServer('pub', _listener, _endpoint_ext, _schemaadditions, _resolveradditions);
   }
 
 
@@ -230,12 +231,13 @@ module.exports = class WovStateLayer {
    * This is a Helper function to call _initServer, creating the 'prot' server..
    *
    * @param {Listener} _listener - listener to listen on. generally, the microservice's listener.
+   * @param {string} _endpoint_ext - MACHINE:PORT/ROOT/pubENDPOINT_EXT, where the default is /graphql
    * @param {object} _schemaadditions - additional GraphQL schema additions
    * @param {object} _resolveradditions - object with code to add resolvers : {Query : , Mutation : , ...}
    * @return {undefined} -
    */
-  async initProtServer(_listener, _schemaadditions = {}, _resolveradditions = {}) {
-    this._initServer('prot', _listener, _schemaadditions, _resolveradditions);
+  async initProtServer(_listener, _endpoint_ext = '/graphql', _schemaadditions = {}, _resolveradditions = {}) {
+    this._initServer('prot', _listener, _endpoint_ext, _schemaadditions, _resolveradditions);
   }
 
 
@@ -246,12 +248,13 @@ module.exports = class WovStateLayer {
    * crud operations.
    *
    * @param {string} _name - The name/type of the server, used to set the route.
+   * @param {string} _endpoint_ext - MACHINE:PORT/ROOT/pubENDPOINT_EXT, where the default is /graphql
    * @param {Listener} _listener - listener to listen on. generally, the microservice's listener.
    * @param {object} _schemaadditions - additional GraphQL schema additions
    * @param {object} _resolveradditions - object with CODE to add resolvers : {Query : , Mutation : , ...}
    * @return {undefined} -
    */
-  async _initServer(_name, _listener, _schemaadditions = {}, _resolveradditions = {}) {
+  async _initServer(_name, _listener, _endpoint_ext = '/graphql', _schemaadditions = {}, _resolveradditions = {}) {
     let servercfgstrings = {schemas : entity.getBlankServerConfig_Schemas(), resolvers : entity.getBlankServerConfig_Resolvers()};
 
 
@@ -299,16 +302,17 @@ module.exports = class WovStateLayer {
         return error;
       },
       formatResponse : (_response, {context}) => {
-        // Logger.g().info('response:', _response);
+        Logger.g().info('response:', _response);
         Logger.g().aspect('listener.incoming', `Handled  : '${context.originalUrl}' with prot GraphQL: '${context.args.query}'`,
           _response.data);
-        let retval = _response;
-        return retval;
+        // let retval = _response.flatten(true, false, false, true);
+        // return retval;
+        return _response;
       },
     });
 
     // this.l.info('_listener root : ', _listener.root);
-    this._rs.applyMiddleware({app : _listener.app, path : `${_listener.root}/${_name}/graphql`});
+    this._rs.applyMiddleware({app : _listener.app, path : `${_listener.root}/${_name}${_endpoint_ext}`});
     this.l.info(`... loaded StateLayer '${_name}' server as GraphQL at route: '${this._rs.graphqlPath}'`);
   }
 
@@ -353,7 +357,7 @@ module.exports = class WovStateLayer {
 
   `;
 
-    // Logger.g().info('buildGraphQLServer_Schemas : ', retval);
+    Logger.g().info('buildGraphQLServer_Schemas : ', retval);
 
     return retval;
   }

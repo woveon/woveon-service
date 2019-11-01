@@ -267,6 +267,7 @@ describe(`> ${mtag}: `, async function() {
     // logger.info('Car Schema: ', rsl.Car.getGraphQLSchema());
     rcar1 = await rsl.Car.getByID(lcar1.get('id'));
     logger.info('lcar1 : ', lcar1.get());
+    logger.info('rcar1 : ', rcar1);
     logger.info('rcar1 : ', rcar1.get());
     expect(lcar1.get()).to.deep.equal(rcar1.get());
 
@@ -315,68 +316,50 @@ describe(`> ${mtag}: `, async function() {
 
 
     logger.h2('test210').aspect('test210', '// delete car 2/3 : deleteOne');
-    result = await lsl.Car.deleteByID(rcar2.get('id'));
+    result = await rsl.Car.deleteByID(rcar2.get('id'));
     logger.info('deleteOne rcar2 result : ', result);
-    rcar2 = await lsl.Car.getByID(result.id);
+    rcar2 = await rsl.Car.getByID(result.id);
     expect(lcar2).to.be.null;
 
-    /*
-    logger.h1().info('Local Models');
-    lTMS.Car.displayModelConfig();
-
-    logger.h1().info('Remote Models');
-    rTMS.Car.displayModelConfig();
-
-    logger.h3().info('Car : Local  GraphQL : Resolver');
-    logger.info(lTMS.Car.getGraphQLResolver());
-
-    logger.h3().info('Car : Local  GraphQL : Schema');
-    logger.info(lTMS.Car.getGraphQLSchema());
-
-    logger.h3().info('Car : Remote GraphQL : Query');
-    logger.info(lTMS.Car.getGraphQLSchema_Query_getByID());
-    logger.info(lTMS.Car.getGraphQLSchema_Query_getByIDs());
-    logger.info(lTMS.Car.getGraphQLSchema_Query_getByXID());
-    logger.info(lTMS.Car.getGraphQLSchema_Query_getToMe());
-
-    logger.h3().info('Car : GraphQL data');
-    logger.info(lTMS.Car._graphQL);
-
-    logger.h3().info('Car : Remote GraphQL : Mutation');
-    logger.info(lTMS.Car.getGraphQLSchema_Mutations());
-    */
 
 
-    // read in remote, from local
-    /*
-    let rcar = await rsl.Car.getByID(car.get('id'));
-    expect(rcar.get()).to.deep.equal(car.get());
 
-    rcar = await rsl.Car.getByIDs([car.get('id')]);
-    rcar = rcar[0];
-    expect(rcar.get()).to.deep.equal(car.get());
+    //  ----------------
 
-    rcar = await rsl.Car.getByIDs([car.get('id')]);
-    rcar = rcar[0];
-    expect(rcar.get()).to.deep.equal(car.get());
-    */
+    logger.h2('test210').aspect('test210', 'get car with only license');
+    rcar2 = await rsl.Car.getByID(lcar1.get('id'), 'license');
+    logger.info('rcar2: ', rcar2.get());
+    expect(rcar2.get()).to.deep.equal({id : lcar1.get('id'), license : lcar1.get('license')});
 
-    // now use remote to test call it
-    /*
-    rcl.ms._baseurl = `http://localhost:${TESTPORT}`;
+    logger.h2('test210').aspect('test210', 'create some tires');
+    await lTMS.Tire.createOne({brand : 'Michelin', model : '1', position : 'FL', wear : '.76', _car_ref : rcar2.get('id')});
+    await lTMS.Tire.createOne({brand : 'Michelin', model : '1', position : 'FR', wear : '.78', _car_ref : rcar2.get('id')});
+    await lTMS.Tire.createOne({brand : 'Michelin', model : '1', position : 'RL', wear : '.86', _car_ref : rcar2.get('id')});
+    await lTMS.Tire.createOne({brand : 'Michelin', model : '1', position : 'RR', wear : '.91', _car_ref : rcar2.get('id')});
 
-    logger.h1().info('calling...');
-    let result = await rsl.Car.callGraphQL('query', 'Car', car.get('id'), 'nameplate make license state combo');
-    logger.info('result: ', JSON.stringify(result, null, 2));
-    */
-    /*
-    expect(result.success).to.be.true;
-    expect(result.data.data.getCar).to.exist;
-    expect(result.data.data.getCar).to.deep.equal((() => { let retval = JSON.parse(JSON.stringify(car.get())); delete retval.id; return retval; })() );
-    expect(car.get('id')).to.exist;
-    */
+
+    logger.h2('test210').aspect('test210', 'use graphql directly and query tires of car');
+    result = await rcl.msr.post('/graphql', null, {query : `query { getCarByID(id : ${lcar1.get('id')}) { id tires { id } } }`});
+    logger.info('result: ', JSON.stringify(result, null, '  '));
+    logger.info('result.data: ', result.data);
+    expect(result.data.data.getCarByID).to.deep.equal({id : '2', tires : [{id : '1'}, {id : '2'}, {id : '3'}, {id : '4'}] });
+
+    logger.h2('test210').aspect('test210', '// fetch car with model with tires');
+    rcar2 = await rsl.Car.getByID(rcar2.get('id'), 'id tires { id }');
+    logger.info('rcar2 with tires: ', rcar2.get());
+    expect(rcar2.get()).to.deep.equal({id : 2, tires : [{id : '1'}, {id : '2'}, {id : '3'}, {id : '4'}] });
+
+    logger.h2('test210').aspect('test210', '// fetch car then tires');
+    rcar2 = await rsl.Car.getByID(rcar2.get('id'));
+    logger.info('rcar2 : ', rcar2.get());
+    await rcar2.readIn('Tire');
+    logger.info('rcar2.get : ', rcar2.get());
+    logger.info('rcar2 : ', rcar2);
+    expect(rcar2.tires).to.not.be.undefined;
+    expect(rcar2.tires.length).to.equal(4);
+//     expect(rcar2.get()).to.deep.equal({id : 2, tires : [{id : '1'}, {id : '2'}, {id : '3'}, {id : '4'}] });
+
   });
-
 
   // it('> Listen for a bit', async function() { await new Promise(function(resolve) { setTimeout(resolve, 18000); }); });
 

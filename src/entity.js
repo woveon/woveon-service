@@ -135,6 +135,27 @@ class WovModelEntity {
 
 
   /**
+   * Gets all of this model using the _ref, which is to the 'me' model.
+   *
+   * Ex. A.getToMe(x, '_a_ref', B) would find every B pointing to A.
+   *
+   * @param {integer} _id -
+   * @param {string} _ref - the ref to 'me'
+   * @param {object} _limiters - restricts which models to return
+   * @param {string} _fields - for remote clients, a string of the fields you wish to return; null will return all known fields of this model
+   * @return {object} -
+   */
+  static async getToMe(_id, _ref, _limiters = null, _fields = null) {
+    Logger.g().info(`${this.name}::getToMe hit`, _id, _ref, `calling this.cl.getToMe on ${this.cl.constructor.name}`);
+    if ( this.cl == null ) {
+      throw Error(`in ${this.name}: Model has no client for 'getToMe' call. `+
+        `Make sure a WovClientX has been created with this model passed in.`);
+    }
+    return this.cl.getToMe(_id, _ref, this, _limiters, _fields);
+  }
+
+
+  /**
    * Helper function for isRef.
    *
    * @param {string} _ref - property to check
