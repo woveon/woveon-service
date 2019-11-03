@@ -146,7 +146,7 @@ class WovModelEntity {
    * @return {object} -
    */
   static async getToMe(_id, _ref, _limiters = null, _fields = null) {
-    Logger.g().info(`${this.name}::getToMe hit`, _id, _ref, `calling this.cl.getToMe on ${this.cl.constructor.name}`);
+    // Logger.g().info(`${this.name}::getToMe hit`, _id, _ref, `calling this.cl.getToMe on ${this.cl.constructor.name}`);
     if ( this.cl == null ) {
       throw Error(`in ${this.name}: Model has no client for 'getToMe' call. `+
         `Make sure a WovClientX has been created with this model passed in.`);

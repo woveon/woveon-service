@@ -79,7 +79,7 @@ module.exports = class WovStateLayer {
    */
   async init(_lcl_i = {}) {
 
-    this.l.h2().info('Statelayer init');
+    // this.l.h2().info('Statelayer init');
 
     // local client init
     let lcl_i = Object.assign({}, {drop : false, table : true, view : true}, _lcl_i);
@@ -302,7 +302,7 @@ module.exports = class WovStateLayer {
         return error;
       },
       formatResponse : (_response, {context}) => {
-        Logger.g().info('response:', _response);
+        // Logger.g().info('response:', _response);
         Logger.g().aspect('listener.incoming', `Handled  : '${context.originalUrl}' with prot GraphQL: '${context.args.query}'`,
           _response.data);
         // let retval = _response.flatten(true, false, false, true);
@@ -353,11 +353,12 @@ module.exports = class WovStateLayer {
   # ---------------------------------------------------------------------
   # Schemas
   # ---------------------------------------------------------------------
+  type deletedID  { id : ID }
   ${_schemastrings.schemas}
 
   `;
 
-    Logger.g().info('buildGraphQLServer_Schemas : ', retval);
+    // Logger.g().info('buildGraphQLServer_Schemas : ', retval);
 
     return retval;
   }

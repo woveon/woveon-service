@@ -395,7 +395,7 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
     }
 
     if ( retval == null ) {
-      this.l.info('createOne with model ', Mod.name);
+      // this.l.info('createOne with model ', Mod.name);
       let qp = this._buildQueryParams(_data, _data, 'insert', Mod);
       let q = `INSERT INTO ${Mod.tablename} (${qp.colnames.join(', ')})
                VALUES (${qp.cols.join(', ')})
@@ -541,26 +541,26 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
    * @return {object} -
    */
   async getToMe(_id, _ref, _Model, _limiters = null) {
-    this.l.info('getToMe hit: ', _Model.name);
+    // this.l.info('getToMe hit: ', _Model.name);
 
     let q = `SELECT * FROM wsv_${_Model.tablename} WHERE ${_ref}=$1::integer`;
     let d = [_id];
 
-    this.l.info('  - getToMe q:', q);
+    // this.l.info('  - getToMe q:', q, d);
     // transform limiters
     let ql = WovClientLocal._genLimiterQueries(_limiters, _Model, d.length);
     if ( ql.q != '' ) {
       q += ` AND ${ql.q}`;
       d = d.concat(ql.d);
     }
-    this.l.info('  - getToMe q now :', q);
+    // this.l.info('  - getToMe q now :', q, d);
 
     let to_mes= await this._runQuery(q, d, `ws.src.${_Model.name}_getToMe`)
       .catch( function(e) {
         return WovReturn.retError(e, `getToMe Failed reading table '${_Model.tablename}', column '${_ref}'.`);
       });
 
-    this.l.info('WovClientLocal::getToMe ', _id, _ref, to_mes);
+    // this.l.info('WovClientLocal::getToMe ', _id, _ref, to_mes);
 
     // convert all to models
     let p = [];
@@ -797,11 +797,11 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
     let retval = {q : '', d : [] };
     let q = [];
 
-    Logger.g().info('_genLimiterQueries :', _l, typeof _l, Array.isArray(_l), _omod.name, _op, _depth);
+    // Logger.g().info('_genLimiterQueries :', _l, typeof _l, Array.isArray(_l), _omod.name, _op, _depth);
     // this.constructor.l.info(`${''.padEnd(_depth*2, ' ')}_genLimiterQueries`, _l, _omod.name, _op);
 
     if ( _l == null ) {
-    } 
+    }
     else if ( Array.isArray(_l) ) {
       // this.constructor.l.info(`...array`);
       _l.forEach(function(v) {

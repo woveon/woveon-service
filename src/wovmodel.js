@@ -242,7 +242,11 @@ class WovModel extends entity.WovModelEntity {
     }
     else {
       if ( resolved.dir == 'to' ) {
+        this.constructor.l.aspect('ws.src.WovModel_readIn', `this ${this.constructor.name}.get with ref ${resolved.ref}.`, this.get());
+        this.constructor.l.aspect('ws.src.WovModel_readIn', `${resolved.model.name}.getByID with id ${this.get(resolved.ref)}.`);
         let result = await resolved.model.getByID(this.get(resolved.ref));
+        this.constructor.l.aspect('ws.src.WovModel_readIn', `  - result is : ${result}`);
+        // TODO without refs returned, there is no id to read in here! FIXME
         if ( result != null ) {
           this[resolved.sel] = result;
           retval = result;
@@ -256,8 +260,8 @@ class WovModel extends entity.WovModelEntity {
         // let result = await this.constructor.cl.getToMe(this.get('id'), resolved.ref, resolved.model, _limiters);
 
         this.constructor.l.aspect('ws.src.WovModel_readIn', `Q result:`, result);
-        this.constructor.l.info('result  : ', result);
-        this.constructor.l.info('resolved: ', resolved);
+        // this.constructor.l.info('result  : ', result);
+        // this.constructor.l.info('resolved: ', resolved);
 
         if ( result != null ) {
           if (result instanceof Error) { retval = result; }
@@ -523,7 +527,7 @@ class WovModel extends entity.WovModelEntity {
   static init(_logger, _wovclient) {
 
     if (this.isInited() ) { throw Error(`Model has already been inited : '${this.name}'.`); }
-    _logger.info(`WovModel init ('${this.name}'): `);
+    // _logger.info(`WovModel init ('${this.name}'): `);
 
     // set static values
     this.cl = _wovclient;
@@ -596,6 +600,7 @@ class WovModel extends entity.WovModelEntity {
         model : this.name,
         vars  : [],
         objs  : [],
+        refs  : [],
       };
 
       // check parent already inited
@@ -630,6 +635,7 @@ class WovModel extends entity.WovModelEntity {
             }
             if ( this.debugme ) this.l.info(`  - self adding obj : ${kt}, ${gqlobject}`);
             this._graphQL.objs.push([kt, gqlobject]);
+            this._graphQL.refs.push([k, 'ID']);
           }
           else {
             let isarray = false;
@@ -767,7 +773,7 @@ class WovModel extends entity.WovModelEntity {
                 // `    console.log('getbyid1: ', retval);\n`+
                 `    if ( retval != null ) {\n`+
                 `      retval = retval.flatten({deleteid : false, deleterefs : false, deletesensitive : false});\n`+
-                `      console.log('getbyid2: ', retval);\n`+
+                // `      console.log('getbyid2: ', retval);\n`+
                 `    }\n`+
                 `    return retval;\n`+
                 `  },\n`;
@@ -776,9 +782,9 @@ class WovModel extends entity.WovModelEntity {
                 `  },\n`;
       retval += `  get${this.name}ByIDs : async function(_parent, _args, {dataSources}) {\n`+
                 `    let retval = undefined;\n`+
-                `    console.log('getByIDs args: ', _args);\n`+
+                // `    console.log('getByIDs args: ', _args);\n`+
                 `    let result = await dataSources.statelayer.${this.name}.getByIDs(_args.ids);\n`+
-                `    console.log('getbyids1: ', result);\n`+
+                // `    console.log('getbyids1: ', result);\n`+
                 `    if ( result == null ) retval = null;\n`+
                 `    else {\n`+
                 `      retval = [];\n`+
@@ -789,15 +795,15 @@ class WovModel extends entity.WovModelEntity {
                 `        }\n`+
                 `      }\n`+
                 `    }\n`+
-                `    console.log('--- getByIDs retval: ', retval);\n`+
+                // `    console.log('--- getByIDs retval: ', retval);\n`+
                 `    return retval;\n`+
                 `  },\n`;
       retval += `  get${this.name}ToMe : async function(_parent, _args, {dataSources}) {\n`+
-                `    console.log('--- WovModel get${this.name}ToMe with args : ', _args);\n`+
-                `    console.log('    dataSources.statelayer.${this.name}: ', dataSources.statelayer.${this.name});\n`+
+                // `    console.log('--- WovModel get${this.name}ToMe with args : ', _args);\n`+
+                // `    console.log('    dataSources.statelayer.${this.name}: ', dataSources.statelayer.${this.name});\n`+
                 `    let retval = undefined;\n`+
                 `    let result = await dataSources.statelayer.${this.name}.getToMe(_args.id, _args.ref);\n`+
-                `    console.log('--- getToMe result: ', result);\n`+
+                // `    console.log('--- getToMe result: ', result);\n`+
                 `    if ( result == null ) retval = null;\n`+
                 `    else {\n`+
                 `      retval = [];\n`+
@@ -805,7 +811,7 @@ class WovModel extends entity.WovModelEntity {
                 `        retval[i] = result[i].flatten({deleteid : false, deleterefs : false, deletesensitive : false});\n`+
                 `      }\n`+
                 `    }\n`+
-                `    console.log('--- getToMe retval: ', retval);\n`+
+                // `    console.log('--- getToMe retval: ', retval);\n`+
                 `    return retval;\n`+
                 `  },\n`;
 
@@ -833,7 +839,7 @@ class WovModel extends entity.WovModelEntity {
                 `  },\n`;
       retval += `  update${this.name} : async function(_, {_id, _updateThis${this.name}}, {dataSources}) {\n`+
                 `    let retval = await dataSources.statelayer.${this.name}.updateOne(_id, _updateThis${this.name});\n`+
-                `    console.log('update ', retval);\n`+
+                // `    console.log('update ', retval);\n`+
                 `    if ( retval instanceof Error ) return retval;\n`+
                 `    else return retval;\n`+
                 `  },\n`;
@@ -883,9 +889,9 @@ class WovModel extends entity.WovModelEntity {
             `    let me = new dataSources.statelayer.${this.name}(_parent);\n`+
             // `    if ( me == null ) { console.log('ERROR: no model "${this.name}".'); return null; }\n`+
             // `    else { await me.readIn('${o[1]}'); return me.${o[0]}.get(); }\n`+
-            `    console.log('**** resolver ${this.name} : readin : ${o[0]}, ${o[1]}');\n`+
+            // `    console.log('**** resolver ${this.name} : readin : ${o[0]}, ${o[1]}');\n`+
             `    await me.readIn('${o[0]}');\n`+
-            `    console.log('  after readin : ', me);\n`+
+            // `    console.log('  after readin : ', me);\n`+
             `    if ( me.${o[0]} == null ) { console.log('WARNING: no value for "${this.name}.${o[0]}".'); }\n`+
             `    return me.${o[0]}.get();\n`+
             `  },\n`;
@@ -893,15 +899,15 @@ class WovModel extends entity.WovModelEntity {
         else {
           retval +=
             `  ${o[0]} : async function(_parent, __, {args, dataSources}) {\n`+
-            `    console.log('asking to readIn: ${o[1]}');\n`+
+            // `    console.log('asking to readIn: ${o[1]}');\n`+
             `    let me = new dataSources.statelayer.${this.name}(_parent);\n`+
-            `    console.log('mod is ', me);\n`+
-            `    console.log('mod qargs ', __);\n`+
-            `    console.log('mod args ', args);\n`+
-            `    console.log('mod readIn is ', me.readIn);\n`+
-            `    console.log('mod is readIn of "${o[1].slice(1, -1)}"');\n`+
+            // `    console.log('mod is ', me);\n`+
+            // `    console.log('mod qargs ', __);\n`+
+            // `    console.log('mod args ', args);\n`+
+            // `    console.log('mod readIn is ', me.readIn);\n`+
+            // `    console.log('mod is readIn of "${o[1].slice(1, -1)}"');\n`+
             `    await me.readIn('${o[1].slice(1, -1)}');\n`+
-            `    console.log('mod tires: ', me.tires);\n`+
+            // `    console.log('mod tires: ', me.tires);\n`+
             `    return me.${o[0]}.get();\n`+
             `  },\n`;
         }
@@ -971,9 +977,16 @@ class WovModel extends entity.WovModelEntity {
       // directly translated lines of the schema
       if ( mod != this ) { lines.push(''); lines.push(`# -- from ${mod.name}`); }
       mod._graphQL.vars.forEach(function(p) { varlength = Math.max(varlength, p[0].length); });
-      mod._graphQL.objs.forEach(function(p) { varlength = Math.max(varlength, p[0].length); });
+      mod._graphQL.objs.forEach(function(p) { varlength = Math.max(varlength, (p[0].length)); });
+      mod._graphQL.refs.forEach(function(p) { varlength = Math.max(varlength, (p[0].length)); });
       mod._graphQL.vars.forEach(function(p) { lines.push(`${p[0].padEnd(varlength)} : ${p[1]}`); });
       mod._graphQL.objs.forEach(function(p) { lines.push(`${p[0].padEnd(varlength)} : ${p[1]}`); });
+      mod._graphQL.refs.forEach(function(p) { lines.push(`${p[0].padEnd(varlength)} : ID`); });
+      // mod._graphQL.refs.forEach(function(p) { lines.push(`${`_${p[0]}_ref`.padEnd(varlength-5)} : ID`); });
+     
+      // HERE... should be a _graphQL.refs that has these so that they are returned if they are on hte model and not just generated on hte fly
+
+
 
       if ( firstvarlength == null ) firstvarlength = varlength;
       mod = Object.getPrototypeOf(mod);
@@ -1226,7 +1239,7 @@ class WovModel extends entity.WovModelEntity {
       retval += `  # --- ${this.name}\n`;
       retval += `  create${this.name}(_createThis${this.name} : i${this.name}!) : ${this.name}\n`;
       retval += `  update${this.name}(_id : ID!, _updateThis${this.name} : i${this.name}!) : ${this.name}\n`; // "save" as well
-      retval += `  delete${this.name}(_id : ID!) : Boolean\n`;
+      retval += `  delete${this.name}(_id : ID!) : deletedID \n`;
 
       this._graphQL.mutations = retval;
     }
@@ -1389,6 +1402,7 @@ class WovModel extends entity.WovModelEntity {
       let mod = this;
       do {
         for (let i=0; i<mod._graphQL.vars.length; i++) { retval += `${mod._graphQL.vars[i][0]} `; }
+        for (let i=0; i<mod._graphQL.refs.length; i++) { retval += `${mod._graphQL.refs[i][0]} `; }
         mod = Object.getPrototypeOf(mod);
       } while ( mod != WovModel );
 

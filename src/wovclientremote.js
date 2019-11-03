@@ -146,9 +146,9 @@ module.exports = class WovClientRemote extends entity.WovClientEntity {
     let qq = `get${_Model.name}ToMe`;
     let q  = `query { ${qq}(id : ${_id}, ref : "${_ref}") { id ${fields}} }`;
 
-    this.l.info('getToMe q: ', q);
+    // this.l.info('getToMe q: ', q);
     let result = await this.msr.post('/graphql', null, {query : q});
-    this.l.info('result: ', JSON.stringify(result, null, 2) );
+    // this.l.info('result: ', JSON.stringify(result, null, 2) );
 
     if ( result.success == true ) {
       let dd = result.data.data[qq];
@@ -249,10 +249,12 @@ module.exports = class WovClientRemote extends entity.WovClientEntity {
              `  ${qq}(_id : $_id) { id }\n`+
              `}\n`;  // TODO : cache this
 
-    this.l.info('deleteOne call : ', q);
+    // this.l.info('deleteByID call : ', q);
     let result = await this.msr.post('/graphql', null, {query : q, variables : {_id : _id}});
-    this.l.info('deleteOne result: ', result);
+    // this.l.info('deleteByID result: ', JSON.stringify(result, null, 2));
 
+    retval = result;
+    /*
     if ( result.success == true ) {
       let d = result.data.data[qq];
       if ( d != null ) { d.id = parseInt(d.id); retval = new _Model(d); }
@@ -262,8 +264,9 @@ module.exports = class WovClientRemote extends entity.WovClientEntity {
       }
     }
     else { retval = result; }
+    */
 
-    // this.l.info('updateOne retval: ', JSON.stringify(retval));
+    // this.l.info('deleteByID retval: ', JSON.stringify(retval));
     return retval;
   }
 

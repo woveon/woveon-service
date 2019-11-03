@@ -115,19 +115,19 @@ describe(`> ${mtag}: `, async function() {
 
     // schema
     let s_v = lTMS.Vehicle.getGraphQLSchema();
-    logger.info('Vehicle schema: ', s_v);
-    logger.info('Vehicle_graphQL', lTMS.Vehicle._graphQL);
+    // logger.info('Vehicle schema: ', s_v);
+    // logger.info('Vehicle_graphQL', lTMS.Vehicle._graphQL);
     expect(lTMS.Vehicle._graphQL.vars.length).to.equal(1);
 
     let s_t = lTMS.Tire.getGraphQLSchema();
-    logger.info('Tire schema: ', s_t);
-    logger.info('Tire _graphQL', lTMS.Tire._graphQL);
+    // logger.info('Tire schema: ', s_t);
+    // logger.info('Tire _graphQL', lTMS.Tire._graphQL);
     expect(lTMS.Tire._graphQL.vars.length).to.equal(4);
 
     let s_c = lTMS.Car.getGraphQLSchema();
-    logger.info('Car has own', lTMS.Car.hasOwnProperty('_graphQL'));
-    logger.info('Car schema: ', s_c);
-    logger.info('Car _graphQL', lTMS.Car._graphQL);
+    // logger.info('Car has own', lTMS.Car.hasOwnProperty('_graphQL'));
+    // logger.info('Car schema: ', s_c);
+    // logger.info('Car _graphQL', lTMS.Car._graphQL);
     expect(lTMS.Car._graphQL.vars.length).to.equal(5);
 
 
@@ -140,19 +140,19 @@ describe(`> ${mtag}: `, async function() {
 
     // schema
     s_v = lTMS.Vehicle.getGraphQLSchema();
-    logger.info('Vehicle schema: ', s_v);
-    logger.info('Vehicle_graphQL', lTMS.Vehicle._graphQL);
+    // logger.info('Vehicle schema: ', s_v);
+    // logger.info('Vehicle_graphQL', lTMS.Vehicle._graphQL);
     expect(lTMS.Vehicle._graphQL.vars.length).to.equal(1);
 
     s_t = lTMS.Tire.getGraphQLSchema();
-    logger.info('Tire schema: ', s_t);
-    logger.info('Tire _graphQL', lTMS.Tire._graphQL);
+    // logger.info('Tire schema: ', s_t);
+    // logger.info('Tire _graphQL', lTMS.Tire._graphQL);
     expect(lTMS.Tire._graphQL.vars.length).to.equal(4);
 
     s_c = lTMS.Car.getGraphQLSchema();
-    logger.info('Car has own', lTMS.Car.hasOwnProperty('_graphQL'));
-    logger.info('Car schema: ', s_c);
-    logger.info('Car _graphQL', lTMS.Car._graphQL);
+    // logger.info('Car has own', lTMS.Car.hasOwnProperty('_graphQL'));
+    // logger.info('Car schema: ', s_c);
+    // logger.info('Car _graphQL', lTMS.Car._graphQL);
     expect(lTMS.Car._graphQL.vars.length).to.equal(5);
 
   });
@@ -192,7 +192,7 @@ describe(`> ${mtag}: `, async function() {
 
     // create car 1 : createOne (use this for remote tests)
     lcar1 = await lsl.Car.createOne(cardata1);
-    logger.info('local car 1: ', lcar1.get());
+    // logger.info('local car 1: ', lcar1.get());
     expect((function() { let a = lcar1.get(null, {dup : true}); delete a.id; return a; })()).to.deep.equal(cardata1);
     // expect((function() { let a = JSON.parse(JSON.stringify(lcar1.get())); delete a.id; return a; })()).to.deep.equal(cardata2);
 
@@ -202,7 +202,7 @@ describe(`> ${mtag}: `, async function() {
 
     // create car 2 : createOne (use this for local tests)
     lcar2 = await lsl.Car.createOne(cardata2);
-    logger.info('local car 2: ', lcar2.get());
+    // logger.info('local car 2: ', lcar2.get());
     expect((function() { let a = JSON.parse(JSON.stringify(lcar2.get())); delete a.id; return a; })()).to.deep.equal(cardata2);
 
     // update car fail : updateOne
@@ -211,9 +211,9 @@ describe(`> ${mtag}: `, async function() {
     expect(result instanceof Error).to.be.true;
 
     // update car 2 : updateOne in db, not model
-    logger.info('local car 2: ', lcar2.get());
+    // logger.info('local car 2: ', lcar2.get());
     result = await lsl.Car.updateOne(lcar2.get('id'), {combo : '6789'});
-    logger.info(`updateOne lcar2(${lcar2.get('id')}) result object : `, result);
+    // logger.info(`updateOne lcar2(${lcar2.get('id')}) result object : `, result);
     // logger.info('updateOne lcar2 result type : ', result.constructor.name);
     expect(result instanceof Error).to.be.false;
     expect(lcar2.get('combo')).to.equal('5678');
@@ -223,10 +223,10 @@ describe(`> ${mtag}: `, async function() {
     expect(lcar2.get('combo')).to.equal('6789');
 
     // model set and save
-    logger.info('set combo to 9999');
+    // logger.info('set combo to 9999');
     lcar2.set('combo', '9999');
     result = await lcar2.save();
-    logger.info('lcar2 save result : ', result);
+    // logger.info('lcar2 save result : ', result);
 
     // fetch car 2 as car3 : getByID
     lcar3 = await lsl.Car.getByID(lcar2.get('id'));
@@ -234,14 +234,14 @@ describe(`> ${mtag}: `, async function() {
 
     // fetch array with 1st failing and second returning car2.
     lcar3 = await lsl.Car.getByIDs([-1, lcar2.get('id')]);
-    logger.info('local car 3 is array: ', lcar3);
+    // logger.info('local car 3 is array: ', lcar3);
     expect(Array.isArray(lcar3)).to.be.true;
     expect(lcar3[0]).to.be.null;
     expect(lcar2.get()).to.deep.equal(lcar3[1].get());
 
     // delete car 2/3 : deleteOne
     result = await lsl.Car.deleteByID(lcar2.get('id'));
-    logger.info('deleteOne lcar2 result : ', result);
+    // logger.info('deleteOne lcar2 result : ', result);
     lcar2 = await lsl.Car.getByID(result.id);
     expect(lcar2).to.be.null;
 
@@ -263,12 +263,12 @@ describe(`> ${mtag}: `, async function() {
 
 
     // cross-local/remote : local car 1 equals to remote car 1
-    logger.info('lcar1 id ', lcar1.get('id'));
+    // logger.info('lcar1 id ', lcar1.get('id'));
     // logger.info('Car Schema: ', rsl.Car.getGraphQLSchema());
     rcar1 = await rsl.Car.getByID(lcar1.get('id'));
-    logger.info('lcar1 : ', lcar1.get());
-    logger.info('rcar1 : ', rcar1);
-    logger.info('rcar1 : ', rcar1.get());
+    // logger.info('lcar1 : ', lcar1.get());
+    // logger.info('rcar1 : ', rcar1);
+    // logger.info('rcar1 : ', rcar1.get());
     expect(lcar1.get()).to.deep.equal(rcar1.get());
 
     // getByID returns null if not found
@@ -277,7 +277,7 @@ describe(`> ${mtag}: `, async function() {
 
     logger.h2('test210').aspect('test210', 'create rcar 2 : createOne (use this for remote tests)');
     rcar2 = await rsl.Car.createOne(cardata2);
-    logger.info('remote car 2: ', rcar2.get());
+    // logger.info('remote car 2: ', rcar2.get());
     expect((function() { let a = JSON.parse(JSON.stringify(rcar2.get())); delete a.id; return a; })()).to.deep.equal(cardata2);
     expect(rcar2.get('id')).to.not.be.undefined;
 
@@ -288,7 +288,7 @@ describe(`> ${mtag}: `, async function() {
 
     logger.h2('test210').aspect('test210', '// update rcar 2 : updateOne in db, not model');
     result = await rsl.Car.updateOne(rcar2.get('id'), {combo : '6789'});
-    logger.info(`updateOne rcar2(${rcar2.get('id')}) result object : `, result);
+    // logger.info(`updateOne rcar2(${rcar2.get('id')}) result object : `, result);
     expect(result instanceof Error).to.be.false;
     expect(rcar2.get('combo')).to.equal('5678'); // Model never updated, even though db did
 
@@ -297,10 +297,10 @@ describe(`> ${mtag}: `, async function() {
     expect(rcar2.get('combo')).to.equal('6789');
 
     logger.h2('test210').aspect('test210', '// model set and save');
-    logger.info('set combo to 9999');
+    // logger.info('set combo to 9999');
     rcar2.set('combo', '9999');
     result = await rcar2.save();
-    logger.info('rcar2 save result : ', result);
+    // logger.info('rcar2 save result : ', result);
     expect(result).to.be.true;
 
     logger.h2('test210').aspect('test210', '// fetch car 2 as car3 : getByID');
@@ -309,26 +309,26 @@ describe(`> ${mtag}: `, async function() {
 
     logger.h2('test210').aspect('test210', '// fetch array with 1st failing and second returning car2.');
     rcar3 = await rsl.Car.getByIDs([-1, rcar2.get('id')]);
-    logger.info('remote car 3 is array: ', rcar3);
+    // logger.info('remote car 3 is array: ', rcar3);
     expect(Array.isArray(rcar3)).to.be.true;
     expect(rcar3[0]).to.be.null;
     expect(rcar2.get()).to.deep.equal(rcar3[1].get());
 
 
-    logger.h2('test210').aspect('test210', '// delete car 2/3 : deleteOne');
+    logger.h2('test210').aspect('test210', '// delete car 2/3 : deleteByID');
     result = await rsl.Car.deleteByID(rcar2.get('id'));
-    logger.info('deleteOne rcar2 result : ', result);
-    rcar2 = await rsl.Car.getByID(result.id);
-    expect(lcar2).to.be.null;
-
-
+    // logger.info('deleteOne rcar2 result : ', JSON.stringify(result, null, 2));
+    expect(result.success).to.be.true;
+    expect(parseInt(result.data.data.deleteCar.id)).to.equal(rcar2.get('id'));
+    rcar2 = await rsl.Car.getByID(result.data.data.deleteCar.id);
+    expect(rcar2).to.be.null;
 
 
     //  ----------------
 
     logger.h2('test210').aspect('test210', 'get car with only license');
     rcar2 = await rsl.Car.getByID(lcar1.get('id'), 'license');
-    logger.info('rcar2: ', rcar2.get());
+    // logger.info('rcar2: ', rcar2.get());
     expect(rcar2.get()).to.deep.equal({id : lcar1.get('id'), license : lcar1.get('license')});
 
     logger.h2('test210').aspect('test210', 'create some tires');
@@ -338,26 +338,55 @@ describe(`> ${mtag}: `, async function() {
     await lTMS.Tire.createOne({brand : 'Michelin', model : '1', position : 'RR', wear : '.91', _car_ref : rcar2.get('id')});
 
 
+
     logger.h2('test210').aspect('test210', 'use graphql directly and query tires of car');
     result = await rcl.msr.post('/graphql', null, {query : `query { getCarByID(id : ${lcar1.get('id')}) { id tires { id } } }`});
-    logger.info('result: ', JSON.stringify(result, null, '  '));
-    logger.info('result.data: ', result.data);
+    // logger.info('result: ', JSON.stringify(result, null, '  '));
+    // logger.info('result.data: ', result.data);
     expect(result.data.data.getCarByID).to.deep.equal({id : '2', tires : [{id : '1'}, {id : '2'}, {id : '3'}, {id : '4'}] });
 
     logger.h2('test210').aspect('test210', '// fetch car with model with tires');
     rcar2 = await rsl.Car.getByID(rcar2.get('id'), 'id tires { id }');
-    logger.info('rcar2 with tires: ', rcar2.get());
+    // logger.info('rcar2 with tires: ', rcar2.get());
     expect(rcar2.get()).to.deep.equal({id : 2, tires : [{id : '1'}, {id : '2'}, {id : '3'}, {id : '4'}] });
 
     logger.h2('test210').aspect('test210', '// fetch car then tires');
     rcar2 = await rsl.Car.getByID(rcar2.get('id'));
-    logger.info('rcar2 : ', rcar2.get());
+    // logger.info('rcar2 : ', rcar2.get());
     await rcar2.readIn('Tire');
-    logger.info('rcar2.get : ', rcar2.get());
-    logger.info('rcar2 : ', rcar2);
+    // logger.info('rcar2.get : ', rcar2.get());
+    // logger.info('rcar2 : ', rcar2);
     expect(rcar2.tires).to.not.be.undefined;
     expect(rcar2.tires.length).to.equal(4);
 //     expect(rcar2.get()).to.deep.equal({id : 2, tires : [{id : '1'}, {id : '2'}, {id : '3'}, {id : '4'}] });
+    //
+    let w0 = await lTMS.Wheel.createOne({style : 'chrome', _tire_ref : rcar2.tires.pos(0).get('id')});
+    await lTMS.Wheel.createOne({style : 'chrome', _tire_ref : rcar2.tires.pos(1).get('id')});
+    await lTMS.Wheel.createOne({style : 'chrome', _tire_ref : rcar2.tires.pos(2).get('id')});
+    await lTMS.Wheel.createOne({style : 'chrome', _tire_ref : rcar2.tires.pos(3).get('id')});
+
+    // logger.info('w0 : ', w0.get());
+
+    logger.h2('test210').aspect('test210', '// fetch car tires\' wheels');
+    await rcar2.tires.readIn('Wheel');
+    // logger.info('rcar2.tires: ', rcar2.tires);
+    // logger.info('rcar2.tires.pos(0).wheel: ', rcar2.tires.pos(0).wheel);
+    // logger.info('rcar2.tires.pos(0).get: ', rcar2.tires.pos(0).get());
+    // logger.info('rcar2.tires.pos(0).wheel.get: ', rcar2.tires.pos(0).wheel.get());
+    // logger.info('w0 2: ', w0.get());
+
+    /*
+    logger.info('rcar2.tires.pos(0).wheel: ', rcar2.tires.pos(0).wheel);
+    logger.info('rcar2.tires.pos(0).wheel: ', rcar2.tires.pos(0).wheel);
+    expect(rcar2.tires.pos(0).wheel.get('_tire_ref')).  to.equal(rcar2.tires.pos(0).get('id'));
+    expect(rcar2.tires.pos(1).wheel.get('_tire_ref')).to.equal(rcar2.tires.pos(1).get('id'));
+    expect(rcar2.tires.pos(2).wheel.get('_tire_ref')).to.equal(rcar2.tires.pos(2).get('id'));
+    expect(rcar2.tires.pos(3).wheel.get('_tire_ref')).to.equal(rcar2.tires.pos(3).get('id'));
+    */
+    await rcar2.tires.pos(0).wheel.readIn('Tire');
+    // logger.info('rcar2.tires.pos(0).wheel: ', rcar2.tires.pos(0).wheel);
+    // logger.info('rcar2.tires.pos(0).wheel.tire: ', rcar2.tires.pos(0).wheel.tire);
+    expect(rcar2.tires.pos(0).wheel.tire.get('id')).to.equal(rcar2.tires.pos(0).get('id'));
 
   });
 

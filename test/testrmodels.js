@@ -28,5 +28,17 @@ module.exports = function() {
     sensitive : ['combo'],
   });
 
-  return {Store, Vehicle, Car};
+  const Tire = class Tire extends Service.WovModel { static tablename = 'tire'; };
+  Tire.setSchema({
+    schema : {brand : 'text', model : 'text', position : 'text', _car_ref : 'integer'}, //  wear : 'float', NO WEAR!!!
+    erels  : {car : 'many'},
+  });
+
+  const Wheel = class Wheel extends Service.WovModel { static tablename = 'wheel'; };
+  Wheel.setSchema({
+    schema : {style : 'text', _tire_ref : 'integer'},
+    erels  : {tire : 'one'},
+  });
+
+  return {Store, Vehicle, Car, Tire, Wheel};
 };
