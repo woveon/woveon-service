@@ -47,7 +47,7 @@ class WovModel extends entity.WovModelEntity {
     super();
 
     if ( this.constructor.isInited() == false ) { throw Error(`Creating object of non-inited class ${this.constructor.name}.`); }
-    if ( _data['id'] == null ) { throw Error(`Missing '${this.constructor.name}.id' in constructor data. Maybe you should call 'createOne' which creates this object, saves it and returns it with the id.`); }
+    if ( _data['id'] == null ) { throw Error(`WovModel ${this.constructor.name}.constructor: Missing 'id' in constructor data. Maybe you should call 'createOne' which creates this object, saves it and returns it with the id.`); }
     this._data = _data;
     this._model_t = this.constructor.name; // _data._model_t || this.name;
     delete this._data._model_t;
@@ -648,7 +648,8 @@ class WovModel extends entity.WovModelEntity {
               case 'timestamp':
               case 'timestamp without time zone':
               case 'json':
-                qv = 'String';
+                qv = 'JSON';
+                // qv = 'String';
                 break;
               case 'float':
                 qv = 'Float';
@@ -1214,6 +1215,9 @@ class WovModel extends entity.WovModelEntity {
           let vv = mod._graphQL.vars[i];
           // Logger.g().info('  vv is ', vv);
           retval += `  ${vv[0].padEnd(lengthvar, ' ')} : ${vv[1].padEnd(lengthtype, ' ')}   # from model ${mod.name}\n`;
+        }
+        for (let i=0; i<mod._graphQL.refs.length; i++) {
+          retval += `  ${mod._graphQL.refs[i][0]} : ID\n`;
         }
         mod = Object.getPrototypeOf(mod);
       } while ( mod != WovModel );

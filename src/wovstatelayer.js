@@ -327,6 +327,8 @@ module.exports = class WovStateLayer {
   static buildGraphQLServer_Schemas(_schemastrings) {
     let retval = `
 
+  scalar JSON
+
   # ---------------------------------------------------------------------
   # Query Definitions
   # ---------------------------------------------------------------------
@@ -374,7 +376,9 @@ module.exports = class WovStateLayer {
   static buildGraphQLServer_Resolvers(_resolverstrings) {
     let retval = `
 
-const Logger = require('woveon-logger');
+// import GraphQLJSON from 'graphql-type-json';
+const GraphQLJSON = require('graphql-type-json');
+const Logger      = require('woveon-logger');
 
 // ---------------------------------------------------------------------
 // Query Implementations
@@ -395,7 +399,7 @@ ${_resolverstrings.mutationjs}
 // ---------------------------------------------------------------------
 ${_resolverstrings.modeljs}
 
-module.exports = {Query, Mutation, ${_resolverstrings.exportsjs}}
+module.exports = {Query, Mutation, ${_resolverstrings.exportsjs} JSON : GraphQLJSON};
 `;
 
     // Logger.g().info('buildGraphQLServer_Resolvers : ', retval);
