@@ -104,7 +104,11 @@ module.exports = class Service {
 
     if ( this.db == null ) { retval = WovReturn.retSuccess(true); }
 
-    else retval = await this.db.isConnected();
+    else {
+      let result = await this.db.isConnected();
+      if ( result == true ) { retval = WovReturn.retSuccess(true); }
+      else { retval = WovReturn.retError(false, 'database is not connected'); }
+    }
 
     return retval;
   };
@@ -158,10 +162,10 @@ module.exports = class Service {
     this.internal_address = null;
     this.external_address = null;
 
-    if ( this._options.baseroute == null ) this._options.baseroute = `/${this.name}/${this._options.ver}`;
-
     this.logger = _options.logger || new Logger(this.name, {showname : true}, {'service' : {'color' : 'blue'}});
     this.l = this.logger;
+
+    if ( this._options.baseroute == null ) this._options.baseroute = `/${this.name}/${this._options.ver}`;
 
     this.logger.aspect('service', '---------------------------------------------------------------------');
     this.logger.aspect('service', '--------------------------------------------------------------------');

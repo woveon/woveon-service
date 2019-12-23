@@ -92,7 +92,7 @@ class WovDBMongo extends WovDB {
     return new Promise( function(r, j) {
       this.connection.on('error', function(err) {
         this.l.error('---Mongoose error: do you have a mongodb running locally? ');
-        this.l.error('\n\n type: `make local-db-start`     to start mongodb\n');
+        this.l.error('\n\n type: `make start-mongo-we`     to start mongodb\n');
         this.l.error(' or `docker ps -a` and find a stopped mongo container\n\n');
         j(err);
       }.bind(this));

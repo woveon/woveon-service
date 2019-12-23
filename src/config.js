@@ -3,14 +3,14 @@ const Logger = require('woveon-logger');
 /**
  * Config is a single object managing configuration information pulled from the environment.
  *
- * It reads in environment variables, ensures they are set, and serves as a single point of 
- * these during runtime. This means you get environment variable simplicity, and can manage 
+ * It reads in environment variables, ensures they are set, and serves as a single point of
+ * these during runtime. This means you get environment variable simplicity, and can manage
  * these in one location, as opposed to having env vars scattered throughout your code.
  *
  *
  * Usage:
  *
- *   - Defining:
+ * - Defining:
  *
  *      // Don't pass in variables, as they should be the same for runtime each time
  *      class MyConfig extends Config {
@@ -32,7 +32,7 @@ const Logger = require('woveon-logger');
  *       MyConfig.sget('SECRET_VAR_1');
  *
  *   - The genK8S[ConfigMap|Secrets] dump the variables in a format for Kubernetes configuration.
- *       ex. MyConfig.genK8SConfigMap() 
+ *       ex. MyConfig.genK8SConfigMap()
  *       ENV_VAR_1=X
  *       ENV_VAR_2=Y
  *
@@ -53,15 +53,28 @@ const Logger = require('woveon-logger');
  *
  */
 
+/**
+ * @typedef Promise
+ * @typedef class
+ */
 
 module.exports = class Config {
 
 
   /**
    * Generic function to add array of vars to the config.
+   *
+   * @param {Logger} _l -
+   * @param {Array<string>} _vars - variables to add
+   * @param {object} _dest - object that stores variables
+   * @param {string} _emsg - error message
+   * @param {string} _wmsg - warning message
+   * @param {string} _extra - additional message on error/warning
+   * @param {Array<string>} _blankenvvars - variables to undefine in the array
+   * @return {undefined} -
    */
   static _addInVars(_l, _vars, _dest, _emsg, _wmsg, _extra, _blankenvvars) {
-//    _l.info(`  _addInVars : _blankenvvars ${_blankenvvars} : `, _vars)
+    _l.aspect('config', `  _addInVars : _blankenvvars ${_blankenvvars} : `, _vars);
 
     for (let i=0; i<_vars.length; i++) {
       let vn = _vars[i];
@@ -86,9 +99,11 @@ module.exports = class Config {
 
   /**
    * Print results and such.
+   *
    * @param {Logger} _l - woveon logger
-   * @param {array} _wmsg - array of warnings
-   * @param {array} _emsg - array of errors
+   * @param {Array} _wmsg - array of warnings
+   * @param {Array} _emsg - array of errors
+   * @return {undefined} -
    */
   static _reviewResults(_l, _wmsg, _emsg) {
     if ( _emsg.length != 0 ) { _l.throwError('Config Error: ', _emsg); }
@@ -99,32 +114,38 @@ module.exports = class Config {
   }
 
 
-
   /**
+   * Constructor.
+   *
    * @param {Logger} _logger - will create one if null
-   * @param {array} _conf - environment variables this microservice uses (for K8s ConfigMap)
-   * @param {array} _sconf - private/secure environment variables this microservice uses (for K8s Secrets)
-   * @param {boolean} blankenvvars - by default, sets all env vars to undefined, so your program MUST pull from config
+   * @param {Array<string>} _conf - environment variables this microservice uses (for K8s ConfigMap)
+   * @param {Array<string>} _sconf - private/secure environment variables this microservice uses (for K8s Secrets)
+   * @param {object} _options -
+   * - blankenvvars - by default, sets all env vars to undefined, so your program MUST pull from config
+   * - wovtools - add in WovTools variables if true
    */
   constructor(_logger, _conf, _sconf, _options = null) {
-
     let options = Object.assign({}, {blankenvvars : true, wovtools : true}, _options);
-    // _logger.info('options : ', options, _options);
-    // _logger.info('***Config constructor called');
-    // _logger.printStack();
 
-    if ( module.exports.staticconfig != 1 ) { _logger.throwError('Calling Config constructor multiple times'); }
+    this.l = _logger ||  new Logger('config',
+      {showName : true, debug : true, level : 'verbose'},
+      {'listener' : true, 'requester' : true, 'listener.route' : true});
+
+    // this.l.info('options : ', options, _options);
+    // this.l.info('conf : ', _conf);
+    // this.l.info('sconf : ', _sconf);
+    // this.l.info('***Config constructor called');
+    // this.l.printStack();
+
+    if ( module.exports.staticconfig != 1 ) { this.l.throwError('Calling Config constructor multiple times'); }
     module.exports.staticconfig = this;
 
-    if ( _conf == null )  _logger.throwError(`Config constructor requires an array for '_conf'.`);
-    if ( _sconf == null ) _logger.throwError(`Config constructor requires an array for '_sconf'.`);
+    if ( _conf == null )  this.l.throwError(`Config constructor requires an array for '_conf'.`);
+    if ( _sconf == null ) this.l.throwError(`Config constructor requires an array for '_sconf'.`);
 
     this.conf  = {};
     this.sconf = {};
     this._data  = {};
-    this.logger = _logger ||  new Logger('config',
-      {showName : true, debug : true, level : 'verbose'},
-      {'listener' : true, 'requester' : true, 'listener.route' : true});
 
     this.emsg = [];
     this.wmsg = [];
@@ -133,11 +154,14 @@ module.exports = class Config {
     //   - WOV_PROJECT - the name of the project
     //   - WOV_STAGE - the curret stage the microservice is running in
     //   - WOV_ME    - who the developer is (which may be the stagename)
-    if ( options.wovtools ) _conf.push('WOV_STAGE', 'WOV_ME', 'WOV_PROJECT');
+    if ( options.wovtools ) {
+      // console.log(`ading in 'WOV_STAGE', 'WOV_ME', 'WOV_PROJECT'`);
+      _conf.push('WOV_STAGE', 'WOV_ME', 'WOV_PROJECT');
+    }
 
     // Apply each in _conf and _sconf
-    module.exports._addInVars(this.logger, _conf,  this.conf,  this.emsg, this.wmsg, '',        options.blankenvvars);
-    module.exports._addInVars(this.logger, _sconf, this.sconf, this.emsg, this.wmsg, 'secure ', options.blankenvvars);
+    module.exports._addInVars(this.l, _conf,  this.conf,  this.emsg, this.wmsg, '',        options.blankenvvars);
+    module.exports._addInVars(this.l, _sconf, this.sconf, this.emsg, this.wmsg, 'secure ', options.blankenvvars);
 
     /*
     for (let i=0; i<_conf.length; i++) {
@@ -149,7 +173,7 @@ module.exports = class Config {
       else {
         if ( v == 'null' ) v = null;
         if ( v == null || v == '' ) { this.wmsg.push(`env variable ${vn} is '${v}'`); }
-        this.logger.aspect('config', vn + ': '+ v);
+        this.l.aspect('config', vn + ': '+ v);
         this.conf[vn] = v;
         if ( blankenvvars ) process.env[vn] = undefined;
       }
@@ -163,7 +187,7 @@ module.exports = class Config {
       else {
         if ( v == 'null' ) v = null;
         if ( v == null || v == '' ) { this.wmsg.push(`secure env variable ${vn} is '${v}'`); }
-        this.logger.aspect('config', vn + ' (s): '+ v);
+        this.l.aspect('config', vn + ' (s): '+ v);
         this.sconf[vn] = v;
         if ( blankenvvars ) process.env[vn] = undefined;
       }
@@ -171,12 +195,12 @@ module.exports = class Config {
     */
 
     // console.log('emsg: ', this.emsg);
-    module.exports._reviewResults(this.logger, this.wmsg, this.emsg);
+    module.exports._reviewResults(this.l, this.wmsg, this.emsg);
     /*
-    if ( this.emsg.length != 0 ) { this.logger.throwError('Config Error: ', this.emsg); }
+    if ( this.emsg.length != 0 ) { this.l.throwError('Config Error: ', this.emsg); }
     if ( this.wmsg.length != 0 ) {
-      this.logger.warn('Config Warning: (', this.wmsg.length, ')');
-      for (let i=0; i<this.wmsg.length; i++) { this.logger.warn(i+1, ') ', this.wmsg[i]); }
+      this.l.warn('Config Warning: (', this.wmsg.length, ')');
+      for (let i=0; i<this.wmsg.length; i++) { this.l.warn(i+1, ') ', this.wmsg[i]); }
     }
     */
 
@@ -188,6 +212,7 @@ module.exports = class Config {
 
   /**
    * Returns a config variable.
+   *
    * @param {string} _k - environment variable
    * @return {string} - value for the key
    */
@@ -196,33 +221,53 @@ module.exports = class Config {
     let retval = module.exports.staticconfig.conf[_k];
     if ( retval === undefined ) {
       if ( module.exports.staticconfig.sconf[_k] !== undefined ) {
-        module.exports.staticconfig.logger.throwError(`Undefined config '${_k}': but it is in sconf. Try 'sget("${_k}")'`);
+        module.exports.staticconfig.l.throwError(`Undefined config '${_k}': but it is in sconf. Try 'sget("${_k}")'`);
       }
       else if ( process.env[_k] !== undefined ) {
-        module.exports.staticconfig.logger.throwError(`Undefined config '${_k}': but it is an environment variable. Add '${_k}' to config constructor.`);
+        module.exports.staticconfig.l.throwError(`Undefined config '${_k}': but it is an environment variable. Add '${_k}' to config constructor.`);
       }
-      else module.exports.staticconfig.logger.throwError(`Undefined config '${_k}': set the environment variable and add to instantiation of Config`);
+      else module.exports.staticconfig.l.throwError(`Undefined config '${_k}': set the environment variable and add to instantiation of Config`);
     }
     return retval;
   }
-  static gET(_v) { return this.sget(_v); }
-  static sget(_v) { 
+
+
+  /**
+   * Returns secret variable. Same as sget, but gET is same number of characters as 'get'.
+   *
+   * @param {string} _k - environment variable
+   * @return {string} - value for the key
+   */
+  static gET(_k) { return this.sget(_k); }
+
+
+  /**
+   * Returns secret variable. Same as gET.
+   *
+   * @param {string} _k - environment variable
+   * @return {string} - value for the key
+   */
+  static sget(_k) {
     if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
-    let retval = module.exports.staticconfig.sconf[_v];
+    let retval = module.exports.staticconfig.sconf[_k];
     if ( retval === undefined ) {
-      if ( module.exports.staticconfig.conf[_v] !== undefined ) 
-        module.exports.staticconfig.logger.throwError(`Undefined secure config '${_v}': but it is in conf. Try 'get("${_v}")'`);
-      else if ( process.env[_v] !== undefined ) 
-        module.exports.staticconfig.logger.throwError(`Undefined secure config '${_v}': but it is an environment variable. Add '${_v}' to secure config constructor.`);
-      else module.exports.staticconfig.logger.throwError(`Undefined secure config '${_v}': add to instantiation of Config`);
+      if ( module.exports.staticconfig.conf[_k] !== undefined ) {
+        module.exports.staticconfig.l.throwError(`Undefined secure config '${_k}': but it is in conf. Try 'get("${_k}")'`);
+      }
+      else if ( process.env[_k] !== undefined ) {
+        module.exports.staticconfig.l.throwError(`Undefined secure config '${_k}': but it is an environment variable. Add '${_k}' to secure config constructor.`);
+      }
+      else module.exports.staticconfig.l.throwError(`Undefined secure config '${_k}': add to instantiation of Config`);
     }
     return retval;
   }
 
   /**
-   * (re)Set a value later.
+   * Do (re)Set a value later.
+   *
    * @param {string} _k - key
    * @param {string} _v - value
+   * @return {undefined} -
    */
   static set(_k, _v) {
     if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
@@ -231,61 +276,98 @@ module.exports = class Config {
 
 
   /**
-   * (re)sSet a value later.
+   * Do (re)sSet a value later.
+   *
    * @param {string} _k - key
    * @param {string} _v - value
+   * @return {undefined} -
    */
   static sset(_k, _v) {
     if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
     module.exports.staticconfig.sconf[_k] = _v;
   }
 
+
   /**
    * Add a value later.
+   *
    * @param {string} _k - key
-   * @param {bool} _blankenvvars - if true, deletes the env var from the current environment
+   * @param {boolean} _blankenvvars - if true, deletes the env var from the current environment
+   * @return {undefined} -
    */
   static add(_k, _blankenvvars = true) {
     if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
-    module.exports._addInVars(module.exports.staticconfig.logger, [_k], module.exports.staticconfig.conf, module.exports.staticconfig.emsg, module.exports.staticconfig.wmsg, '', _blankenvvars);
-    module.exports._reviewResults(module.exports.staticconfig.logger, module.exports.staticconfig.wmsg, module.exports.staticconfig.emsg);
+    module.exports._addInVars(module.exports.staticconfig.l, [_k], module.exports.staticconfig.conf, module.exports.staticconfig.emsg, module.exports.staticconfig.wmsg, '', _blankenvvars);
+    module.exports._reviewResults(module.exports.staticconfig.l, module.exports.staticconfig.wmsg, module.exports.staticconfig.emsg);
   }
 
 
   /**
    * Secure add a value later.
+   *
    * @param {string} _k - key
-   * @param {bool} _blankenvvars - if true, deletes the env var from the current environment
+   * @param {boolean} _blankenvvars - if true, deletes the env var from the current environment
+   * @return {undefined} -
    */
   static sadd(_k, _blankenvvars = true) {
     if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
-    module.exports._addInVars(module.exports.staticconfig.logger, [_k], module.exports.staticconfig.sconf, module.exports.staticconfig.emsg, module.exports.staticconfig.wmsg, 'secure ', _blankenvvars);
-    module.exports._reviewResults(this.logger, this.wmsg, this.emsg);
+    module.exports._addInVars(module.exports.staticconfig.l, [_k], module.exports.staticconfig.sconf, module.exports.staticconfig.emsg, module.exports.staticconfig.wmsg, 'secure ', _blankenvvars);
+    module.exports._reviewResults(this.l, this.wmsg, this.emsg);
   }
 
 
+  /**
+   * Outputs a Kubernetes ConfigMap from these vars.
+   *
+   * @return {string} -
+   */
   _genK8SConfigMap() {
     let retval = '';
     for (let p in this.conf) { if (this.conf.hasOwnProperty(p)) retval += `${p}=${this.conf[p]}\n`; }
     return retval;
   }
 
+
+  /**
+   * Outputs a Kubernetes ConfigMap from these vars.
+   *
+   * @return {string} -
+   */
   static genK8SConfigMap() {
     if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
     return module.exports.staticconfig._genK8SConfigMap();
   }
 
+
+  /**
+   * Outputs a Kubernetes Secrets file from these vars.
+   *
+   * @return {string} -
+   */
   _genK8SSecrets() {
     let retval = '';
     for (let p in this.sconf) { if (this.sconf.hasOwnProperty(p)) retval += `${p}=${this.sconf[p]}\n`; }
     return retval;
   }
 
+
+  /**
+   * Outputs a Kubernetes Secrets file from these vars.
+   *
+   * @return {string} -
+   */
   static genK8SSecrets() {
     if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
     return module.exports.staticconfig._genK8SSecrets();
   }
 
+
+  /**
+   * Converts this config object to string.
+   *
+   * @param {boolean} _pretty - add spacers to make it pretty
+   * @return {string} -
+   */
   toString(_pretty = false) {
     let spacer = null;
     if ( _pretty ) spacer = '  ';
@@ -299,20 +381,24 @@ module.exports = class Config {
     return retval;
   }
 
+
   /**
    * Set data on the Config for later use.
-   *   ex. Not  'get("A")' but C.A
+   *   ex. Not  'get("A")' but C.A.
    *
    * @param {string} _key - the key for the data
    * @param {object} _val - data attached to config
+   * @return {undefined} -
    */
   static setData(_key, _val) {
     if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
     module.exports.staticconfig._data[_key] = _val;
   }
 
+
   /**
    * Return the data.
+   *
    * @param {string} _key - the key for the data
    * @return {object} - returns data
    */
@@ -322,27 +408,46 @@ module.exports = class Config {
   }
 
 
+  /**
+   * Checks if a static config object exists.
+   *
+   * @return {boolean} - true/false
+   */
   static isInited() {
     if ( module.exports.staticconfig == 1 ) return false;
     return true;
   }
 
+
+  /**
+   * Display.
+   *
+   * @return {undefined} -
+   */
   static displayMe() {
     if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
-    module.exports.staticconfig.logger.info(module.exports.staticconfig.toString(true));
+    module.exports.staticconfig.l.info(module.exports.staticconfig.toString(true));
   }
 
-  static getLogger() { 
+
+  /**
+   * Returns the static Config object logger.
+   *
+   * @return {Logger/Error} - Error if not inited yet
+   */
+  static getLogger() {
     if ( module.exports.staticconfig == 1 ) throw new Error('Config not inited');
-    return module.exports.staticconfig.logger;
+    return module.exports.staticconfig.l;
   }
 
 
   /**
    * Blocks for Config to be created. If _class and _logger are passed, will create it here.
+   *
    * @param {class} _class - the child class of this, which will create a Config
    * @param {Logger} _logger - the logger to use
    * @param {boolean} _displayOnCreation - if true, will display the config when it is created
+   * @return {Promise} -
    */
   static async blockForInit(_class, _logger, _displayOnCreation = false) {
     // console.error('blockForInit : called ', __filename);
