@@ -11,7 +11,7 @@
     "url": "https://github.com/woveon/woveon-service"
   },
   "author": "Chadwick Wingrave",
-  "license": "MIT",
+  "license": "MPL-2.0",
   "dependencies": {
     "apollo-server-core": "^2.9.3",
     "apollo-server-express": "^2.9.3",
