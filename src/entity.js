@@ -26,6 +26,11 @@ class WovModelEntity {
   constructor() {
   }
 
+  static deinit() {
+    this.l = null;
+    this.cl = null;
+  }
+
 
   /**
    * Saves this model to persistent storage via the client.

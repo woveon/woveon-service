@@ -1,7 +1,7 @@
 
 const expect    = require('chai').expect;
 const Logger    = require('woveon-logger');
-const WovReturn = require('../src/wovreturn');
+// const WovReturn = require('../src/wovreturn');
 const Service   = require('../src/index');
 const M         = (require('./testmodels'))();
 
@@ -41,13 +41,11 @@ describe(`> ${mtag}: `, async function() {
     testdb = new Service.WovDBPostgres('testdb', logger);
     await testdb.connect();
     C.setData('db', testdb);
-    /*
-    await C.data('db').connect()
-      .then(() => { logger.verbose('  ... db connected'); })
-      .catch( (e) => { logger.throwError('  ... db connection error', e.stack); });
-      */
-    cl = new Service.WovModelClient(logger, C.data('db'),
-      [M.ParentModel, M.ChildModel, M.ChildChildModel, M.AssModelP, M.AssModelC, M.MP, M.Car, M.Tire, M.Wheel, M.ReadInA, M.ReadInB, M.ReadInC, M.ReadInCChild]);
+    let tmodels = [M.ParentModel, M.ChildModel, M.ChildChildModel, M.AssModelP, M.AssModelC, M.MP,
+        M.Vehicle, M.Car, M.Tire, M.Wheel, M.ReadInA, M.ReadInB, M.ReadInC, M.ReadInCChild];
+    // tmodels.forEach( function(m) { m.l = null; m.cl = null; }); // remove any previous init
+    tmodels.forEach( function(m) { m.deinit(); });
+    cl = new Service.WovClientLocal(logger, tmodels, C.data('db'));
     sl = new Service.WovStateLayer(logger, [cl]);
     await cl.init(sl, true, true, true);
   });

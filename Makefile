@@ -58,7 +58,7 @@ pg-create-db :
 	@PGPASSWORD=${POSTGRES_PASSWORD} psql -h localhost -U postgres -c "create database ${WOV_DB}"
 
 pg-psql :
-	@PGPASSWORD=${POSTGRES_PASSWORD} psql -h localhost -U postgres -d ${WOV_DB}
+	PGPASSWORD=${POSTGRES_PASSWORD} psql -h localhost -U postgres -d ${WOV_DB}
 
 pg-stop :
 	@docker stop postgres-${DOCKEREXT}
@@ -67,12 +67,14 @@ pg :
 	PGPASSWORD=${POSTGRES_PASSWORD} psql -h localhost -U postgres -d "${WOV_DB}" || printf '\nERROR: run "make pg-start" to start postgres (and make pg-db to populate it)\n\n'
 
 test : .FORCE
-	$(eval TESTFILE := $(shell ls test/${TEST}*) )
+	$(eval TESTFILE := $(shell ls test/${TEST}*.js) )
+	@if [ "${TEST}" != "" ] && [ "${TESTFILE}" == "" ]; then printf "\n***ERROR: Test '${TEST}' not found\n----- TESTS\n"; ls test; exit 1; fi
 	${ENVS} mocha -b ${TESTFILE} --timeout ${DEFAULTTESTTIMEOUT}
 #	${ENVS} mocha -b $$TEST --timeout ${DEFAULTTESTTIMEOUT}
 
 test-html : .FORCE
-	$(eval TESTFILE := $(shell ls test/${TEST}*) )
+	$(eval TESTFILE := $(shell ls test/${TEST}*.js) )
+	@if [ "${TEST}" != "" ] && [ "${TESTFILE}" == "" ]; then printf "\n***ERROR: Test '${TEST}' not found\n----- TESTS\n"; ls test; exit 1; fi
 	${ENVS} WOV_TEST=${TEST} mocha -b ${TESTFILE} --timeout ${DEFAULTTESTTIMEOUT} --reporter mochawesome --reporter-options reportDir=.mochawesome-report ; open -g ./.mochawesome-report/mochawesome.html
 #	${ENVS} WOV_TEST=$$TEST mocha -b $$TEST --timeout ${DEFAULTTESTTIMEOUT} --reporter mochawesome --reporter-options reportDir=.mochawesome-report ; open -g ./.mochawesome-report/mochawesome.html
 

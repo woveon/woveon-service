@@ -10,6 +10,7 @@ const WovReturn = require('./wovreturn');
 let Mongoose = require('mongoose');
 Mongoose.Promise = Promise;
 Mongoose.set('useFindAndModify', false); // see https://mongoosejs.com/docs/deprecations.html
+Mongoose.set('useUnifiedTopology', true);
 require('mongoose-long')(Mongoose);
 
 /**
@@ -191,12 +192,14 @@ class WovDBPostgres extends WovDB {
 
   /**
    * Creates the connection to the database.
+   *
+   * @return {null} -
    */
   async connect() {
     await this.client.connect()
       .then(() => Logger.g().info(`  ... db ${this.name} connected`))
       .catch( (e) => {
-        Logger.g().throwError('  ... connection error, is bastion tunneled into?', e.stack);
+        Logger.g().throwError(`  ... connection error, is bastion tunneled into? ${this.name}::${this.constructor.name}`, e.stack);
       });
   }
 
