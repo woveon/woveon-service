@@ -1,6 +1,7 @@
 # woveon-service
 
 [![Total alerts](https://img.shields.io/lgtm/alerts/g/woveon/woveon-service.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/woveon/woveon-service/alerts/)
+[![Language grade: JavaScript](https://img.shields.io/lgtm/grade/javascript/g/woveon/woveon-service.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/woveon/woveon-service/context:javascript)
 
 ![Woveon Logo](https://raw.githubusercontent.com/wiki/woveon/woveon-service/imgs/woveonlogo.png)
 
