@@ -5,7 +5,7 @@ const express    = require('express');
 const bodyParser = require('body-parser');
 const path       = require('path');
 const Handlebars = require('handlebars');
-const Logger     = require('woveon-logger');
+// const Logger     = require('woveon-logger');
 const fs         = require('fs');
 const cors       = require('cors');
 

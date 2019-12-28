@@ -11,7 +11,7 @@
  * @typedef WovStateLayer
  */
 
-const Logger = require('woveon-logger');
+// const Logger = require('woveon-logger');
 
 /**
  */

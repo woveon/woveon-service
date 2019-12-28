@@ -12,7 +12,7 @@
 
 const entity    = require('./entity');
 // const Requester = require('./requester');
-const Logger    = require('woveon-logger');
+// const Logger    = require('woveon-logger');
 
 /**
  * The client stores all the WovRemoteServices.

@@ -269,7 +269,7 @@ class WovModel extends entity.WovModelEntity {
         if ( result != null ) {
           if (result instanceof Error) { retval = result; }
           else {
-            let models = result; null;
+            let models = result;
             /*
             let proms  = [];
             for (let i in result ) {
@@ -1082,13 +1082,18 @@ class WovModel extends entity.WovModelEntity {
   // TODO: reload()
   //
   //
+  //
 
+  /**
+   */
+  /*
   static getGraphQLQuery_createOne() {
     let retval = `                       
     create${this.name}(${this.name}ToCreate : iCreate${this.name}!);
     `;
     unfinished();
   }
+  */
 
 
   // =====================================================================

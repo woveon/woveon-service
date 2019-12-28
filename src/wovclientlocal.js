@@ -10,7 +10,7 @@
  * @typedef integer
  */
 
-const Logger    = require('woveon-logger');
+// const Logger    = require('woveon-logger');
 const WovReturn = require('./wovreturn');
 const entity    = require('./entity');
 // const {ApolloServer}    = require('apollo-server-express');
