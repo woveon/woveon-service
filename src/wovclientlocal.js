@@ -195,6 +195,7 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
     if ( (typeof _q) != 'string' ) { _wr = _aspect; _aspect = _d; _d = null; }
     return new Promise( async function(ret, rej) {
       let retval = null;
+      // this.l.printStack();
       this.l.with('add_to_stacklvl', 1).aspect(`model ${_aspect}`, `Query '${_aspect}'`);
       this.l.with('add_to_stacklvl', 1).aspect(`modelquery ${_aspect}`, `Q(${_aspect}): `, _q);
       this.l.with('add_to_stacklvl', 1).aspect(`modeldata ${_aspect}`, `D(${_aspect}): `, _d);
@@ -465,12 +466,12 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
    * @return {WovModel|null} -
    */
   async getByID(_id, _Model) {
-    // this.l.aspect('ws.getByID', `getByID(${_id} : this: `, this, this.tablename);
+    // this.l.info(`getByID(${_id}): model: `, _Model.tablename);
     let retval = await this._selectByID(_id, `wsv_${_Model.tablename}`);
     if ( retval != null && !(retval instanceof Error) ) {
       retval = await this._polyReadCheck(retval, _Model);
     }
-    this.l.aspect('ws.getByID', `getByID( ${_id} ) of ${_Model.tablename} : `, retval);
+    // this.l.aspect('ws.getByID', `getByID( ${_id} ) of ${_Model.tablename} : `, retval);
     // this.l.aspect('ws.getByID', 'retval is ', retval);
     return retval;
   }
@@ -491,6 +492,7 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
     // do all DB queries at once (instead of caling getByID repeatedly)
     for (let i = 0; i< _ids.length; i++) { qqs.push(`id=$${i+xoff}::integer`); }
     let q = `SELECT * FROM "wsv_${_Model.tablename}" WHERE ${qqs.join(' OR ')}`;
+    // this.l.info('q for fetching all models: ', q);
     let result = await this._runQuery(q, _ids, 'ws.src.WovModel_getByIDs');
     // this.l.info('result of fetching all models: ', result);
 
@@ -498,10 +500,26 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
       let rid = _ids[i];
       let r = result.find((e) => { return e.id == rid; });
 
+      // this.l.info(`r[${i}] is : `, r);
+
+      // polyReadCheck removes _model_t
+
       // add Error or promise to array (Errors will just return, Promises we will wait for)
       if ( r != null && !(r instanceof Error) ) { p[i] = await this._polyReadCheck(r, _Model); }
       else p[i] = null; // Error(`_Model not found, of id(${rid}).`);
     }
+
+    // for every result (in case of overlap
+    /*
+    for (let i=0; i<result.length; i++) {
+      let r = result[i];
+
+      // add Error or promise to array (Errors will just return, Promises we will wait for)
+      if ( r != null && !(r instanceof Error) ) { p[i] = await this._polyReadCheck(r, _Model); }
+      else p[i] = null; // Error(`_Model not found, of id(${rid}).`);
+
+    }
+    */
 
     return Promise.all(p);
   }
@@ -775,7 +793,7 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
 
     this.l.aspect('polyReadCheck', '_polyReadCheck: ', _data, Mod.name);
     if ( _data._model_t === undefined ) { throw Error('How did this happen. You have failed me.', _data, Mod); }
-    else if ( _data._model_t == Mod.name ) { retval = new Mod(_data); }
+    else if ( _data._model_t == Mod.name ) { retval = new Mod(_data); } // dups data before sending
     else { // polymorphic
       Mod = this[_data._model_t]; // get the model
       if ( Mod == null ) { this.l.throwError(`polyReadCheck for '${Mod.name}' returned _model_t of '${_data._model_t}' which does not exist on client.`); }
