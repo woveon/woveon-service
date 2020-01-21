@@ -144,7 +144,7 @@ module.exports = class WovReturn {
       throw new Error(`WovReturn::retCodedError: no error definitions; need to call defineCodedErrors`);
     }
 
-    if ( _data == null ) { throw new Error('retCodedError called with null _data parameter'); }
+    // if ( _data == null ) { throw new Error('retCodedError called with null _data parameter'); }
 
     let ec = WovReturn._errordefs[_errname];
     if ( ec == null ) { throw new Error(`WovReturn::retCodedError: unknown error of '${_errname}'.`); }
