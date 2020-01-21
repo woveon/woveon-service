@@ -26,6 +26,12 @@ class WovModelEntity {
   constructor() {
   }
 
+
+  /**
+   * Disconnects the model from a client. Used for testing mostly.
+   *
+   * @return {undefined} -
+   */
   static deinit() {
     this.l = null;
     this.cl = null;
@@ -195,9 +201,16 @@ class WovModelEntity {
   /**
    * Simple check if `init` has been called on this class definition.
    *
-   * @return {boolean} - true if it has, false if not
+   * @return {boolean} - true if THIS CLASS has both logger and client, false if not
    */
-  static isInited() { let retval = false; if ( this.l != null && this.cl != null ) retval = true; return retval; }
+  static isInited() {
+    let retval = false;
+    if ( this.hasOwnProperty('l') && this.hasOwnProperty('cl') && this.l != null && this.cl != null ) retval = true;
+    // console.log(`isInited(${this.name}) ${retval}`);
+    // if ( this.l != null && this.cl != null ) retval = true;
+    // console.log(`  isInited(${this.name}) ${this.l == null} ${this.cl == null}`);
+    return retval;
+  }
 
 };
 
