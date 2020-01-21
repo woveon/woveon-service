@@ -12,7 +12,7 @@ include ./wovtoolscheat.mk
 #>   WOV_testdb_username=postgres WOV_testdb_host=localhost WOV_testdb_database=${WOV_DB} WOV_testdb_password=${POSTGRES_PASSWORD} \
 #>   WOV_testdb_port=5432 WOV_testdb_type=postgres WOV_apimatch_port=${WOV_apimatch_port}
 
-DOCKEREXT="here"
+DOCKEREXT="ws"
 
 all:
 	@echo ""
