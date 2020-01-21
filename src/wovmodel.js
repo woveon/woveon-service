@@ -51,7 +51,7 @@ class WovModel extends entity.WovModelEntity {
 
     if ( this.constructor.isInited() == false ) { throw Error(`Creating object of non-inited class ${this.constructor.name}.`); }
     if ( _data['id'] == null ) { throw Error(`WovModel ${this.constructor.name}.constructor: Missing 'id' in constructor data. Maybe you should call 'createOne' which creates this object, saves it and returns it with the id.`); }
-    this._data = _data;
+    this._data = Object.assign({}, _data); // dup data (not DEEP tho, so could be a problem?)
     this._model_t = this.constructor.name; // _data._model_t || this.name;
     delete this._data._model_t;
     this._dirty = {};
@@ -299,6 +299,7 @@ class WovModel extends entity.WovModelEntity {
 
               // create WovModelMany if does not exist (will add to it next)
               if ( this[plural] == null ) { this[plural] = new WovModelMany(); }
+              // else { Logger.g().info('existing WovModelMany of ', plural, this[plural].constructor.name); }
               for (let k in models ) { this[plural][models[k].get('id')] = models[k]; }
               retval = models;
             }
