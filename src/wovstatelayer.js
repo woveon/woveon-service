@@ -33,7 +33,7 @@ module.exports = class WovStateLayer {
   l        = null; // the loggr object
   _clients = null; // the array of WovEntity Clients this layer has
   _models  = null; // the hash (by lowercase model name) of WovModels this state layer serves (added from clients)
-  _rs      = null; // GraphQL Remote Server for all local clients
+  _rs      = {}; // GraphQL Remote Server for all local clients
 
 
   /**
@@ -223,7 +223,7 @@ module.exports = class WovStateLayer {
    * @return {undefined} -
    */
   async initPubServer(_listener, _endpoint_ext, _schemaadditions = {}, _resolveradditions = {}) {
-    this._initServer('pub', _listener, _endpoint_ext, _schemaadditions, _resolveradditions);
+    return this._initServer('pub', _listener, _endpoint_ext, _schemaadditions, _resolveradditions, {usedefaultschemas : false, usedefaultresolvers : false});
   }
 
 
@@ -251,41 +251,55 @@ module.exports = class WovStateLayer {
    * crud operations.
    *
    * @param {string} _name - The name/type of the server, used to set the route.
-   * @param {string} _endpoint_ext - MACHINE:PORT/ROOT/pubENDPOINT_EXT, where the default is /graphql
    * @param {Listener} _listener - listener to listen on. generally, the microservice's listener.
+   * @param {string} _endpoint_ext - MACHINE:PORT/ROOT/pubENDPOINT_EXT, where the default is /graphql
    * @param {object} _schemaadditions - additional GraphQL schema additions
    * @param {object} _resolveradditions - object with CODE to add resolvers : {Query : , Mutation : , ...}
+   * @param {object} _options - additional optional options
    * @return {undefined} -
    */
-  async _initServer(_name, _listener, _endpoint_ext = '/graphql', _schemaadditions = {}, _resolveradditions = {}) {
+  async _initServer(_name, _listener, _endpoint_ext = '/graphql', _schemaadditions = {}, _resolveradditions = {}, _options = {}) {
+    // this.l.info(`_initServer ${_name}`);
     let servercfgstrings = {schemas : entity.getBlankServerConfig_Schemas(), resolvers : entity.getBlankServerConfig_Resolvers()};
-
+    let options = Object.assign({
+      usedefaultschemas   : true,
+      usedefaultresolvers : true,
+    }, _options);
+    // this.l.info(`_initServer ${_name} - options`, options);
 
     // add in passed in at top
     Object.assign(servercfgstrings.schemas, _schemaadditions);
 
-    // Build Config from all local clients
+    // this.l.info('Build Config from all local clients');
     for (let i=0; i<this._clients.length; i++) {
       let cl     = this._clients[i];
       if ( cl instanceof WovClientLocal ) {
-        entity.mergeServerConfigStrings_Schemas(servercfgstrings.schemas,     cl.getGraphQLSchemas());
-        entity.mergeServerConfigStrings_Resolvers(servercfgstrings.resolvers, cl.getGraphQLResolvers());
+        if ( options.usedefaultschemas == true ) {
+          entity.mergeServerConfigStrings_Schemas(servercfgstrings.schemas,     cl.getGraphQLSchemas());
+        }
+        if ( options.usedefaultresolvers == true ) {
+          entity.mergeServerConfigStrings_Resolvers(servercfgstrings.resolvers, cl.getGraphQLResolvers());
+        }
       }
     }
 
     // this.l.h3().info('schemas   : ', servercfgstrings.schemas);
-    // this.l.h3().info('resolvers1 : ', servercfgstrings.resolvers);
+    // this.l.h3().info('resolvers : ', servercfgstrings.resolvers);
     // resolvers = requireFromString(resolvers);
     // resolvers = Object.assign(resolvers, _resolveradditions);
+    // this.l.h3().info('buildGraphQLServer_Resolvers');
     let resolvercode = requireFromString(WovStateLayer.buildGraphQLServer_Resolvers(servercfgstrings.resolvers));
+    // this.l.h3().info('mergeServerConfigCode_Resolvers');
     entity.mergeServerConfigCode_Resolvers(resolvercode, _resolveradditions);
     // this.l.h3().info('resolvers2 : ', resolvercode);
 
+    // if ( _name == 'pub' ) this.l.h3().info('Pub Resolvers : ', resolvercode);
 
     // Start GraphQL server for the Remote Server
     // NOTE: creates a schema text file, and a resolver code object
-    this._rs = new ApolloServer({
+    this._rs[_name] = new ApolloServer({
       typeDefs  : WovStateLayer.buildGraphQLServer_Schemas(servercfgstrings.schemas),
+      // 'type Query { greeting : String }', // WovStateLayer.buildGraphQLServer_Schemas(servercfgstrings.schemas),
       resolvers : resolvercode,
       context   : ({req}) => {  // eslint-disable-line key-spacing
         let retval = {
@@ -306,17 +320,17 @@ module.exports = class WovStateLayer {
       },
       formatResponse : (_response, {context}) => {
         // Logger.g().info('response:', _response);
-        Logger.g().aspect('listener.incoming', `Handled  : '${context.originalUrl}' with prot GraphQL: '${context.args.query}'`,
-          _response.data);
+        Logger.g().aspect('listener.incoming', `Handled  : '${context.originalUrl}' with prot GraphQL: '${context.args.query}'`);
+        Logger.g().aspect('listener.result', `Response: `, JSON.stringify(_response, null, 2));
         // let retval = _response.flatten(true, false, false, true);
         // return retval;
         return _response;
       },
     });
 
-    // this.l.info('_listener root : ', _listener.root);
-    this._rs.applyMiddleware({app : _listener.app, path : `${_listener.root}/${_name}${_endpoint_ext}`});
-    this.l.info(`... loaded StateLayer '${_name}' server as GraphQL at route: '${this._rs.graphqlPath}'`);
+    this.l.info('_listener root : ', _listener.root);
+    this._rs[_name].applyMiddleware({app : _listener.app, path : `${_listener.root}/${_name}${_endpoint_ext}`});
+    this.l.info(`... loaded StateLayer '${_name}' server as GraphQL at route: '${this._rs[_name].graphqlPath}'`);
   }
 
 
@@ -331,6 +345,10 @@ module.exports = class WovStateLayer {
     let retval = `
 
   scalar JSON
+  `;
+
+    if ( _schemastrings.queries != '' ) {
+      retval += `
 
   # ---------------------------------------------------------------------
   # Query Definitions
@@ -338,7 +356,11 @@ module.exports = class WovStateLayer {
   type Query {
   ${_schemastrings.queries}
   }
+  `;
+    }
 
+    if ( _schemastrings.mutations != '' ) {
+      retval += `
 
   # ---------------------------------------------------------------------
   # Mutation Definitions
@@ -346,15 +368,22 @@ module.exports = class WovStateLayer {
   type Mutation {
   ${_schemastrings.mutations}
   }
+  `;
+    }
 
+    if ( _schemastrings.query_t != '' ) {
+      retval += `
 
   # ---------------------------------------------------------------------
   # Query Input Types
   # ---------------------------------------------------------------------
   # input IDs { ids : [ID!] }
   ${_schemastrings.query_t}
+  `;
+    }
 
 
+      retval += `
   # ---------------------------------------------------------------------
   # Schemas
   # ---------------------------------------------------------------------
@@ -377,11 +406,18 @@ module.exports = class WovStateLayer {
    * @return {string} -
    */
   static buildGraphQLServer_Resolvers(_resolverstrings) {
+
+    // Logger.g().info('  _resolverstrings ', _resolverstrings);
+    let ex = '';
     let retval = `
 
 // import GraphQLJSON from 'graphql-type-json';
 const GraphQLJSON = require('graphql-type-json');
 const Logger      = require('woveon-logger');
+`;
+
+    if ( _resolverstrings.queryjs != '' ) {
+      retval += `
 
 // ---------------------------------------------------------------------
 // Query Implementations
@@ -389,6 +425,12 @@ const Logger      = require('woveon-logger');
 const Query = {
 ${_resolverstrings.queryjs}
 };
+`;
+      if ( ex != '' ) ex += ', '; ex += 'Query';
+    }
+
+    if ( _resolverstrings.mutationjs != '' ) {
+      retval += `
 
 // ---------------------------------------------------------------------
 // Mutation Implementations
@@ -396,13 +438,23 @@ ${_resolverstrings.queryjs}
 const Mutation = {
 ${_resolverstrings.mutationjs}
 };
+`;
+      if ( ex != '' ) ex += ', '; ex += 'Mutation';
+    }
+
+    if ( _resolverstrings.modeljs != '' ) {
+      retval += `
 
 // ---------------------------------------------------------------------
 // Model Implementations
 // ---------------------------------------------------------------------
 ${_resolverstrings.modeljs}
+`;
+    }
 
-module.exports = {Query, Mutation, ${_resolverstrings.exportsjs} JSON : GraphQLJSON};
+    if ( ex != '' ) ex += ', ';
+    retval += `
+module.exports = {${ex} ${_resolverstrings.exportsjs} JSON : GraphQLJSON};
 `;
 
     // Logger.g().info('buildGraphQLServer_Resolvers : ', retval);
