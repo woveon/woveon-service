@@ -651,9 +651,10 @@ class WovModel extends entity.WovModelEntity {
               case 'uuid':
               case 'timestamp':
               case 'timestamp without time zone':
+                qv = 'String';
+                break;
               case 'json':
                 qv = 'JSON';
-                // qv = 'String';
                 break;
               case 'float':
                 qv = 'Float';
@@ -673,6 +674,7 @@ class WovModel extends entity.WovModelEntity {
             }
             if ( isarray ) qv = `[${qv}]`;
             if ( this.debugme ) this.l.info(`  - self adding var : ${k}, ${qv}`);
+            // this.l.info(`  - self adding var : ${v}, ${k}, ${qv}`);
             this._graphQL.vars.push([k, qv]);
           }
         }
@@ -839,6 +841,7 @@ class WovModel extends entity.WovModelEntity {
       retval  = `\n  // --- ${this.name}\n`;
       retval += `  create${this.name} : async function(_, {_createThis${this.name}}, {dataSources}) {\n`+
                 `    let retval = await dataSources.statelayer.${this.name}.createOne(_createThis${this.name});\n`+
+                `    console.log('Model.getGraphQLResolver_MutationJS : create${this.name}: retval:', retval);\n`+
                 `    if ( retval == null ) return null;\n`+
                 `    else return retval.flatten({deleteid : false, deleterefs : false, deletesensitive : false});\n`+
                 `  },\n`;
@@ -1201,9 +1204,10 @@ class WovModel extends entity.WovModelEntity {
   /**
    * GraphQL Query types, used in mutations and such.
    *
+   * @param {string} _refsAs - what to put the ids as. Defaults to ID, but for public XIDs, use String.
    * @return {string} -
    */
-  static getGraphQLSchema_QueryTypes() {
+  static getGraphQLSchema_QueryTypes(_refsAs = 'ID') {
     let retval = null;
     this.initGraphQLSchema();
     if ( this._graphQL.querytypes == null ) { retval = this._graphQL.querytypes; }
@@ -1222,11 +1226,16 @@ class WovModel extends entity.WovModelEntity {
       do {
         for (let i=0; i<mod._graphQL.vars.length; i++) {
           let vv = mod._graphQL.vars[i];
-          // Logger.g().info('  vv is ', vv);
+          // Logger.g().info('  qt vv is ', vv);
           retval += `  ${vv[0].padEnd(lengthvar, ' ')} : ${vv[1].padEnd(lengthtype, ' ')}   # from model ${mod.name}\n`;
         }
         for (let i=0; i<mod._graphQL.refs.length; i++) {
-          retval += `  ${mod._graphQL.refs[i][0]} : ID\n`;
+          // Logger.g().info('  qt refs is ', mod._graphQL.refs[i]);
+          //
+
+          console.log('!!!here need to make revs not _x_ref but _x_refXID, the ncheck derefs code');
+
+          retval += `  ${mod._graphQL.refs[i][0]} : ${_refsAs}\n`;
         }
         mod = Object.getPrototypeOf(mod);
       } while ( mod != WovModel );
@@ -1241,9 +1250,10 @@ class WovModel extends entity.WovModelEntity {
    * GraphQL Query Generator.
    * TODO: finish.
    *
+   * @param {string} _refsAs - the type of the identifier. defaults to ID, but for public facing, should use XID's type of 'String'
    * @return {string} -
    */
-  static getGraphQLSchema_Mutations() {
+  static getGraphQLSchema_Mutations(_refsAs = 'ID') {
     let retval = null;
     this.initGraphQLSchema();
     if ( this._graphQL.mutations == null ) { retval = this._graphQL.mutations; }
@@ -1251,8 +1261,8 @@ class WovModel extends entity.WovModelEntity {
       retval  = `\n`;
       retval += `  # --- ${this.name}\n`;
       retval += `  create${this.name}(_createThis${this.name} : i${this.name}!) : ${this.name}\n`;
-      retval += `  update${this.name}(_id : ID!, _updateThis${this.name} : i${this.name}!) : ${this.name}\n`; // "save" as well
-      retval += `  delete${this.name}(_id : ID!) : deletedID \n`;
+      retval += `  update${this.name}(_id : ${_refsAs}!, _updateThis${this.name} : i${this.name}!) : ${this.name}\n`; // "save" as well
+      retval += `  delete${this.name}(_id : ${_refsAs}!) : deletedID \n`;
 
       this._graphQL.mutations = retval;
     }

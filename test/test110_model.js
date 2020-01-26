@@ -46,6 +46,9 @@ describe(`> ${mtag}: Generic Model Tests`, async function() {
   let data3  = {id : 101, title : 'title3.1', _testmodel_ref : data.id};
   let data3a = {id : 102, title : 'title3.2', _testmodel_ref : data.id};
   let data3b = {id : 103, title : 'title3.3', _testmodel_ref : data.id};
+  let dxid1  = {id : 201, xid : '4C8DC225-4EAA-4C1B-B818-2B1570A7226B', title : 'xidtitle201'};
+  let dxid2  = {id : 301, xid : '3C575EFF-6392-435B-B43D-0AA791ADB6E2', _testmodelxid1_ref : dxid1.id};
+  let dxid3  = {id : 302, xid : 'CAE1967E-2675-40DE-BBBA-9AAB53707BF2', _testmodelxid1_refXID : dxid1.xid};
   let fdata  = {name : data.name};
   let fdata2 = {title : data2.title};
 //  let fdata3 = {title : data3.title};
@@ -57,7 +60,7 @@ describe(`> ${mtag}: Generic Model Tests`, async function() {
     testdb = new WovDBPostgres('testdb', logger);
     await testdb.connect();
 
-    let tmodels = [TestModel, TestModel2, TestModel3, MP, TMS.Car, TMS.Tire, TMS.Wheel, TMS.ParentModel, TMS.ChildModel, TMS.ChildChildModel, TMS.AssModelP, TMS.AssModelC, TMS.ReadInA, TMS.ReadInB, TMS.ReadInC, TMS.ReadInCChild, TMS.AA, TMS.BB, TMS.CC];
+    let tmodels = [TestModel, TestModel2, TestModel3, TMS.TestModelXID1, TMS.TestModelXID2, MP, TMS.Car, TMS.Tire, TMS.Wheel, TMS.ParentModel, TMS.ChildModel, TMS.ChildChildModel, TMS.AssModelP, TMS.AssModelC, TMS.ReadInA, TMS.ReadInB, TMS.ReadInC, TMS.ReadInCChild, TMS.AA, TMS.BB, TMS.CC];
     tmodels.forEach( function(m) { m.l = null; m.cl = null; }); // remove any previous init
 
     cl = new Service.WovClientLocal(logger, tmodels, testdb);
@@ -221,6 +224,15 @@ describe(`> ${mtag}: Generic Model Tests`, async function() {
       expect(TestModel2.isRef('_testmodel_ref')).to.be.true;
     });
 
+    it(`> isXIDRef : ${__fileloc}`, async function() {
+      // let tm1 = await TestModel.createOne(data);
+      // let tm2 = await TestModel2.createOne(data2);
+      // logger.info('tm1: ', tm1);
+      // logger.info('tm2: ', tm2);
+      expect(cl.isXIDRef('_x_refXID')).to.equal('x');
+      expect(cl.isXIDRef('_x_ref')).to.be.null;
+    });
+
     it(`> ref/id converstion : ${__fileloc}`, async function() {
       expect(Service.entity.WovModelEntity.refToID('_X_ref')).to.equal('X_id');
       expect(Service.entity.WovModelEntity.refToID('_XXX_ref')).to.equal('XXX_id');
@@ -228,6 +240,23 @@ describe(`> ${mtag}: Generic Model Tests`, async function() {
       expect(Service.entity.WovModelEntity.idToRef('X_id')).to.equal('_X_ref');
       expect(Service.entity.WovModelEntity.idToRef('XXX_id')).to.equal('_XXX_ref');
       expect(Service.entity.WovModelEntity.idToRef('_XXX__id')).to.equal('__XXX__ref');
+    });
+
+    it(`> _deXIDRefs : ${__fileloc}`, async function() {
+
+
+      let tmxid1  = await TMS.TestModelXID1.createOne(dxid1);
+      // logger.info('tmxid1: ', tmxid1.get());
+      let tmxid2a = await TMS.TestModelXID2.createOne(dxid2);
+      // logger.info('tmxid2a: ', tmxid2a.get());
+
+      // logger.info('now use an XIDRef and it should still work', dxid3);
+      let tmxid2b = await TMS.TestModelXID2.createOne(dxid3);
+      // logger.info('tmxid2b: ', tmxid2b.get());
+
+      expect(tmxid2a.get('id')).to.not.equal(tmxid2b.get('id'));
+      expect(tmxid2a.get('xid')).to.not.equal(tmxid2b.get('xid'));
+      expect(tmxid2a.get('_testmodelxid1_ref')).to.equal(tmxid2b.get('_testmodelxid1_ref'));
     });
 
     it(`> flatten : ${__fileloc}`, async function() {

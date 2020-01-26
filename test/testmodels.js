@@ -32,6 +32,17 @@ module.exports = function() {
     erels  : {testmodel : 'many'},
   });
 
+  /**
+   * XID testing
+   */
+  const TestModelXID1 = class TestModelXID1 extends Service.WovModel { static tablename = 'testmodelxid1'; };
+  TestModelXID1.setSchema({schema : {xid : 'text', title : 'text'}});
+
+  /**
+   * XID ref testing
+   */
+  const TestModelXID2 = class TestModelXID2 extends Service.WovModel { static tablename = 'testmodelxid2'; };
+  TestModelXID2.setSchema({schema : {xid : 'text', _testmodelxid1_ref : 'integer'}});
 
   // ---------------------------------------------------------------------
   // Model with one-to-many-AssModelP
@@ -169,6 +180,7 @@ module.exports = function() {
   // NOTE: all new models need to be added to the client that they are used in!
   let models = {
     TestModel, TestModel2, TestModel3,
+    TestModelXID1, TestModelXID2,
     ParentModel, ChildModel, ChildChildModel,
     AssModelP, AssModelC,
     MP,

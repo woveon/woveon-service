@@ -383,6 +383,7 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
   async createOne(_data, _Model) {
     let retval = null;
     let Mod = _Model;
+    let derefed = null;
 
     // veryify data in
     if ( ! (_data instanceof Object) ) {
@@ -399,8 +400,16 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
     }
 
     if ( retval == null ) {
+      // turn any _x_refXID into _x_ref
+      derefed = await this._deXIDRefs(_data);
+      // this.l.info('derefed : ', derefed);
+    }
+
+    if ( retval == null ) {
       // this.l.info('createOne with model ', Mod.name);
-      let qp = this._buildQueryParams(_data, _data, 'insert', Mod);
+      this.l.aspect('ws.createOne', `  - buildQueryParmas with: `, derefed);
+      let qp = this._buildQueryParams(derefed, derefed, 'insert', Mod);
+      this.l.aspect('ws.createOne', `  - createOne qp : `, qp);
       let q = `INSERT INTO ${Mod.tablename} (${qp.colnames.join(', ')})
                VALUES (${qp.cols.join(', ')})
                RETURNING *`;
@@ -412,8 +421,65 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
     }
 
     // this.l.info('ClientLocal: createOne retval : ', retval);
-    this.l.aspect('ws.createOne', `createOne( ${_data} ) of ${Mod.tablename} : `, retval);
+    this.l.aspect('ws.createOne', `createOne( ${JSON.stringify(_data)} ) of ${Mod.tablename} : `, retval);
 
+    return retval;
+  }
+
+
+  /**
+   * turn any _x_refXID into _x_ref.
+   *
+   * @param {object} _data - hash of parameters and values that can have _x_refXID and needs to be _x_ref
+   * @return {object} -
+   */
+  async _deXIDRefs(_data) {
+    let retval = null; retval={};
+    let sels = [];
+    let ts = [];
+    let wheres= [];
+
+    Object.keys(_data).map( (_k) => {
+      let kd = this.isXIDRef(_k);
+      if ( kd == null ) retval[_k] = _data[_k];
+      else {
+        // this.l.info('  - deXIDRefs found: ', _k, kd);
+        let sel = _k.substring(0, _k.length - 7).substring(1).toLowerCase(); // get all but last 4 chars, then remove 1st char, then lower
+        sels.push(`${sel}.id as ${sel}`);
+        ts.push(sel);
+        wheres.push(`${sel}.xid='${_data[_k]}'`);
+        retval[`_${sel}_ref`] = null;
+      }
+    });
+
+    // if need to query, run a queyr to get all at once
+    if ( sels.length != 0 ) {
+      let q = `SELECT ${sels.join(', ')} FROM ${ts.join(', ')} WHERE ${wheres.join(' and ')}`;
+      let result = await this._runSingularQuery(q, [], `_deXIDRefs`).catch(function(e) { return e; });
+      // this.l.info('  - deXIDRefs result: ', result);
+      Object.keys(result).map( (_r)=>{
+        // this.l.info('  - mapping data ', _r);
+        retval[`_${_r}_ref`]=result[_r];
+      });
+    }
+
+    // this.l.info('  - deXIDRefs of ', _data, ' is ', retval);
+
+    return retval;
+  }
+
+  /**
+   * Retuns the selector of the XIDRef or null if it is not an XID ref.
+   * Ex. _x_ref is not, _x_refXID is.
+   *
+   * @param {string} _ref -
+   * @return {string|null} - null if not
+   */
+  isXIDRef(_ref) {
+    let retval = null;
+    if ( _ref != null && _ref.endsWith('_refXID') && _ref.startsWith('_') ) {
+      retval = _ref.substring(0, _ref.length - 7).substring(1).toLowerCase(); // get all but last 7 chars, then remove 1st char, then lower
+    }
     return retval;
   }
 

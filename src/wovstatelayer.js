@@ -362,13 +362,13 @@ module.exports = class WovStateLayer {
     if ( _schemastrings.mutations != '' ) {
       retval += `
 
-  # ---------------------------------------------------------------------
-  # Mutation Definitions
-  # ---------------------------------------------------------------------
-  type Mutation {
+# ---------------------------------------------------------------------
+# Mutation Definitions
+# ---------------------------------------------------------------------
+type Mutation {
   ${_schemastrings.mutations}
-  }
-  `;
+}
+`;
     }
 
     if ( _schemastrings.query_t != '' ) {
