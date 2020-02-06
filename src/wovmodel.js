@@ -21,6 +21,7 @@ const entity = require('./entity');
 class WovModel extends entity.WovModelEntity {
 
   static _schema     = null;   // the full schema of this model
+  static _ischema    = null;   // additional inputs needed to create this, but not part of this schema. Used in create. ex. dependencies
   static _transmodel = {};     // defines the models for a ref (i.e. Refs that are not named after the model)
   static _erels      = null;   // entity relationship types (one to one or many) (1-to-1, 1-to-M)
 
@@ -508,7 +509,7 @@ class WovModel extends entity.WovModelEntity {
         catch (e) { throw Error(`Bad deRef of ${_ref} ${_sel}.`); }
       }
       else {
-        throw Error(`Bad deRef of ${_ref} ${_sel}.`);
+        throw Error(`Bad deRef of ref:'${_ref}'  sel:'${_sel}'. Did you use a plural instead of a singular selector? (remove ending 's' character)`);
       }
     }
 
@@ -546,7 +547,8 @@ class WovModel extends entity.WovModelEntity {
     if ( this.tablename   == null ) throw Error(`WovModel of class '${this.name}' requires model to set static: 'tablename'.`);
     if ( this._transmodel == null ) throw Error(`WovModel of class '${this.name}' requires model to set static: '_transmodel'.`);
     if ( this._schema     == null ) throw Error(`WovModel of class '${this.name}' requires model to call : '${this.name}.updateSchema'.`);
-    this.l.aspect('wovmodelinit', `...init model '${this.name}', table '${this.tablename}', _transmodel: '${this._transmodel}', schema : `, this._schema);
+    if ( this._ischema    == null ) throw Error(`WovModel of class '${this.name}' requires model to call : '${this.name}.updateSchema'.`);
+    this.l.aspect('wovmodelinit', `...init model '${this.name}', table '${this.tablename}', _transmodel: '${this._transmodel}', schema : '${this._schema}', ischema : '${this._ischema}'`);
   }
 
 
@@ -645,33 +647,7 @@ class WovModel extends entity.WovModelEntity {
             let isarray = false;
             if ( v.endsWith('[]') ) { isarray = true; v = v.substring(0, v.length-2); }
 
-            switch (v) {
-              case 'text':
-              case 'varchar':
-              case 'uuid':
-              case 'timestamp':
-              case 'timestamp without time zone':
-                qv = 'String';
-                break;
-              case 'json':
-                qv = 'JSON';
-                break;
-              case 'float':
-                qv = 'Float';
-                break;
-              case 'integer':
-                qv = 'Int';
-                break;
-              case 'bool':
-              case 'boolean':
-                qv = 'Boolean';
-                break;
-              default:
-                // throw Error(`Unknown pgtype for '${k}' of '${v}'.`);
-                this.l.warn(`Unknown pgtype for '${k}' of '${v}'. Assuming 'String' and continuing.`);
-                qv = 'String';
-                break;
-            }
+            qv = this.typeDBToGraphQL(v);
             if ( isarray ) qv = `[${qv}]`;
             if ( this.debugme ) this.l.info(`  - self adding var : ${k}, ${qv}`);
             // this.l.info(`  - self adding var : ${v}, ${k}, ${qv}`);
@@ -746,18 +722,61 @@ class WovModel extends entity.WovModelEntity {
 
 
   /**
+   * Used to convert a database type to a GraphQL type.
+   *
+   * @param {string} _db_t -
+   * @return {string} -
+   */
+  static typeDBToGraphQL(_db_t) {
+    let retval= null;
+    switch (_db_t) {
+      case 'text':
+      case 'varchar':
+      case 'uuid':
+      case 'timestamp':
+      case 'timestamp without time zone':
+        retval = 'String';
+        break;
+      case 'json':
+        retval = 'JSON';
+        break;
+      case 'float':
+        retval = 'Float';
+        break;
+      case 'integer':
+        retval = 'Int';
+        break;
+      case 'bool':
+      case 'boolean':
+        retval = 'Boolean';
+        break;
+      default:
+        // throw Error(`Unknown pgtype for '${k}' of '${v}'.`);
+        this.l.warn(`Unknown pgtype of '${_db_t}'. Assuming 'String' and continuing.`);
+        retval = 'String';
+        break;
+    }
+    return retval;
+  }
+
+
+  /**
    * Generates the code to access the data.
    *
+   * @param {object} _options -
    * @return {string} - javascript code
    */
-  static getGraphQLResolver() {
+  static getGraphQLResolver(_options = {}) {
     let retval = entity.getBlankServerConfig_Resolvers();
+    let options = Object.assign({
+      external : false, // public facing or internal where we have more trust
+    }, _options);
 
     this.initGraphQLSchema();
-    retval.queryjs    = this.getGraphQLResolver_QueryJS();
-    retval.mutationjs = this.getGraphQLResolver_MutationJS();
-    retval.modeljs    = this.getGraphQLResolver_ModelJS();
-    retval.exportsjs  = this.getGraphQLResolver_ExportsJS();
+    retval.queryjs    = this.getGraphQLResolver_QueryJS(options);
+    retval.mutationjs = this.getGraphQLResolver_MutationJS(options);
+    retval.modeljs    = this.getGraphQLResolver_ModelJS(options);
+    retval.exportsjs  = this.getGraphQLResolver_ExportsJS(options);
 
     return retval;
   };
@@ -766,60 +785,68 @@ class WovModel extends entity.WovModelEntity {
   /**
    * Resolvers for queries.
    *
+   * @param {object} _options -
    * @return {string} -
    */
-  static getGraphQLResolver_QueryJS() {
+  static getGraphQLResolver_QueryJS(_options) {
     let retval = null;
+    let options = Object.assign({
+      external : false,
+    }, _options);
+
     this.initGraphQLSchema();
+
     if ( this._graphQL.rQueryJS == null ) { retval = this._graphQL.rQueryJS; }
     if ( retval == null ) {
       retval  = `\n  // --- ${this.name}\n`;
-      retval += `  get${this.name}ByID  : async function(_parent, _args, {dataSources}) {\n`+
-                // `    console.log('getByID args: ', _args);\n`+
-                `    let retval = await dataSources.statelayer.${this.name}.getByID(_args.id);\n`+
-                // `    console.log('getbyid1: ', retval);\n`+
-                `    if ( retval != null ) {\n`+
-                `      retval = retval.flatten({deleteid : false, deleterefs : false, deletesensitive : false});\n`+
-                // `      console.log('getbyid2: ', retval);\n`+
-                `    }\n`+
-                `    return retval;\n`+
-                `  },\n`;
+      if ( options.external == false ) {
+        retval += `  get${this.name}ByID  : async function(_parent, _args, {dataSources}) {\n`+
+          // `    console.log('getByID args: ', _args);\n`+
+          `    let retval = await dataSources.statelayer.${this.name}.getByID(_args.id);\n`+
+          // `    console.log('getbyid1: ', retval);\n`+
+          `    if ( retval != null ) {\n`+
+          `      retval = retval.flatten({deleteid : false, deleterefs : false, deletesensitive : false});\n`+
+          // `      console.log('getbyid2: ', retval);\n`+
+          `    }\n`+
+          `    return retval;\n`+
+          `  },\n`;
+        retval += `  get${this.name}ByIDs : async function(_parent, _args, {dataSources}) {\n`+
+          `    let retval = undefined;\n`+
+          // `    console.log('getByIDs args: ', _args);\n`+
+          `    let result = await dataSources.statelayer.${this.name}.getByIDs(_args.ids);\n`+
+          // `    console.log('getbyids1: ', result);\n`+
+          `    if ( result == null ) retval = null;\n`+
+          `    else {\n`+
+          `      retval = [];\n`+
+          `      for (let i=0; i<result.length; i++) {\n`+
+          `        retval[i] = result[i];\n`+
+          `        if ( retval[i] != null ) {\n`+ // ignore nulls, which were bad ids
+          `          retval[i] = result[i].flatten({deleteid : false, deleterefs : false, deletesensitive : false});\n`+
+          `        }\n`+
+          `      }\n`+
+          `    }\n`+
+          // `    console.log('--- getByIDs retval: ', retval);\n`+
+          `    return retval;\n`+
+          `  },\n`;
+        retval += `  get${this.name}ToMe : async function(_parent, _args, {dataSources}) {\n`+
+          // `    console.log('--- WovModel get${this.name}ToMe with args : ', _args);\n`+
+          // `    console.log('    dataSources.statelayer.${this.name}: ', dataSources.statelayer.${this.name});\n`+
+          `    let retval = undefined;\n`+
+          `    let result = await dataSources.statelayer.${this.name}.getToMe(_args.id, _args.ref);\n`+
+          // `    console.log('--- getToMe result: ', result);\n`+
+          `    if ( result == null ) retval = null;\n`+
+          `    else {\n`+
+          `      retval = [];\n`+
+          `      for (let i=0; i<result.length; i++) {\n`+
+          `        retval[i] = result[i].flatten({deleteid : false, deleterefs : false, deletesensitive : false});\n`+
+          `      }\n`+
+          `    }\n`+
+          // `    console.log('--- getToMe retval: ', retval);\n`+
+          `    return retval;\n`+
+          `  },\n`;
+      }
       retval += `  get${this.name}ByXID : async function(_parent, _args, {dataSources}) {\n`+
                 `    return dataSources.statelayer.${this.name}.getByXID(_args.xid);\n`+
-                `  },\n`;
-      retval += `  get${this.name}ByIDs : async function(_parent, _args, {dataSources}) {\n`+
-                `    let retval = undefined;\n`+
-                // `    console.log('getByIDs args: ', _args);\n`+
-                `    let result = await dataSources.statelayer.${this.name}.getByIDs(_args.ids);\n`+
-                // `    console.log('getbyids1: ', result);\n`+
-                `    if ( result == null ) retval = null;\n`+
-                `    else {\n`+
-                `      retval = [];\n`+
-                `      for (let i=0; i<result.length; i++) {\n`+
-                `        retval[i] = result[i];\n`+
-                `        if ( retval[i] != null ) {\n`+ // ignore nulls, which were bad ids
-                `          retval[i] = result[i].flatten({deleteid : false, deleterefs : false, deletesensitive : false});\n`+
-                `        }\n`+
-                `      }\n`+
-                `    }\n`+
-                // `    console.log('--- getByIDs retval: ', retval);\n`+
-                `    return retval;\n`+
-                `  },\n`;
-      retval += `  get${this.name}ToMe : async function(_parent, _args, {dataSources}) {\n`+
-                // `    console.log('--- WovModel get${this.name}ToMe with args : ', _args);\n`+
-                // `    console.log('    dataSources.statelayer.${this.name}: ', dataSources.statelayer.${this.name});\n`+
-                `    let retval = undefined;\n`+
-                `    let result = await dataSources.statelayer.${this.name}.getToMe(_args.id, _args.ref);\n`+
-                // `    console.log('--- getToMe result: ', result);\n`+
-                `    if ( result == null ) retval = null;\n`+
-                `    else {\n`+
-                `      retval = [];\n`+
-                `      for (let i=0; i<result.length; i++) {\n`+
-                `        retval[i] = result[i].flatten({deleteid : false, deleterefs : false, deletesensitive : false});\n`+
-                `      }\n`+
-                `    }\n`+
-                // `    console.log('--- getToMe retval: ', retval);\n`+
-                `    return retval;\n`+
                 `  },\n`;
 
       this._graphQL.rQueryJS = retval;
@@ -831,29 +858,61 @@ class WovModel extends entity.WovModelEntity {
   /**
    * Resolvers for mutations.
    *
+   * @param {object} _options -
    * @return {string} -
    */
-  static getGraphQLResolver_MutationJS() {
+  static getGraphQLResolver_MutationJS(_options = {}) {
     let retval = null;
+    let options = Object.assign({
+      external            : false,
+      codeCreateOnSuccess : function(_name) { return ''; }, // inject code to createX after creating and flattening data
+    }, _options);
+
+    let xidext          ='';
+    let idn             = '_id';
+    let deleteid        = false;
+    let deleterefs      = false;
+    let deletesensitive = false;
+    if (options.external == true) {
+      xidext          = 'XID';
+      idn             = '_xid';
+      deleteid        = false;
+      deleterefs      = false;
+      deletesensitive = true;
+    }
+
     this.initGraphQLSchema();
-    if ( this._graphQL.rMutationJS == null ) { retval = this._graphQL.rMutationJS; }
+
+    // NOTE: turned off cache since params can modify
+    // if ( this._graphQL.rMutationJS != null ) { retval = this._graphQL.rMutationJS; }
+
     if ( retval == null ) {
       retval  = `\n  // --- ${this.name}\n`;
       retval += `  create${this.name} : async function(_, {_createThis${this.name}}, {dataSources}) {\n`+
-                `    let retval = await dataSources.statelayer.${this.name}.createOne(_createThis${this.name});\n`+
-                `    console.log('Model.getGraphQLResolver_MutationJS : create${this.name}: retval:', retval);\n`+
-                `    if ( retval == null ) return null;\n`+
-                `    else return retval.flatten({deleteid : false, deleterefs : false, deletesensitive : false});\n`+
+                `    let retval = null;\n`+
+                `    console.log('create${this.name}.createOne data: ', _createThis${this.name});\n`+
+                `    let user = (_?_.user:undefined);\n`+
+                `    let result = await dataSources.statelayer.${this.name}.createOne(_createThis${this.name}, user);\n`+
+                `    if ( result == null ) retval = null;\n`+
+                `    else if ( result instanceof Error ) retval = result;\n`+
+                `    else {\n`+
+                `      retval = result.flatten({deleteid : ${deleteid}, deleterefs : ${deleterefs}, deletesensitive : ${deletesensitive}});\n`+
+                options.codeCreateOnSuccess(this.name)+
+                // `      if ( dataSources.socket && dataSources.socket.${this.name} && dataSources.socket.${this.name}.create${this.name} ) dataSources.socket.${this.name}.create${this.name}(retval, user);\n`+
+                `    }\n`+
+                `    return retval;\n`+
                 `  },\n`;
-      retval += `  update${this.name} : async function(_, {_id, _updateThis${this.name}}, {dataSources}) {\n`+
-                `    let retval = await dataSources.statelayer.${this.name}.updateOne(_id, _updateThis${this.name});\n`+
-                // `    console.log('update ', retval);\n`+
+      retval += `  update${this.name} : async function(_, {${idn}, _updateThis${this.name}}, {dataSources}) {\n`+
+                // `    console.log('update${this.name} with ', ${idn}, _updateThis${this.name});\n`+
+                `    let retval = await dataSources.statelayer.${this.name}.updateOne${xidext}(${idn}, _updateThis${this.name});\n`+
+                // `    console.log('update${this.name} ', retval);\n`+
                 `    if ( retval instanceof Error ) return retval;\n`+
                 `    else return retval;\n`+
                 `  },\n`;
                 // `    else return retval.flatten({deleteid : false, deleterefs : false, deletesensitive : false});\n`+
-      retval += `  delete${this.name} : async function(_, {_id}, {dataSources}) {\n`+
-                `    return await dataSources.statelayer.${this.name}.deleteByID(_id);\n`+
+      retval += `  delete${this.name} : async function(_, {${idn}}, {dataSources}) {\n`+
+                // `    console.log('delete${this.name} called with ${idn}');\n`+
+                `    return await dataSources.statelayer.${this.name}.deleteBy${xidext==''?'ID':xidext}(${idn});\n`+
                 `  },\n`;
 
       this._graphQL.rMutationJS = retval;
@@ -963,11 +1022,20 @@ class WovModel extends entity.WovModelEntity {
    *
    * @return {string} - GraphQL type definition for this Model
    */
-  static getGraphQLSchema() {
+  static getGraphQLSchema(_options) {
     this.initGraphQLSchema();
     let mod = this;
+    let options = Object.assign({
+      external : false,
+    }, _options);
 
-    // this.l.info(`getGraphQLSchema: ${this.name}: `, mod._graphQL );
+    // if ( this.name == 'Work' ) this.l.info(`getGraphQLSchema: ${this.name}: `, _options ); // mod._graphQL 
+
+    let useid='ID';
+    if ( options.external == true ) {
+      useid='XID';
+    }
+
 
     let lines = [];
     let firstvarlength = null;
@@ -989,13 +1057,10 @@ class WovModel extends entity.WovModelEntity {
       mod._graphQL.refs.forEach(function(p) { varlength = Math.max(varlength, (p[0].length)); });
       mod._graphQL.vars.forEach(function(p) { lines.push(`${p[0].padEnd(varlength)} : ${p[1]}`); });
       mod._graphQL.objs.forEach(function(p) { lines.push(`${p[0].padEnd(varlength)} : ${p[1]}`); });
-      mod._graphQL.refs.forEach(function(p) { lines.push(`${p[0].padEnd(varlength)} : ID`); });
+      mod._graphQL.refs.forEach(function(p) { lines.push(`${p[0].padEnd(varlength)} : ${useid}`); });
       // mod._graphQL.refs.forEach(function(p) { lines.push(`${`_${p[0]}_ref`.padEnd(varlength-5)} : ID`); });
-     
+
       // HERE... should be a _graphQL.refs that has these so that they are returned if they are on hte model and not just generated on hte fly
-
-
-
       if ( firstvarlength == null ) firstvarlength = varlength;
       mod = Object.getPrototypeOf(mod);
     } while ( mod != WovModel );
@@ -1003,18 +1068,20 @@ class WovModel extends entity.WovModelEntity {
 
     // schema
     let retval = entity.getBlankServerConfig_Schemas();
-    retval.queries   += this.getGraphQLSchema_Query_getByID();
-    retval.queries   += this.getGraphQLSchema_Query_getByIDs();
-    retval.queries   += this.getGraphQLSchema_Query_getByXID();
-    retval.queries   += this.getGraphQLSchema_Query_getToMe();
-    retval.query_t   += this.getGraphQLSchema_QueryTypes();
-    retval.mutations += this.getGraphQLSchema_Mutations();
+    if ( options.external == false ) {
+      retval.queries   += this.getGraphQLSchema_Query_getByID(_options);
+      retval.queries   += this.getGraphQLSchema_Query_getByIDs(_options);
+    }
+    retval.queries   += this.getGraphQLSchema_Query_getByXID(_options);
+    retval.queries   += this.getGraphQLSchema_Query_getToMe(_options);
+    retval.query_t   += this.getGraphQLSchema_QueryTypes(_options);
+    retval.mutations += this.getGraphQLSchema_Mutations(_options);
 
     // schemas
     if ( extlines.length != 0 ) retval.schemas += extlines.join('\n');
-    retval.schemas += `type ${this.name} {\n`+
-                      `  ${'id'.padEnd(firstvarlength)} : ID!\n`+
-                      `  ${lines.join('\n  ')}`+
+    retval.schemas += `type ${this.name} {\n`;
+    if ( useid == 'ID' ) retval.schemas += `  ${'id'.padEnd(firstvarlength)} : ID!\n`;
+    retval.schemas += `  ${lines.join('\n  ')}`+
                       `\n}\n`;
 
     return retval;
@@ -1186,15 +1253,23 @@ class WovModel extends entity.WovModelEntity {
    * GraphQL Query Generator.
    * TODO: finish.
    *
-   * @param {WovModel} _ModelOther - the Model class
+   * @param {object} _options - 
    * @return {string} -
    */
-  static getGraphQLSchema_Query_getToMe(_ModelOther) {
-    let retval = null; // '  # getToMe TODO\n';
+  static getGraphQLSchema_Query_getToMe(_options) {
+    let retval = null;
+    let options = Object.assign({
+      external : false,
+    }, _options);
+
+    let idt='ID';
+    let idtt='id';
+    if ( options.external == true ) { idt='XID'; idtt='xid'; }
+
     this.initGraphQLSchema();
-    if ( this._graphQL.qGetToMe == null ) { retval = this._graphQL.qGetToMe; }
+    // if ( this._graphQL.qGetToMe == null ) { retval = this._graphQL.qGetToMe; } turned off cache
     if ( retval == null ) {
-      retval= `    get${this.name}ToMe(id : ID!, ref : String!) : [${this.name}]\n`;
+      retval= `    get${this.name}ToMe${idt=='ID'?'':idt}(${idtt} : ${idt}!, ref : String!) : [${this.name}]\n`;
       this._graphQL.qGetToMe = retval;
     }
     return retval;
@@ -1204,11 +1279,15 @@ class WovModel extends entity.WovModelEntity {
   /**
    * GraphQL Query types, used in mutations and such.
    *
-   * @param {string} _refsAs - what to put the ids as. Defaults to ID, but for public XIDs, use String.
+   * @param {string} _options - Additional params that can be passed.
    * @return {string} -
    */
-  static getGraphQLSchema_QueryTypes(_refsAs = 'ID') {
+  static getGraphQLSchema_QueryTypes(_options = {}) {
     let retval = null;
+    let reftype = 'ID';
+    let refext  = '';
+    if ( _options.external == true ) { reftype='String'; refext='XID'; }
+
     this.initGraphQLSchema();
     if ( this._graphQL.querytypes == null ) { retval = this._graphQL.querytypes; }
     if ( retval == null ) {
@@ -1230,18 +1309,23 @@ class WovModel extends entity.WovModelEntity {
           retval += `  ${vv[0].padEnd(lengthvar, ' ')} : ${vv[1].padEnd(lengthtype, ' ')}   # from model ${mod.name}\n`;
         }
         for (let i=0; i<mod._graphQL.refs.length; i++) {
-          // Logger.g().info('  qt refs is ', mod._graphQL.refs[i]);
-          //
-
-          console.log('!!!here need to make revs not _x_ref but _x_refXID, the ncheck derefs code');
-
-          retval += `  ${mod._graphQL.refs[i][0]} : ${_refsAs}\n`;
+          // if ( this.name == 'Work' ) Logger.g().info('  qt refs is ', mod._graphQL.refs[i], refext, reftype);
+          retval += `  ${mod._graphQL.refs[i][0]}${refext} : ${reftype}\n`;
         }
+        Object.keys(mod._ownischema).map( (_k) => {
+          // Logger.g().info(`  input schema addition ${_k}: `);
+          // Logger.g().info(`  input schema addition ${_k}: `, mod._ischema[_k], this.isRef(_k), this.typeDBToGraphQL(mod._ischema[_k]));
+          if ( this.isRef(_k) ) { retval += `  ${_k}${refext} : ${reftype}\n`; }
+          else                  { retval += `  ${_k} : ${mod._ownischema[_k]}\n`; }
+        });
         mod = Object.getPrototypeOf(mod);
       } while ( mod != WovModel );
 
       retval += `}\n`;
     }
+
+    // if ( this.name == 'Work') { this.l.info('Schema for Work query types : ', retval); }
+
     return retval;
   }
 
@@ -1250,19 +1334,30 @@ class WovModel extends entity.WovModelEntity {
    * GraphQL Query Generator.
    * TODO: finish.
    *
-   * @param {string} _refsAs - the type of the identifier. defaults to ID, but for public facing, should use XID's type of 'String'
+   * @param {string} _options - Additional params that can be passed.
    * @return {string} -
    */
-  static getGraphQLSchema_Mutations(_refsAs = 'ID') {
+  static getGraphQLSchema_Mutations(_options = {}) {
     let retval = null;
+    let reftype = 'ID';
+    let idt='id';
+    let options = Object.assign({
+      external : false,
+      create   : true,
+      update   : true,
+      delete   : true,
+    }, _options);
+
+    if ( options.external == true ) { reftype = 'String'; idt='xid'; }
+
     this.initGraphQLSchema();
     if ( this._graphQL.mutations == null ) { retval = this._graphQL.mutations; }
     if ( retval == null ) {
       retval  = `\n`;
       retval += `  # --- ${this.name}\n`;
-      retval += `  create${this.name}(_createThis${this.name} : i${this.name}!) : ${this.name}\n`;
-      retval += `  update${this.name}(_id : ${_refsAs}!, _updateThis${this.name} : i${this.name}!) : ${this.name}\n`; // "save" as well
-      retval += `  delete${this.name}(_id : ${_refsAs}!) : deletedID \n`;
+      if ( options.create ) retval += `  create${this.name}(_createThis${this.name} : i${this.name}!) : ${this.name}\n`;
+      if ( options.update ) retval += `  update${this.name}(_${idt} : ${reftype}!, _updateThis${this.name} : i${this.name}!) : ${this.name}\n`;
+      if ( options.delete ) retval += `  delete${this.name}(_${idt} : ${reftype}!) : deleted${idt.toUpperCase()} \n`;
 
       this._graphQL.mutations = retval;
     }
@@ -1307,8 +1402,9 @@ class WovModel extends entity.WovModelEntity {
       throw new Error(`WovModel::setSchema requires at least a 'schema' value in passed in values. (on '${_sc.schema}')`);
       // _sc.schema = {};
     }
-    if ( _sc.trans  == undefined ) _sc.trans  = {};
-    if ( _sc.erels  == undefined ) _sc.erels  = {};
+    if ( _sc.trans   == undefined ) _sc.trans   = {};
+    if ( _sc.erels   == undefined ) _sc.erels   = {};
+    if ( _sc.ischema == undefined ) _sc.ischema = {};
 
     // plural
     // if ( _sc.plural ) this._plural = _sc.plural;
@@ -1323,6 +1419,10 @@ class WovModel extends entity.WovModelEntity {
         this._schema._model_t = 'varchar';
       }
       else { this._schema = {}; }
+
+      // duplicate ischema on this class from parent
+      if ( this._ischema != null ) { this._ischema = JSON.parse(JSON.stringify(this._ischema)); }
+      else { this._ischema = {}; }
 
       // duplicate trans on this class from parent so parent has it's own copy
       if ( this._transmodel != null ) { this._transmodel = JSON.parse(JSON.stringify(this._transmodel)); }
@@ -1345,6 +1445,7 @@ class WovModel extends entity.WovModelEntity {
     if (true) {
       this._owntransmodel = _sc.trans;
       this._ownschema     = _sc.schema;
+      this._ownischema    = _sc.ischema;
       this._ownerels      = _sc.erels;
       if ( this._ownschema.sensitive ) {
         // Logger.g().info(`- found sensitive entry(s) : `, this._ownschema['sensitive']);
@@ -1361,6 +1462,12 @@ class WovModel extends entity.WovModelEntity {
         this._schema[_key] = _sc.schema[_key];
         // if ( this.isRef(_key) ) this._transmodel[_key] = this.ER_ONE; // one to one by default
       }
+    }.bind(this));
+
+    // Copy in ischema
+    Object.keys(_sc.ischema).forEach(function(_key) {
+      if ( _sc.ischema[_key] == null ) delete this._ischema[_key];
+      else { this._ischema[_key] = _sc.ischema[_key]; }
     }.bind(this));
 
     // Copy in trans
@@ -1469,6 +1576,7 @@ class WovModel extends entity.WovModelEntity {
     Logger.g().info(` - tablename   : `, this.tablename);
     Logger.g().info(` - _plural     : `, this._plural);
     Logger.g().info(` - _schema     : `, this._schema);
+    Logger.g().info(` - _ischema    : `, this._ischema);
     Logger.g().info(` - _transmodel : `, this._transmodel);
     Logger.g().info(` - _erels      : `, this._erels);
     Logger.g().info(` - _sensitive  : `, this._sensitive);

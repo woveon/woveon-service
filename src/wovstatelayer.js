@@ -220,10 +220,17 @@ module.exports = class WovStateLayer {
    * @param {string} _endpoint_ext - MACHINE:PORT/ROOT/pubENDPOINT_EXT, where the default is /graphql
    * @param {object} _schemaadditions - additional GraphQL schema additions
    * @param {object} _resolveradditions - object with code to add resolvers : {Query : , Mutation : , ...}
+   * @param {object} _options - additional options
    * @return {undefined} -
    */
-  async initPubServer(_listener, _endpoint_ext, _schemaadditions = {}, _resolveradditions = {}) {
-    return this._initServer('pub', _listener, _endpoint_ext, _schemaadditions, _resolveradditions, {usedefaultschemas : false, usedefaultresolvers : false});
+  async initPubServer(_listener, _endpoint_ext, _schemaadditions = {}, _resolveradditions = {}, _options = {}) {
+    let options = Object.assign({
+      additionalDataSources : {},
+      usedefaultschemas     : false,
+      usedefaultresolvers   : false,
+      external              : true,
+    }, _options);
+    return this._initServer('pub', _listener, _endpoint_ext, _schemaadditions, _resolveradditions, options);
   }
 
 
@@ -237,10 +244,14 @@ module.exports = class WovStateLayer {
    * @param {string} _endpoint_ext - MACHINE:PORT/ROOT/pubENDPOINT_EXT, where the default is /graphql
    * @param {object} _schemaadditions - additional GraphQL schema additions
    * @param {object} _resolveradditions - object with code to add resolvers : {Query : , Mutation : , ...}
+   * @param {object} _options - additional options
    * @return {undefined} -
    */
-  async initProtServer(_listener, _endpoint_ext = '/graphql', _schemaadditions = {}, _resolveradditions = {}) {
-    this._initServer('prot', _listener, _endpoint_ext, _schemaadditions, _resolveradditions);
+  async initProtServer(_listener, _endpoint_ext = '/graphql', _schemaadditions = {}, _resolveradditions = {}, _options = {}) {
+    let options = Object.assign({
+      additionalDataSources : {},
+    }, _options);
+    this._initServer('prot', _listener, _endpoint_ext, _schemaadditions, _resolveradditions, options);
   }
 
 
@@ -262,29 +273,56 @@ module.exports = class WovStateLayer {
     // this.l.info(`_initServer ${_name}`);
     let servercfgstrings = {schemas : entity.getBlankServerConfig_Schemas(), resolvers : entity.getBlankServerConfig_Resolvers()};
     let options = Object.assign({
-      usedefaultschemas   : true,
-      usedefaultresolvers : true,
+      usedefaultschemas     : true,
+      usedefaultresolvers   : true,
+      external              : false,
+      additionalDataSources : {},
     }, _options);
     // this.l.info(`_initServer ${_name} - options`, options);
 
     // add in passed in at top
     Object.assign(servercfgstrings.schemas, _schemaadditions);
 
-    // this.l.info('Build Config from all local clients');
+    if ( options.usedefaultschemas == true ) {
+      servercfgstrings.schemas = entity.mergeServerConfigStrings_Schemas([
+        servercfgstrings.schemas,
+        entity.mergeServerConfigStrings_Schemas(this._clients.map( (_cl)=>{ return _cl.getGraphQLSchemas({external : options.external}); })),
+      ]);
+    }
+    if ( options.usedefaultresolvers == true ) {
+      servercfgstrings.resolvers = entity.mergeServerConfigStrings_Resolvers([
+        servercfgstrings.resolvers,
+        entity.mergeServerConfigStrings_Resolvers(this._clients.map( (_cl)=>{
+          let retval = '';
+          try { retval = _cl.getGraphQLResolvers({external : options.external}); }
+          catch (e) { this.l.info('retval err: ', e); }
+          // this.l.info('retval: ', retval);
+          return retval;
+        })),
+      ]);
+    }
+
+      /*
     for (let i=0; i<this._clients.length; i++) {
       let cl     = this._clients[i];
       if ( cl instanceof WovClientLocal ) {
         if ( options.usedefaultschemas == true ) {
-          entity.mergeServerConfigStrings_Schemas(servercfgstrings.schemas,     cl.getGraphQLSchemas());
+          entity.mergeServerConfigStrings_Schemas([servercfgstrings.schemas, cl.getGraphQLSchemas());
         }
         if ( options.usedefaultresolvers == true ) {
           entity.mergeServerConfigStrings_Resolvers(servercfgstrings.resolvers, cl.getGraphQLResolvers());
         }
       }
     }
+    */
 
-    // this.l.h3().info('schemas   : ', servercfgstrings.schemas);
-    // this.l.h3().info('resolvers : ', servercfgstrings.resolvers);
+    // this.l.info('init server, ', options);
+    /*
+    if ( options.external == true ) {
+      this.l.h3().info('schemas   : ', servercfgstrings.schemas);
+      this.l.h3().info('resolvers : ', servercfgstrings.resolvers);
+    }
+    */
     // resolvers = requireFromString(resolvers);
     // resolvers = Object.assign(resolvers, _resolveradditions);
     // this.l.h3().info('buildGraphQLServer_Resolvers');
@@ -295,6 +333,7 @@ module.exports = class WovStateLayer {
 
     // if ( _name == 'pub' ) this.l.h3().info('Pub Resolvers : ', resolvercode);
 
+    // this.l.info('start apolo server with ', _name);
     // Start GraphQL server for the Remote Server
     // NOTE: creates a schema text file, and a resolver code object
     this._rs[_name] = new ApolloServer({
@@ -313,14 +352,18 @@ module.exports = class WovStateLayer {
         };
         return retval;
       },
-      dataSources : () => ({statelayer : this}),  // (State Layer)
+      dataSources : () => (Object.assign({}, {statelayer : this}, options.additionalDataSources)),  // (State Layer)
       formatError : function(error) {
         Logger.g().error(JSON.stringify(error, null, 2));
         return error;
       },
       formatResponse : (_response, {context}) => {
         // Logger.g().info('response:', _response);
+        // Logger.g().info('context:', context); // JSON.stringify(context, null, 2));
         Logger.g().aspect('listener.incoming', `Handled  : '${context.originalUrl}' with prot GraphQL: '${context.args.query}'`);
+        Logger.g().aspect('listener.incoming', `    args : {\n`,
+          Object.keys(context.args).map((k)=>{ if ( k != 'query' ) return `${k} : ${JSON.stringify(context.args[k], null, 2)},`; }), '}\n');
+
         Logger.g().aspect('listener.result', `Response: `, JSON.stringify(_response, null, 2));
         // let retval = _response.flatten(true, false, false, true);
         // return retval;
@@ -328,9 +371,9 @@ module.exports = class WovStateLayer {
       },
     });
 
-    this.l.info('_listener root : ', _listener.root);
+    // this.l.info('_listener root : ', _listener.root);
     this._rs[_name].applyMiddleware({app : _listener.app, path : `${_listener.root}/${_name}${_endpoint_ext}`});
-    this.l.info(`... loaded StateLayer '${_name}' server as GraphQL at route: '${this._rs[_name].graphqlPath}'`);
+    // this.l.info(`... loaded StateLayer '${_name}' server as GraphQL at route: '${this._rs[_name].graphqlPath}'`);
   }
 
 
@@ -377,7 +420,6 @@ type Mutation {
   # ---------------------------------------------------------------------
   # Query Input Types
   # ---------------------------------------------------------------------
-  # input IDs { ids : [ID!] }
   ${_schemastrings.query_t}
   `;
     }
@@ -387,7 +429,8 @@ type Mutation {
   # ---------------------------------------------------------------------
   # Schemas
   # ---------------------------------------------------------------------
-  type deletedID  { id : ID }
+  type deletedID   { id : ID }         # internal id
+  type deletedXID  { xid : String }    # external id (xid, as a uuid)
   ${_schemastrings.schemas}
 
   `;

@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 const uuidv4         = require('uuid/v4');
 const CryptoJS       = require('crypto-js'); // library with convenient syntax
+const crypto         = require('crypto');    // part of nodejs
+
 
 const Service        = require('./index');
 
@@ -78,6 +80,15 @@ module.exports = {
    * @return {string} -
    */
   generateToken() { return uuidv4(); },
+
+
+  /**
+   * Used to generate tokens. Uses upperalpha/number chars.
+   *
+   * @param {int} _length - defaults to 20 if empty
+   * @return {string} - random length string
+   */
+  generateRandomString(_length = 20) { return crypto.randomBytes(_length).toString('hex'); },
 
 
   /**

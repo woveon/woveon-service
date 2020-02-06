@@ -8,10 +8,10 @@
  */
 
 const autoBind       = require('auto-bind-inheritance');
-const CryptoJS       = require('crypto-js'); // library with convenient syntax
-const crypto         = require('crypto');    // part of nodejs
+// const CryptoJS       = require('crypto-js'); // library with convenient syntax
+// const crypto         = require('crypto');    // part of nodejs
 const Logger         = require('woveon-logger');
-const uuidv4         = require('uuid/v4');
+// const uuidv4         = require('uuid/v4');
 
 const Listener         = require('./listener');
 const Requester        = require('./requester');
@@ -245,10 +245,12 @@ module.exports = class Service {
    *
    * @return {string} -
    */
+  /*
   static generateToken() {
     Logger.g().logDeprecated('generateToken should be called on WovUtil');
     return uuidv4();
   }
+  */
 
 
   /**
@@ -257,10 +259,12 @@ module.exports = class Service {
    * @param {integer} length - defaults to 20 if empty
    * @return {string} - random length string
    */
+  /*
   static generateRandomString(length = 20) {
     Logger.g().logDeprecated('generateRandomString should be called on WovUtil');
     return crypto.randomBytes(length).toString('hex');
   };
+  */
 
 
   /**
@@ -269,6 +273,7 @@ module.exports = class Service {
    * @param {integer} length - number of bytes in string returned
    * @return {string} -
    */
+  /*
   static generateOrderedString(length = 20) {
     Logger.g().logDeprecated('generateOrderedString should be called on WovUtil');
     if ( Service.GOS_last === undefined ) Service.GOS_last = -1;
@@ -282,6 +287,7 @@ module.exports = class Service {
     }
     return retval;
   }
+  */
 
 
   /**
@@ -289,10 +295,12 @@ module.exports = class Service {
    *
    * @return {undefined} -
    */
+  /*
   static orderedStringReset() {
     Logger.g().logDeprecated('orderedStringReset should be called on WovUtil');
     Service.GOS_last = -1;
   }
+  */
 
 
   /**
@@ -302,12 +310,14 @@ module.exports = class Service {
    * @param {*} _secret - Content string to encrypt
    * @return {string} - _secret decrypted to UTF8 string
    */
+  /*
   static decrypt(_saltedkey, _secret) {
     Logger.g().logDeprecated('decrypt should be called on WovUtil');
     let decryptedBytes = CryptoJS.AES.decrypt(_secret, _saltedkey);
     let plaintext = decryptedBytes.toString(CryptoJS.enc.Utf8);
     return JSON.parse(plaintext);
   }
+  */
 
 
   /**
@@ -317,6 +327,7 @@ module.exports = class Service {
    * @param {*} _secret - Thing to encrypt. UTF8, bytes, etc. JSON.stringify don't care.
    * @return {object} - call toString() on the object to get the string
    */
+  /*
   static encrypt(_saltedkey, _secret) {
     Logger.g().logDeprecated('encrypt should be called on WovUtil');
     let retval = null;
@@ -327,6 +338,7 @@ module.exports = class Service {
     catch (e) { console.log(e); throw new Error('Failed to encrypt.'); }
     return retval;
   }
+*/
 
 };
 

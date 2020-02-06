@@ -184,14 +184,16 @@ module.exports = class Requester {
   /**
    * RESTFUL Get.
    *
-   * @param {*} url -
-   * @param {*} headers -
+   * @param {*} _url -
+   * @param {*} _headers -
+   * param {*} _body - NOT USED - node-fetch follows HTTP spec, not RESTFUL API,so no body
    * @param {*} _rawresult - should this retunull, null, rn the data or the result object
    * @return {Promise} -
    */
-  async get(url, headers, _rawresult = false) {
+  async get(_url, _headers, _rawresult = false) {
     // let fullurl = (this._baseurl ? this._baseurl+url: url);
-    return this.request(url, 'get', headers, null, _rawresult);
+    // this.logger.info('requester get ', _url);
+    return this.request(_url, 'get', _headers, null, _rawresult);
   }
 
 

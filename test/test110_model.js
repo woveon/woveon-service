@@ -244,7 +244,6 @@ describe(`> ${mtag}: Generic Model Tests`, async function() {
 
     it(`> _deXIDRefs : ${__fileloc}`, async function() {
 
-
       let tmxid1  = await TMS.TestModelXID1.createOne(dxid1);
       // logger.info('tmxid1: ', tmxid1.get());
       let tmxid2a = await TMS.TestModelXID2.createOne(dxid2);
@@ -254,6 +253,7 @@ describe(`> ${mtag}: Generic Model Tests`, async function() {
       let tmxid2b = await TMS.TestModelXID2.createOne(dxid3);
       // logger.info('tmxid2b: ', tmxid2b.get());
 
+      expect(tmxid2a.get('_testmodelxid1_ref')).to.equal(tmxid1.get('id'));
       expect(tmxid2a.get('id')).to.not.equal(tmxid2b.get('id'));
       expect(tmxid2a.get('xid')).to.not.equal(tmxid2b.get('xid'));
       expect(tmxid2a.get('_testmodelxid1_ref')).to.equal(tmxid2b.get('_testmodelxid1_ref'));

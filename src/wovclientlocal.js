@@ -10,7 +10,7 @@
  * @typedef integer
  */
 
-// const Logger    = require('woveon-logger');
+const Logger    = require('woveon-logger');
 const WovReturn = require('./wovreturn');
 const entity    = require('./entity');
 // const {ApolloServer}    = require('apollo-server-express');
@@ -90,7 +90,7 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
         let m = models[i];
         // this.l.info(`model ${m.name}: isInited? ${m.isInited()}.`);
         if ( m.isInited() ) {
-          // this.l.info('WovClientLocal initDB for model : ', m.name);
+          // this.l.info('WovClientLocal initDB for model : ', m.name, _doDrop, _doTable, _doView, models[i]);
           // let result = await models[k].doInitDB(_doDrop, _doTable, _doView);
           let result = await this.doInitDB(_doDrop, _doTable, _doView, models[i]);
           if ( result instanceof WovReturn ) {
@@ -141,6 +141,7 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
     for (let k in models ) {
       if ( models.hasOwnProperty(k) ) {
         let m = models[k];
+        // this.l.info('getGraphQLResolvers on model: ', m.name);
         let s = m.getGraphQLResolver();
         retval.queryjs    += s.queryjs;
         retval.mutationjs += s.mutationjs;
@@ -376,14 +377,19 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
   /**
    * Creates it in the database, then creates and returns the model.
    *
-   * @param {object} _data           -
+   * @param {object} _data          -
+   * @param {User} _user            - unused here, but used for security checks
    * @param {WovModel.class} _Model - the class to create an object from
    * @return {WovModel|WovReturn<Error>} - returns the newly created object.
    */
-  async createOne(_data, _Model) {
+  async createOne(_data, _user, _Model) {
     let retval = null;
     let Mod = _Model;
     let derefed = null;
+
+    if ( _Model == null ) throw Error('No model passed to WovClientLocal.createOne');
+
+    // TODO: remove id and xid from _data!!!
 
     // veryify data in
     if ( ! (_data instanceof Object) ) {
@@ -409,10 +415,12 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
       // this.l.info('createOne with model ', Mod.name);
       this.l.aspect('ws.createOne', `  - buildQueryParmas with: `, derefed);
       let qp = this._buildQueryParams(derefed, derefed, 'insert', Mod);
-      this.l.aspect('ws.createOne', `  - createOne qp : `, qp);
+      // this.l.aspect('ws.createOne', `  - createOne qp : `, qp);
       let q = `INSERT INTO ${Mod.tablename} (${qp.colnames.join(', ')})
                VALUES (${qp.cols.join(', ')})
                RETURNING *`;
+
+      this.l.aspect('ws.createOne', `  - createOne: `, q, qp.data);
 
       let result = await this._runSingularQuery(q, qp.data, `createOne${Mod.name}`).catch(function(e) { return e; });
       if ( result == null ) retval = WovReturn.retError(_data, `Failed to create ${Mod.name}'.`);
@@ -492,14 +500,39 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
    * @param {WovModel.class} _Model - the class to create an object from
    * @return {object} - data
    */
-  async updateOne(_id, _data, _Model) {
+  async updateOne(_id, _data, _Model)     { return this._updateOne('id', _id, 'integer', _data, _Model); }
+
+  /**
+   * Writes back to the DB. Unlike save, this does not require a model.
+   *
+   * @param {integer} _xid -
+   * @param {object} _data - data to update on the model
+   * @param {WovModel.class} _Model - the class to create an object from
+   * @return {object} - data
+   */
+  async updateOneXID(_xid, _data, _Model) { return this._updateOne('xid', _xid, 'uuid', _data, _Model); }
+
+  /**
+   * Internal function to write back to the DB. Unlike save, this does not require a model.
+   *
+   * @param {string} _key - string name of hte key
+   * @param {*} _val - value of the key
+   * @param {*} _val_t - type of the value of the key
+   * @param {object} _data - data to update on the model
+   * @param {WovModel.class} _Model - the class to create an object from
+   * @return {object} - data
+   */
+  async _updateOne(_key, _val, _val_t, _data, _Model) {
     // this.l.throwError(`Need to implement 'updateOne' for ${_Model.name}.`);
+    // Logger.g().info('_updateOne : ', _key, _val, _val_t, _data, _Model.constructor.name);
     let qp = this._buildQueryParams(_data, _data, 'update', _Model);
-    // Logger.g().info('updateOne: ', qp);
     let q = `UPDATE ${_Model.tablename}
                SET ${qp.cols.join(', ')}
-               WHERE id = ${_id}
+               WHERE ${_key}=\$${qp.data.length+1}::${_val_t}
                RETURNING *`;
+    qp.data.push(_val);
+    // Logger.g().info('updateOne q: ', q, qp);
+
     return await this._runSingularQuery(q, qp.data, `updateOne${_Model.name}`)
       .then(function(r, r2) {
         if ( r == null ) return new Error(`WovClientLocal::updateOne(${_id}, ${JSON.stringify(_data)}, ${_Model.name}) : model of id not found`);
@@ -520,7 +553,22 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
   async deleteByID(_id, _Model) {
     let q = `DELETE FROM ${_Model.tablename} WHERE id=$1::integer RETURNING id`;
     let d = [_id];
+    // Logger.g().info('client deleteByID: ', _id);
     return this._runSingularQuery(q, d, `deleteByID${_Model.name}`);
+  }
+
+  /**
+   * Deletes a row form the table that is the data of the model object.
+   *
+   * @param {string} _xid -
+   * @param {WovModel.class} _Model - the model class
+   * @return {Promise} - ?returns I think the number of rows deleted?
+   */
+  async deleteByXID(_xid, _Model) {
+    let q = `DELETE FROM ${_Model.tablename} WHERE xid=$1::uuid RETURNING xid`;
+    let d = [_xid];
+    // Logger.g().info('client deleteByXID: ', _xid);
+    return this._runSingularQuery(q, d, `deleteByXID${_Model.name}`);
   }
 
 
@@ -607,8 +655,9 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
       // console.log('getByXID : ', this.name, this.tablename, _xid);
       let q = `SELECT * FROM wsv_${_Model.tablename} WHERE xid=$1::uuid`;
       let d = [_xid];
+      // this.l.info('getByXID: ', _Model.tablename, _xid, q, d);
       let result = await this._runSingularQuery(q, d, `${_Model.name}.getByXID`);
-      // console.log('result is ', result);
+      // this.l.info('result is ', result);
       if ( result != null && !(result instanceof Error) ) { retval = new _Model(result); }
     }
 
@@ -743,20 +792,30 @@ module.exports = class WovClientLocal extends entity.WovClientEntity {
 
 
     // Create tables so that _model_t is only in tables with inheritance. Create the views to fill in model_t.
+    let q2plus='';
+    let q2pluspost='';
+    let q3plus='';
     if ( parent.name == 'WovModel' ) {
       if ( _Model._haschildren == false ) {
-        q2 = `CREATE TABLE IF NOT EXISTS "${_Model.tablename}" ( id SERIAL PRIMARY KEY, ${cols.join(', ')} )`;
-        q3 = `CREATE VIEW "wsv_${_Model.tablename}" AS SELECT *, text '${_Model.name}' as _model_t FROM "${_Model.tablename}"`;
+        // q2 = `CREATE TABLE IF NOT EXISTS "${_Model.tablename}" ( id SERIAL PRIMARY KEY, ${cols.join(', ')} )`;
+        // q3 = `CREATE VIEW "wsv_${_Model.tablename}" AS SELECT *, text '${_Model.name}' as _model_t FROM "${_Model.tablename}"`;
+        q2plus=`id SERIAL PRIMARY KEY`;
+        q3plus=`, text '${_Model.name}' as _model_t`;
       }
       else {
-        q2 = `CREATE TABLE IF NOT EXISTS "${_Model.tablename}" ( id SERIAL PRIMARY KEY, _model_t varchar default '${_Model.name}', ${cols.join(', ')} )`;
-        q3 = `CREATE VIEW "wsv_${_Model.tablename}" AS SELECT * FROM "${_Model.tablename}"`;
+        q2plus=`id SERIAL PRIMARY KEY, _model_t varchar default '${_Model.name}'`;
+        // q2 = `CREATE TABLE IF NOT EXISTS "${_Model.tablename}" ( id SERIAL PRIMARY KEY, _model_t varchar default '${_Model.name}', ${cols.join(', ')} )`;
+        // q3 = `CREATE VIEW "wsv_${_Model.tablename}" AS SELECT * FROM "${_Model.tablename}"`;
       }
     }
     else  {
-      q2 = `CREATE TABLE IF NOT EXISTS ${_Model.tablename} ( _model_t varchar default '${_Model.name}', ${cols.join(', ')} ) INHERITS ( "${parent.tablename}" )`;
-      q3 = `CREATE VIEW "wsv_${_Model.tablename}" AS SELECT * FROM "${_Model.tablename}"`;
+      q2plus=`_model_t varchar default '${_Model.name}'`;
+      q2pluspost=`INHERITS ( "${parent.tablename}" )`;
+      // q2 = `CREATE TABLE IF NOT EXISTS ${_Model.tablename} ( _model_t varchar default '${_Model.name}', ${cols.join(', ')} ) INHERITS ( "${parent.tablename}" )`;
+      // q3 = `CREATE VIEW "wsv_${_Model.tablename}" AS SELECT * FROM "${_Model.tablename}"`;
     }
+    q2 = `CREATE TABLE IF NOT EXISTS "${_Model.tablename}" ( ${([].concat([q2plus], cols)).join(', ')} ) ${q2pluspost}`;
+    q3 = `CREATE VIEW "wsv_${_Model.tablename}" AS SELECT * ${q3plus} FROM "${_Model.tablename}"`;
 
     this.l.aspect('ms.WovModel_doCreateTableQuery', `q1(${_doDrop}): `,  q1);
     this.l.aspect('ms.WovModel_doCreateTableQuery', `q2(${_doTable}): `, q2);
@@ -957,7 +1016,6 @@ ${genschemadata.queries}
 ${customschema.queries}
 }
 
-  
 # ---------------------------------------------------------------------
 # Mutation Definitions
 # ---------------------------------------------------------------------
@@ -974,7 +1032,6 @@ ${customschema.mutations}
 ${genschemadata.query_t}
 ${customschema.query_t}
 
-  
 # ---------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------
@@ -990,23 +1047,23 @@ ${customschema.schemas}
     let gqlresolversdata = this.getGraphQLResolvers();
     let gqlresolvers = `
 
-// --------------------------------------------------------------------- 
+// ---------------------------------------------------------------------
 // Query Implementations
-// --------------------------------------------------------------------- 
+// ---------------------------------------------------------------------
 const Query = {
 ${gqlresolversdata.queryjs}
 };
 
-// --------------------------------------------------------------------- 
+// ---------------------------------------------------------------------
 // Mutation Implementations
-// --------------------------------------------------------------------- 
+// ---------------------------------------------------------------------
 const Mutation = {
 ${gqlresolversdata.mutationjs}
 };
 
-// --------------------------------------------------------------------- 
+// ---------------------------------------------------------------------
 // Model Implementations
-// --------------------------------------------------------------------- 
+// ---------------------------------------------------------------------
 ${gqlresolversdata.modeljs}
 
 module.exports = {Query, Mutation, ${gqlresolversdata.exportsjs}}

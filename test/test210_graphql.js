@@ -315,7 +315,8 @@ describe(`> ${mtag}: `, async function() {
     expect(rcar2.get()).to.deep.equal(rcar3[1].get());
 
 
-    logger.h2('test210').aspect('test210', '// delete car 2/3 : deleteByID');
+    logger.h2('test210').aspect('test210', '// delete car 2/3 : rsl.Car.deleteByID(', rcar2.get('id'), ')');
+    // logger.aspect('test210', '// Car', Object.getOwnPropertyNames(Object.getPrototypeOf(rsl.Car)));
     result = await rsl.Car.deleteByID(rcar2.get('id'));
     // logger.info('deleteOne rcar2 result : ', JSON.stringify(result, null, 2));
     expect(result.success).to.be.true;

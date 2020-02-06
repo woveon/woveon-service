@@ -36,13 +36,13 @@ module.exports = function() {
    * XID testing
    */
   const TestModelXID1 = class TestModelXID1 extends Service.WovModel { static tablename = 'testmodelxid1'; };
-  TestModelXID1.setSchema({schema : {xid : 'text', title : 'text'}});
+  TestModelXID1.setSchema({schema : {xid : 'uuid', title : 'text'}});
 
   /**
    * XID ref testing
    */
   const TestModelXID2 = class TestModelXID2 extends Service.WovModel { static tablename = 'testmodelxid2'; };
-  TestModelXID2.setSchema({schema : {xid : 'text', _testmodelxid1_ref : 'integer'}});
+  TestModelXID2.setSchema({schema : {xid : 'uuid', _testmodelxid1_ref : 'integer'}});
 
   // ---------------------------------------------------------------------
   // Model with one-to-many-AssModelP

@@ -58,15 +58,17 @@ class WovModelEntity {
    * @param {object} _data -
    * @return {WovModel|WovReturn<Error>} - returns the newly created object.
    */
-  static async createOne(_data, _nothing) {
+  static async createOne(_data, _user) {
+    /*
     if ( _nothing !== undefined ) {
       throw Error(`in '${this.name}': was called with multiple values, which should have only been one object: _data`);
     }
+    */
     if ( this.cl == null ) {
       throw Error(`in '${this.name}': Model has no client for 'createOne' call. `+
                   `Make sure a WovClientX has been created with this model passed in.`);
     }
-    return this.cl.createOne(_data, this);
+    return this.cl.createOne(_data, _user, this);
   }
 
   /**
@@ -84,6 +86,21 @@ class WovModelEntity {
     return this.cl.updateOne(_id, _data, this);
   }
 
+  /**
+   * Writes back to the DB. Unlike save, this does not require a model.
+   *
+   * @param {integer} _xid -
+   * @param {object} _data - data to update on the model
+   * @return {?} -
+   */
+  static async updateOneXID(_xid, _data) {
+    if ( this.cl == null ) {
+      throw Error(`in ${this.name}: Model has no client for 'updateOneXID' call. `+
+                  `Make sure a WovClientX has been created with this model passed in.`);
+    }
+    return this.cl.updateOneXID(_xid, _data, this);
+  }
+
 
   /**
    * Deletes a row form the table that is the data of the model object.
@@ -97,6 +114,21 @@ class WovModelEntity {
                   `Make sure a WovClientX has been created with this model passed in.`);
     }
     return this.cl.deleteByID(_id, this);
+  }
+
+  /**
+   * Deletes a row form the table that is the data of the model object.
+   *
+   * @param {string} _xid -
+   * @return {Promise} - returns {xid : X} where X is id of the deleted model
+   */
+  static async deleteByXID(_xid) {
+    if ( this.cl == null ) {
+      throw Error(`in ${this.name}: Model has no client for 'deleteByXID' call. `+
+                  `Make sure a WovClientX has been created with this model passed in.`);
+    }
+    this.l.info('entity.deleteByXID', _xid);
+    return this.cl.deleteByXID(_xid, this);
   }
 
 
@@ -302,30 +334,40 @@ function getBlankServerConfig_Resolvers() {
 /**
  * Merges contents of _from, into _into.
  *
- * @param {object} _into - appends strings of _from, into this
- * @param {object} _from - copies strings from
+ * @param {Array<object>} _from - copies strings from array of these
  * @return {undefined} -
  */
-function mergeServerConfigStrings_Schemas(_into, _from) {
-  _into.queries   += `\n${_from.queries}`;
-  _into.mutations += `\n${_from.mutations}`;
-  _into.query_t   += `\n${_from.query_t}`;
-  _into.schemas   += `\n${_from.schemas}`;
+function mergeServerConfigStrings_Schemas(_from) {
+  let retval = getBlankServerConfig_Schemas();
+
+  _from.map( (_f)=> {
+    retval.queries   += `\n${_f.queries}`;
+    retval.mutations += `\n${_f.mutations}`;
+    retval.query_t   += `\n${_f.query_t}`;
+    retval.schemas   += `\n${_f.schemas}`;
+  });
+
+  return retval;
 }
 
 
 /**
  * Merges contents of _from, into _into.
  *
- * @param {object} _into - appends strings of _from, into this
- * @param {object} _from - copies strings from
+ * @param {Array<object>} _from - copies strings from
  * @return {undefined} -
  */
-function mergeServerConfigStrings_Resolvers(_into, _from) {
-  _into.queryjs    += `\n${_from.queryjs}`;
-  _into.mutationjs += `\n${_from.mutationjs}`;
-  _into.modeljs    += `\n${_from.modeljs}`;
-  _into.exportsjs  += `\n${_from.exportsjs}`;
+function mergeServerConfigStrings_Resolvers(_from) {
+  let retval = getBlankServerConfig_Resolvers();
+
+  _from.map( (_f)=> {
+    retval.queryjs    += `\n${_f.queryjs}`;
+    retval.mutationjs += `\n${_f.mutationjs}`;
+    retval.modeljs    += `\n${_f.modeljs}`;
+    retval.exportsjs  += `\n${_f.exportsjs}`;
+  });
+
+  return retval;
 }
 
 

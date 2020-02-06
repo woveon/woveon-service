@@ -173,11 +173,12 @@ module.exports = class WovClientRemote extends entity.WovClientEntity {
    * Creates from data.
    *
    * @param {object} _data -
+   * @param {object} _user - unused here, but can be overridden for use in security checks
    * @param {WovModel} _Model - the Model class
    * @param {string|null} _fields - space sparates string of fields to return. null returns all known to model.
    * @return {WovModel|Error} -
    **/
-  async createOne(_data, _Model, _fields) {
+  async createOne(_data, _user, _Model, _fields) {
     let retval = null;
     let fields = _fields || _Model.getAllGraphQLFields();
     let qq = `create${_Model.name}`;
@@ -252,9 +253,9 @@ module.exports = class WovClientRemote extends entity.WovClientEntity {
              `  ${qq}(_id : $_id) { id }\n`+
              `}\n`;  // TODO : cache this
 
-    // this.l.info('deleteByID call : ', q);
+    this.l.info('deleteByID call : ', q);
     let result = await this.msr.post('/graphql', null, {query : q, variables : {_id : _id}});
-    // this.l.info('deleteByID result: ', JSON.stringify(result, null, 2));
+    this.l.info('deleteByID result: ', JSON.stringify(result, null, 2));
 
     retval = result;
     /*

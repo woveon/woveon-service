@@ -306,6 +306,7 @@ module.exports = class Listener {
    * @param {object} _options - further instructions to this handler
    */
   async responseHandler(_route, _method, _paramDefs, _mfilename, _args, _res, _options = {}) {
+    // this.logger.info(`responseHandler ${_route}`);
     this.logger.verbose(`...listener heard route: ${_route}`);
     let fn = this.logger.trimpath(_mfilename, this.logger.options.trimTo); // _mfilename.split(this.logger.options.trimTo+'/')[1] || _mfilename;
     this.logger.aspect('listener.incomingfull', `Handling : '${_route}' with: '${fn}::${_method.name}' :`, _args);
@@ -413,9 +414,11 @@ module.exports = class Listener {
    *       so the leaf method can lookup and see if user can access that widget.
    *
    * NOTE: vals stored in _req.wov.
-   * @param {url} _route -
-   * @param {function} _methodOrDocMethod - method to call or DocMethod
+   *
+   * @param {string} _route -
+   * @param {Function} _methodOrDocMethod - method to call or DocMethod
    * @param {string} _mfilename - method's file
+   * @return {undefined} -
    */
   async onProtect(_route, _methodOrDocMethod, _mfilename) {
     let result = this.onXCommon('protect', _route, _methodOrDocMethod, _mfilename);
@@ -423,11 +426,19 @@ module.exports = class Listener {
     if ( result.docmethod.params == null ) this.logger.throwError('onProtect has no params');
     if ( result.docmethod.paramspost == null ) this.logger.throwError('onProtect has no paramspost');
 
-    // add middlewear on the route
+    // add middleware on the route
     this.app.use(result.fullroute, async function(_req, _res, next) {
       let args = Object.assign({}, _req.query, _req.params, _req.body, _req.files, _req.wov);
+      // this.logger.info('thereq: ', _req);
+      // this.logger.info('args ', args);
+      // this.logger.info('result', result);
+      // this.logger.info('result.fullroute', result.fullroute);
+      // this.logger.info('_route ', _route);
+      // this.logger.info('_req: baseUrl ', _req.baseUrl);
+      // this.logger.info('_req: originalUrl ', _req.originalUrl);
+      // this.logger.info('_req: _parsedUrl ', _req._parsedUrl);
 
-      this.logger.aspect('listener.protect', `Protecting : '${_route}' with: '${JSON.stringify(args, null, 2)}'`);
+      this.logger.aspect('listener.protect', `Protecting : '${_route}':'${result.fullroute}' with: '${JSON.stringify(args, null, 2)}'`);
 
       // check that required attributes exist
       let retval = WovReturn.checkProperties(args, result.docmethod.params, null, {retRawError : true, checkStrict : false});
